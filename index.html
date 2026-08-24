@@ -1753,6 +1753,31 @@
     return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
   }
 
+  function playTimerEndSound(){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const beep = (freq, startTime, duration)=>{
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.35, startTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration + 0.02);
+      };
+      const now = ctx.currentTime;
+      beep(880, now, 0.16);
+      beep(880, now + 0.22, 0.16);
+      beep(1175, now + 0.44, 0.3);
+    }catch(err){
+      console.error('Não foi possível tocar o som do cronômetro', err);
+    }
+  }
+
   function startRestTimer(exerciseId, seconds){
     const box = document.getElementById('fr-ex-timer-box-'+exerciseId);
     if(!box) return;
@@ -1765,6 +1790,7 @@
       if(remaining <= 0){
         clearInterval(interval);
         box.innerHTML = `<div class="fr-timer-box"><div class="fr-timer-num" style="color:var(--rust)">Descanso concluído!</div></div>`;
+        playTimerEndSound();
         return;
       }
       numEl.textContent = formatTimer(remaining);
