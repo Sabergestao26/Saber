@@ -2023,9 +2023,30 @@
       <button class="fr-btn-primary" id="fr-wkex-add" style="width:100%;margin-bottom:16px;">${PLUS_SVG} Adicionar exercício</button>
       <div id="fr-wkex-list"><div class="fr-loading">Carregando...</div></div>
       <button class="fr-btn-ghost" id="fr-wkex-done" style="width:100%;margin-top:14px;">Concluir</button>
+      <div id="fr-wkex-delete-area" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+        <button class="fr-btn-danger" id="fr-wkex-delete-workout" style="width:100%;">Excluir este treino inteiro</button>
+      </div>
     `);
     overlay.querySelector('#fr-wkex-done').addEventListener('click', ()=>{ closeOverlay(); loadWorkouts(); });
     overlay.querySelector('#fr-wkex-add').addEventListener('click', ()=> openExerciseFormModal(workoutId, workoutName, null));
+    overlay.querySelector('#fr-wkex-delete-workout').addEventListener('click', function(){
+      const area = overlay.querySelector('#fr-wkex-delete-area');
+      area.innerHTML = `
+        <div class="fr-confirm-row">
+          <span class="fr-confirm-text">Excluir "${esc(workoutName)}" e todos os exercícios dele? Não pode ser desfeito.</span>
+          <button class="fr-btn-ghost" id="fr-wkex-cancel-delete">Cancelar</button>
+          <button class="fr-btn-danger" id="fr-wkex-confirm-delete">Confirmar exclusão</button>
+        </div>`;
+      area.querySelector('#fr-wkex-cancel-delete').addEventListener('click', ()=>{ closeOverlay(); openWorkoutExerciseManager(workoutId, workoutName); });
+      area.querySelector('#fr-wkex-confirm-delete').addEventListener('click', async function(){
+        const btn = this; btn.disabled = true; btn.textContent = 'Excluindo...';
+        const { error } = await sb.from('workouts').delete().eq('id', workoutId);
+        if(error){ showToast('Não foi possível excluir. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Confirmar exclusão'; return; }
+        showToast('Treino excluído.', 'ok');
+        closeOverlay();
+        loadWorkouts();
+      });
+    });
 
     const { data, error } = await sb.from('workout_exercises').select('*').eq('workout_id', workoutId).order('position');
     const listEl = overlay.querySelector('#fr-wkex-list');
