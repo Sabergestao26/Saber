@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script>
+  (function(){
+    try{
+      var pref = localStorage.getItem('saber_theme') || 'auto';
+      var isDark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if(isDark) document.documentElement.setAttribute('data-theme', 'dark');
+    }catch(e){}
+  })();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Saber</title>
@@ -24,10 +33,12 @@
     --paper: #E7DFC7;
     --paper-deep: #DCD1AE;
     --card: #FFFCF3;
+    --surface: var(--surface);
     --ink: #262B1E;
     --ink-soft: #6B6A57;
     --green: #3F6B4A;
     --green-deep: #2E4F37;
+    --green-deep-hover: #264030;
     --mustard: #BF8A2E;
     --plum: #5B3A52;
     --blue: #46687A;
@@ -35,6 +46,29 @@
     --border: rgba(38,43,30,0.14);
     --shadow: 0 3px 10px rgba(38,43,30,0.10);
     --radius: 10px;
+    --err-bg: var(--err-bg);
+    --ok-bg: var(--ok-bg);
+    --note-bg: var(--note-bg);
+  }
+  html[data-theme="dark"]{
+    --paper: #1B1E15;
+    --paper-deep: #262A1E;
+    --card: #23271C;
+    --surface: #262B1E;
+    --ink: #EDE6D3;
+    --ink-soft: #A8A38C;
+    --green: #6FA37D;
+    --green-deep: #4A7C58;
+    --green-deep-hover: #5E9169;
+    --mustard: #D9A64C;
+    --plum: #A784A0;
+    --blue: #82A9BE;
+    --rust: #DE7B4A;
+    --border: rgba(237,230,211,0.16);
+    --shadow: 0 3px 12px rgba(0,0,0,0.4);
+    --err-bg: #3A2320;
+    --ok-bg: #1E3327;
+    --note-bg: #3A311A;
   }
   *{box-sizing:border-box;}
   html,body{ margin:0; padding:0; }
@@ -66,8 +100,8 @@
   .auth-message{
     font-size:13px; padding:9px 12px; border-radius:7px; margin-bottom:12px;
   }
-  .auth-message.err{ background:#FBEAE3; color:var(--rust); border:1px solid var(--rust); }
-  .auth-message.ok{ background:#EAF2EC; color:var(--green-deep); border:1px solid var(--green-deep); }
+  .auth-message.err{ background:var(--err-bg); color:var(--rust); border:1px solid var(--rust); }
+  .auth-message.ok{ background:var(--ok-bg); color:var(--green-deep); border:1px solid var(--green-deep); }
 
   /* ---------- User bar ---------- */
   .fr-user-bar{
@@ -96,13 +130,13 @@
   .fr-code-label{ font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:#C9D9CD; margin-bottom:6px; }
   .fr-code-val{ font-family:'Fraunces',serif; font-weight:700; font-size:26px; letter-spacing:.1em; color:#F6F1DF; }
   .fr-linked-card{
-    background:#FFFEFA; border:1px solid var(--border); border-radius:9px; padding:12px 14px;
+    background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:12px 14px;
     display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px;
   }
   .fr-linked-name{ font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; }
   .fr-linked-role{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); }
   .fr-client-row{
-    background:#FFFEFA; border:1px solid var(--border); border-radius:9px; padding:12px 14px; margin-bottom:8px;
+    background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:12px 14px; margin-bottom:8px;
     display:flex; justify-content:space-between; align-items:center; cursor:pointer;
   }
   .fr-client-row:hover{ background:var(--paper-deep); }
@@ -115,8 +149,9 @@
     color:var(--green-deep); margin:0 0 10px; border-top:1px solid var(--border); padding-top:16px;
   }
   .fr-settings-section:first-child h4{ border-top:none; padding-top:0; }
+  .fr-settings-wrap{ max-width:640px; margin:0 auto; }
 
-  .fr-suggestion{ background:#FFFEFA; border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+  .fr-suggestion{ background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
   .fr-suggestion-head{ margin-bottom:5px; }
   .fr-suggestion-name{ font-family:'Fraunces',serif; font-weight:600; font-size:14.5px; }
   .fr-suggestion-macros{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-soft); margin-bottom:10px; }
@@ -124,7 +159,7 @@
 
   .fr-ing-row{ display:grid; grid-template-columns: 62px 96px 1fr 28px; gap:6px; margin-bottom:8px; align-items:center; }
   .fr-ing-row input, .fr-ing-row select{
-    padding:7px 8px; font-size:12.5px; border:1px solid var(--border); border-radius:6px; background:#FFFEFA;
+    padding:7px 8px; font-size:12.5px; border:1px solid var(--border); border-radius:6px; background:var(--surface);
     font-family:'Inter',sans-serif; color:var(--ink); width:100%;
   }
   .fr-ing-remove{ background:none; border:none; color:var(--ink-soft); font-size:18px; cursor:pointer; line-height:1; }
@@ -137,7 +172,7 @@
   .fr-shop-row-name{ font-size:13.5px; display:flex; align-items:center; gap:8px; }
   .fr-shop-row-name small{ color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; font-size:10px; }
   .fr-shop-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
-  .fr-shop-qty-input{ width:56px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-family:'IBM Plex Mono',monospace; text-align:center; background:#FFFEFA; }
+  .fr-shop-qty-input{ width:56px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-family:'IBM Plex Mono',monospace; text-align:center; background:var(--surface); }
   .fr-shop-list{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 16px; box-shadow:var(--shadow); }
   .fr-shop-item{ display:flex; justify-content:space-between; font-size:14px; padding:6px 0; border-bottom:1px dashed var(--border); }
   .fr-shop-item:last-child{ border-bottom:none; }
@@ -153,7 +188,7 @@
   .fr-chip-video{ background:var(--paper-deep); color:var(--ink); }
   .fr-chip-timer{ background:var(--mustard); color:#fff; }
   .fr-chip-upload{ background:none; color:var(--green-deep); border:1px solid var(--green-deep); }
-  .fr-timer-box{ background:#FFFEFA; border:1px solid var(--border); border-radius:10px; padding:16px; text-align:center; margin-top:10px; }
+  .fr-timer-box{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:center; margin-top:10px; }
   .fr-timer-num{ font-family:'Fraunces',serif; font-weight:700; font-size:32px; color:var(--green-deep); }
   .fr-timer-label{ font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); }
   .fr-timer-controls{ display:flex; gap:8px; justify-content:center; margin-top:10px; }
@@ -164,7 +199,7 @@
   .fr-timer-btn:hover{ background:var(--card); }
 
   .fr-session-hist-row{
-    display:flex; justify-content:space-between; align-items:center; background:#FFFEFA;
+    display:flex; justify-content:space-between; align-items:center; background:var(--surface);
     border:1px solid var(--border); border-radius:7px; padding:9px 12px; margin-bottom:6px; font-size:12.5px;
   }
   .fr-session-hist-row span{ color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; font-size:11px; }
@@ -206,7 +241,7 @@
   .fr-ex-check input{ width:17px; height:17px; accent-color:var(--green-deep); }
   .fr-chip-load{ background:none; color:var(--plum); border:1px solid var(--plum); }
 
-  .fr-load-box{ background:#FFFEFA; border:1px dashed var(--border); border-radius:8px; padding:10px; margin-top:10px; }
+  .fr-load-box{ background:var(--surface); border:1px dashed var(--border); border-radius:8px; padding:10px; margin-top:10px; }
   .fr-load-set-row{ display:grid; grid-template-columns: 70px 1fr 1fr; gap:8px; align-items:center; margin-bottom:6px; }
   .fr-load-set-num{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
   .fr-load-weight, .fr-load-reps{
@@ -251,7 +286,7 @@
     display:flex; align-items:center; gap:8px; box-shadow: var(--shadow);
     transition: transform .12s ease, background .12s ease;
   }
-  .fr-add-btn:hover{ background:#264030; transform: translateY(-1px); }
+  .fr-add-btn:hover{ background:var(--green-deep-hover); transform: translateY(-1px); }
   .fr-add-btn:focus-visible{ outline: 2px solid var(--green-deep); outline-offset:2px; }
 
   .fr-view-tabs{ max-width:1080px; margin: 0 auto 20px; display:flex; gap:8px; flex-wrap:wrap; }
@@ -337,7 +372,7 @@
   .fr-field label{ display:block; font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color: var(--ink-soft); margin-bottom:5px; }
   .fr-field input[type=text], .fr-field input[type=email], .fr-field input[type=password], .fr-field input[type=number], .fr-field input[type=date], .fr-field select, .fr-field textarea{
     width:100%; font-family:'Inter',sans-serif; font-size:14px; padding:9px 11px; border:1px solid var(--border);
-    border-radius:7px; background:#FFFEFA; color: var(--ink);
+    border-radius:7px; background:var(--surface); color: var(--ink);
   }
   .fr-field textarea{ min-height:80px; resize:vertical; font-family:'Inter',sans-serif; line-height:1.5;}
   .fr-field input:focus, .fr-field select:focus, .fr-field textarea:focus{ outline:2px solid var(--green); outline-offset:1px; }
@@ -347,7 +382,7 @@
 
   .fr-form-actions{ display:flex; justify-content:space-between; align-items:center; margin-top: 18px; gap:10px; flex-wrap:wrap; }
   .fr-btn-primary{ font-family:'Inter',sans-serif; font-weight:600; font-size:14px; background: var(--green-deep); color:#F6F1DF; border:none; border-radius:8px; padding:10px 18px; cursor:pointer; }
-  .fr-btn-primary:hover{ background:#264030; }
+  .fr-btn-primary:hover{ background:var(--green-deep-hover); }
   .fr-btn-primary:disabled{ opacity:.65; cursor:default; }
   .fr-btn-danger{ font-family:'Inter',sans-serif; font-weight:600; font-size:13px; background:none; color: var(--rust); border:1px solid var(--rust); border-radius:8px; padding:9px 14px; cursor:pointer; }
   .fr-btn-danger:hover{ background: rgba(168,72,31,0.08); }
@@ -356,7 +391,7 @@
   .fr-detail-tab{ display:inline-block; font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; font-weight:600; color:#fff; padding:4px 10px; border-radius:6px; margin-bottom:10px; }
   .fr-detail-name{ font-family:'Fraunces', serif; font-weight:700; font-size:26px; color: var(--green-deep); margin: 0 0 4px; line-height:1.15; }
   .fr-nutrition{ display:grid; grid-template-columns: repeat(4,1fr); gap:1px; background: var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin: 16px 0; }
-  .fr-nutrition div{ background:#FFFEFA; padding:10px 6px; text-align:center; }
+  .fr-nutrition div{ background:var(--surface); padding:10px 6px; text-align:center; }
   .fr-nutrition .fr-nut-val{ font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:16px; color:var(--ink); display:block; }
   .fr-nutrition .fr-nut-label{ font-size:9.5px; text-transform:uppercase; letter-spacing:0.05em; color: var(--ink-soft); }
   .fr-detail-section{ margin-top:16px; }
@@ -364,7 +399,7 @@
   .fr-detail-section ul{ margin:0; padding-left:18px; }
   .fr-detail-section li{ margin-bottom:5px; font-size:14px; line-height:1.5; }
   .fr-detail-pre{ white-space:pre-wrap; font-size:14px; line-height:1.6; color: var(--ink); }
-  .fr-detail-notes{ background: #FBF3DE; border:1px dashed var(--mustard); border-radius:8px; padding:10px 12px; font-size:13px; color:#5B4A20; margin-top:16px; }
+  .fr-detail-notes{ background: var(--note-bg); border:1px dashed var(--mustard); border-radius:8px; padding:10px 12px; font-size:13px; color:#5B4A20; margin-top:16px; }
 
   .fr-date-nav{ max-width:1080px; margin:0 auto 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .fr-date-btn{ background:var(--card); border:1px solid var(--border); border-radius:7px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink); font-size:17px; box-shadow:var(--shadow); }
@@ -405,7 +440,7 @@
   .fr-cal-month-label{ font-family:'Fraunces',serif; font-weight:600; font-size:16px; color:var(--green-deep); min-width:140px; text-align:center; }
   .fr-cal-weekdays{ display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); margin-bottom:6px; }
   .fr-cal-days{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
-  .fr-cal-day{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:6px; background:#FFFEFA; border:1px solid var(--border); }
+  .fr-cal-day{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:6px; background:var(--surface); border:1px solid var(--border); }
   .fr-cal-day-empty{ background:none; border:none; }
   .fr-cal-day-today{ border-color:var(--green-deep); border-width:2px; }
   .fr-cal-day-num{ font-family:'IBM Plex Mono',monospace; font-size:11px; }
@@ -413,7 +448,7 @@
   .fr-cal-dots span{ width:4px; height:4px; border-radius:50%; display:inline-block; }
 
   .fr-report-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:6px; }
-  .fr-report-stat{ background:#FFFEFA; border:1px solid var(--border); border-radius:9px; padding:14px; text-align:center; }
+  .fr-report-stat{ background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:14px; text-align:center; }
   .fr-report-num{ display:block; font-family:'Fraunces',serif; font-weight:700; font-size:24px; color:var(--green-deep); }
   .fr-report-label{ font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
 
@@ -441,13 +476,13 @@
   .fr-log-panel{ display:none; }
   .fr-log-panel.active{ display:block; }
   .fr-log-preview{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin:12px 0 4px; }
-  .fr-log-preview div{ background:#FFFEFA; padding:8px 4px; text-align:center; }
+  .fr-log-preview div{ background:var(--surface); padding:8px 4px; text-align:center; }
   .fr-log-preview .v{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px; display:block; }
   .fr-log-preview .l{ font-size:9px; text-transform:uppercase; color:var(--ink-soft); }
 
   .fr-food-results{ margin-top:-8px; margin-bottom:10px; }
   .fr-food-result-item{
-    display:block; width:100%; text-align:left; background:#FFFEFA; border:1px solid var(--border);
+    display:block; width:100%; text-align:left; background:var(--surface); border:1px solid var(--border);
     border-top:none; padding:8px 12px; font-size:13px; cursor:pointer; font-family:'Inter',sans-serif; color:var(--ink);
   }
   .fr-food-result-item:first-child{ border-top:1px solid var(--border); border-radius:7px 7px 0 0; }
@@ -455,7 +490,7 @@
   .fr-food-result-item:hover{ background:var(--paper-deep); }
   .fr-food-result-item small{ display:block; color:var(--ink-soft); font-size:10.5px; font-family:'IBM Plex Mono',monospace; margin-top:1px; }
   .fr-food-picked{
-    background:#FFFEFA; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:10px;
+    background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:10px;
   }
   .fr-food-picked b{ display:block; margin-bottom:3px; font-family:'Inter',sans-serif; }
   .fr-food-picked span{ color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; font-size:11px; }
@@ -508,7 +543,6 @@
 <div id="ficharo-root" style="display:none">
   <div class="fr-user-bar">
     <span id="fr-user-label"></span>
-    <button class="fr-gear-btn" id="fr-gear-btn" aria-label="Configurações da conta">⚙</button>
     <button class="fr-logout-btn" id="fr-logout-btn">Sair</button>
   </div>
 
@@ -545,6 +579,10 @@
 
   <div id="fr-view-workouts" style="display:none">
     <div id="fr-workouts-content"></div>
+  </div>
+
+  <div id="fr-view-settings" style="display:none">
+    <div id="fr-settings-content"></div>
   </div>
 </div>
 
@@ -600,6 +638,26 @@
   let activeCat = 'todas';
   let searchTerm = '';
   let currentView = 'diary';
+
+  /* ---------- Tema (claro/escuro/automático) ---------- */
+  function getThemePref(){
+    try{ return localStorage.getItem('saber_theme') || 'auto'; }catch(e){ return 'auto'; }
+  }
+  function applyTheme(pref){
+    const isDark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if(isDark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  function setThemePref(pref){
+    try{ localStorage.setItem('saber_theme', pref); }catch(e){}
+    applyTheme(pref);
+  }
+  applyTheme(getThemePref());
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+      if(getThemePref() === 'auto') applyTheme('auto');
+    });
+  }
   let currentDate = todayStr();
 
   const root = document.getElementById('ficharo-root');
@@ -764,7 +822,6 @@
   document.getElementById('fr-logout-btn').addEventListener('click', async ()=>{
     await sb.auth.signOut();
   });
-  document.getElementById('fr-gear-btn').addEventListener('click', openSettingsModal);
 
   async function loadProfessionalLinkStatus(){
     const { data: linkRow } = await sb.from('professional_clients').select('*').eq('client_id', currentUser.id).maybeSingle();
@@ -788,9 +845,22 @@
     }).sort((a,b)=> a.email.localeCompare(b.email,'pt-BR'));
   }
 
-  function openSettingsModal(){
+  function renderSettingsView(){
+    const container = document.getElementById('fr-settings-content');
     const isPro = currentProfile && currentProfile.is_professional;
+    const themePref = getThemePref();
     let html = '';
+
+    html += `
+      <div class="fr-settings-section">
+        <h4>Aparência</h4>
+        <p class="fr-hint" style="margin-bottom:8px;">Como você quer que o Saber apareça nesse aparelho?</p>
+        <select id="fr-theme-pref">
+          <option value="light" ${themePref==='light'?'selected':''}>Modo claro</option>
+          <option value="dark" ${themePref==='dark'?'selected':''}>Modo escuro</option>
+          <option value="auto" ${themePref==='auto'?'selected':''}>Sincronizado com o celular</option>
+        </select>
+      </div>`;
 
     html += `
       <div class="fr-settings-section">
@@ -849,12 +919,25 @@
       </div>`;
     }
 
-    const overlay = buildOverlay(`<h3 class="fr-form-title">Configurações da conta</h3>${html}`);
+    html += `
+      <div class="fr-settings-section">
+        <button class="fr-btn-danger" id="fr-settings-logout" style="width:100%;">Sair da conta</button>
+      </div>`;
 
-    overlay.querySelector('#fr-acc-email-save').addEventListener('click', async function(){
+    container.innerHTML = `<div class="fr-settings-wrap">${html}</div>`;
+
+    container.querySelector('#fr-theme-pref').addEventListener('change', function(){
+      setThemePref(this.value);
+    });
+
+    container.querySelector('#fr-settings-logout').addEventListener('click', async function(){
+      await sb.auth.signOut();
+    });
+
+    container.querySelector('#fr-acc-email-save').addEventListener('click', async function(){
       const btn = this;
       const newEmail = document.getElementById('fr-acc-email').value.trim();
-      const msgEl = overlay.querySelector('#fr-acc-email-msg');
+      const msgEl = container.querySelector('#fr-acc-email-msg');
       if(!newEmail || newEmail === currentUser.email){ return; }
       btn.disabled = true; btn.textContent = 'Salvando...';
       const { error } = await sb.auth.updateUser({ email: newEmail });
@@ -866,11 +949,11 @@
       msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Enviamos um link de confirmação pro e-mail novo (e, às vezes, pro antigo também). Só troca depois de confirmar.</p>`;
     });
 
-    overlay.querySelector('#fr-acc-pass-save').addEventListener('click', async function(){
+    container.querySelector('#fr-acc-pass-save').addEventListener('click', async function(){
       const btn = this;
       const pass1 = document.getElementById('fr-acc-pass').value;
       const pass2 = document.getElementById('fr-acc-pass2').value;
-      const msgEl = overlay.querySelector('#fr-acc-pass-msg');
+      const msgEl = container.querySelector('#fr-acc-pass-msg');
       if(!pass1 || pass1.length < 6){
         msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">A senha precisa ter pelo menos 6 caracteres.</p>`;
         return;
@@ -891,7 +974,7 @@
       msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Senha atualizada!</p>`;
     });
 
-    overlay.querySelector('#fr-report-day').addEventListener('change', async function(){
+    container.querySelector('#fr-report-day').addEventListener('change', async function(){
       const val = parseInt(this.value, 10);
       const { error } = await sb.from('profiles').update({ report_day: val }).eq('id', currentUser.id);
       if(error){ showToast('Não foi possível salvar agora.', 'err'); return; }
@@ -900,12 +983,12 @@
     });
 
     if(isPro){
-      renderClientsList(overlay);
+      renderClientsList(container);
     }
-    renderLinkedArea(overlay);
+    renderLinkedArea(container);
     if(isAdmin){
-      renderSuggestionsArea(overlay);
-      renderAssessmentsArea(overlay);
+      renderSuggestionsArea(container);
+      renderAssessmentsArea(container);
     }
   }
 
@@ -1205,7 +1288,7 @@
 
   /* ---------- View switching ---------- */
   function renderViewTabs(){
-    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos']];
+    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['settings','Configurações']];
     document.getElementById('fr-view-tabs').innerHTML = tabs.map(t=>
       `<button class="fr-view-tab ${currentView===t[0]?'active':''}" data-view="${t[0]}">${t[1]}</button>`
     ).join('');
@@ -1241,12 +1324,14 @@
     document.getElementById('fr-view-diary').style.display = view==='diary' ? '' : 'none';
     document.getElementById('fr-view-shopping').style.display = view==='shopping' ? '' : 'none';
     document.getElementById('fr-view-workouts').style.display = view==='workouts' ? '' : 'none';
+    document.getElementById('fr-view-settings').style.display = view==='settings' ? '' : 'none';
     renderViewTabs();
     renderPrimaryAction();
     if(view==='recipes') renderScopeTabs();
     if(view==='diary') renderDiary();
     if(view==='shopping') renderShoppingView();
     if(view==='workouts') renderWorkoutsView();
+    if(view==='settings') renderSettingsView();
   }
 
   /* ---------- Lista de Compras ---------- */
