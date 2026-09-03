@@ -501,6 +501,7 @@
       </div>
       <button type="submit" class="fr-btn-primary" id="auth-submit" style="width:100%">Entrar</button>
     </form>
+    <button type="button" id="auth-forgot-link" style="background:none;border:none;color:var(--ink-soft);font-size:12.5px;text-decoration:underline;margin-top:12px;cursor:pointer;width:100%;">Esqueci minha senha</button>
   </div>
 </div>
 
@@ -713,6 +714,20 @@
     authMessage.hidden = false;
   }
 
+  document.getElementById('auth-forgot-link').addEventListener('click', async function(){
+    const email = document.getElementById('auth-email').value.trim();
+    if(!email){
+      showAuthMessage('Digite seu e-mail no campo acima primeiro, depois toque em "Esqueci minha senha".', 'err');
+      document.getElementById('auth-email').focus();
+      return;
+    }
+    this.disabled = true;
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href.split('#')[0] });
+    this.disabled = false;
+    if(error){ showAuthMessage(error.message, 'err'); return; }
+    showAuthMessage('Enviamos um link pro seu e-mail. Abra ele nesse mesmo aparelho pra criar uma nova senha.', 'ok');
+  });
+
   authForm.addEventListener('submit', async function(e){
     e.preventDefault();
     const email = document.getElementById('auth-email').value.trim();
@@ -777,6 +792,18 @@
     const isPro = currentProfile && currentProfile.is_professional;
     let html = '';
 
+    html += `
+      <div class="fr-settings-section">
+        <h4>Sua conta</h4>
+        <div class="fr-field"><label for="fr-acc-email">E-mail atual</label><input type="email" id="fr-acc-email" value="${esc(currentUser.email)}"></div>
+        <button class="fr-btn-ghost" id="fr-acc-email-save" style="width:100%;margin-bottom:6px;">Salvar novo e-mail</button>
+        <div id="fr-acc-email-msg"></div>
+        <div class="fr-field" style="margin-top:14px;"><label for="fr-acc-pass">Nova senha</label><input type="password" id="fr-acc-pass" minlength="6" placeholder="Mínimo 6 caracteres"></div>
+        <div class="fr-field"><label for="fr-acc-pass2">Confirmar nova senha</label><input type="password" id="fr-acc-pass2" minlength="6"></div>
+        <button class="fr-btn-ghost" id="fr-acc-pass-save" style="width:100%;">Salvar nova senha</button>
+        <div id="fr-acc-pass-msg"></div>
+      </div>`;
+
     if(isPro){
       html += `
       <div class="fr-settings-section">
@@ -823,6 +850,46 @@
     }
 
     const overlay = buildOverlay(`<h3 class="fr-form-title">Configurações da conta</h3>${html}`);
+
+    overlay.querySelector('#fr-acc-email-save').addEventListener('click', async function(){
+      const btn = this;
+      const newEmail = document.getElementById('fr-acc-email').value.trim();
+      const msgEl = overlay.querySelector('#fr-acc-email-msg');
+      if(!newEmail || newEmail === currentUser.email){ return; }
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.auth.updateUser({ email: newEmail });
+      btn.disabled = false; btn.textContent = 'Salvar novo e-mail';
+      if(error){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(error.message)}</p>`;
+        return;
+      }
+      msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Enviamos um link de confirmação pro e-mail novo (e, às vezes, pro antigo também). Só troca depois de confirmar.</p>`;
+    });
+
+    overlay.querySelector('#fr-acc-pass-save').addEventListener('click', async function(){
+      const btn = this;
+      const pass1 = document.getElementById('fr-acc-pass').value;
+      const pass2 = document.getElementById('fr-acc-pass2').value;
+      const msgEl = overlay.querySelector('#fr-acc-pass-msg');
+      if(!pass1 || pass1.length < 6){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">A senha precisa ter pelo menos 6 caracteres.</p>`;
+        return;
+      }
+      if(pass1 !== pass2){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">As duas senhas não são iguais.</p>`;
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.auth.updateUser({ password: pass1 });
+      btn.disabled = false; btn.textContent = 'Salvar nova senha';
+      if(error){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(error.message)}</p>`;
+        return;
+      }
+      document.getElementById('fr-acc-pass').value = '';
+      document.getElementById('fr-acc-pass2').value = '';
+      msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Senha atualizada!</p>`;
+    });
 
     overlay.querySelector('#fr-report-day').addEventListener('change', async function(){
       const val = parseInt(this.value, 10);
@@ -1021,6 +1088,10 @@
 
   let hasBooted = false;
   sb.auth.onAuthStateChange((event, session)=>{
+    if(event === 'PASSWORD_RECOVERY'){
+      openSetNewPasswordModal();
+      return;
+    }
     if(session && session.user){
       currentUser = session.user;
       if(!hasBooted){
@@ -1036,6 +1107,45 @@
       root.style.display = 'none';
     }
   });
+
+  function openSetNewPasswordModal(){
+    authScreen.style.display = '';
+    root.style.display = 'none';
+    const card = document.querySelector('.auth-card');
+    card.innerHTML = `
+      <h1 class="auth-title">Nova senha</h1>
+      <p class="auth-sub">Defina sua nova senha de acesso</p>
+      <div id="reset-message" class="auth-message" hidden></div>
+      <form id="reset-form">
+        <div class="fr-field"><label for="reset-password">Nova senha</label><input type="password" id="reset-password" required minlength="6" autocomplete="new-password"></div>
+        <button type="submit" class="fr-btn-primary" style="width:100%">Salvar nova senha</button>
+      </form>
+    `;
+    document.getElementById('reset-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const btn = this.querySelector('button[type="submit"]');
+      const msgEl = document.getElementById('reset-message');
+      const newPassword = document.getElementById('reset-password').value;
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.auth.updateUser({ password: newPassword });
+      if(error){
+        msgEl.textContent = error.message;
+        msgEl.className = 'auth-message err';
+        msgEl.hidden = false;
+        btn.disabled = false; btn.textContent = 'Salvar nova senha';
+        return;
+      }
+      msgEl.textContent = 'Senha atualizada! Entrando...';
+      msgEl.className = 'auth-message ok';
+      msgEl.hidden = false;
+      const { data: sessionData } = await sb.auth.getSession();
+      if(sessionData && sessionData.session && sessionData.session.user){
+        currentUser = sessionData.session.user;
+        hasBooted = true;
+        setTimeout(()=> boot(), 600);
+      }
+    });
+  }
 
   async function ensureProfile(){
     let { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
@@ -1413,6 +1523,19 @@
     quadril: 'Quadril',
     tornozelo_pe: 'Tornozelo ou pé'
   };
+  const FOCUS_AREA_LABELS = [
+    ['Treino de Peito', 'Peito'],
+    ['Treino de Costas', 'Costas'],
+    ['Treino de Pernas', 'Pernas'],
+    ['Treino de Ombros', 'Ombros'],
+    ['Treino de Bíceps', 'Bíceps'],
+    ['Treino de Tríceps', 'Tríceps'],
+    ['Treino de Abdômen', 'Abdômen'],
+    ['Treino de Glúteos', 'Glúteos'],
+    ['Treino de Panturrilhas', 'Panturrilhas'],
+    ['Treino de Trapézio', 'Trapézio'],
+    ['Treino de Antebraço', 'Antebraço']
+  ];
   const LIMITATION_EXCLUSIONS = {
     coluna: ['Levantamento terra','Levantamento terra romeno','Stiff','Remada curvada','Remada cavalinho','Agachamento livre','Agachamento frontal','Agachamento sumô (pés afastados)','Agachamento búlgaro','Roda abdominal','Agachamento no hack'],
     joelhos: ['Agachamento livre','Agachamento frontal','Agachamento no hack','Agachamento búlgaro','Leg press','Extensora','Passada','Elevação de panturrilha no leg press'],
@@ -1450,6 +1573,13 @@
             <option value="4">4 dias</option>
             <option value="5">5 ou mais dias</option>
           </select>
+        </div>
+        <div class="fr-field"><label>Tem alguma área específica que você quer focar mais? (opcional)</label>
+          <div id="fr-as-focus">
+            ${FOCUS_AREA_LABELS.map(([key,label])=>`
+              <label class="fr-pick-row"><input type="checkbox" class="fr-as-focus-box" value="${key}"><span>${esc(label)}</span></label>
+            `).join('')}
+          </div>
         </div>
         <div class="fr-field"><label for="fr-as-medical">Você tem liberação médica para praticar exercícios físicos?</label>
           <select id="fr-as-medical">
@@ -1497,11 +1627,12 @@
         return;
       }
       const limitations = Array.from(overlay.querySelectorAll('.fr-as-limit-box:checked')).map(b=>b.value).filter(v=>v!=='nenhuma');
+      const focusAreas = Array.from(overlay.querySelectorAll('.fr-as-focus-box:checked')).map(b=>b.value);
       const answers = {
         goal: document.getElementById('fr-as-goal').value,
         level: document.getElementById('fr-as-level').value,
         days: parseInt(document.getElementById('fr-as-days').value, 10),
-        medical, limitations,
+        medical, limitations, focusAreas,
         notes: document.getElementById('fr-as-notes').value.trim()
       };
       btn.disabled = true; btn.textContent = 'Enviando...';
@@ -1534,11 +1665,13 @@
 
   function generateWorkoutPlan(answers, excludedNames){
     excludedNames = excludedNames || [];
+    const focusAreas = answers.focusAreas || [];
     const groups = groupLibraryByMuscle();
     const exPerGroup = answers.level==='iniciante' ? 2 : (answers.level==='avancado' ? 4 : 3);
     function pick(groupName, n){
+      const boosted = focusAreas.includes(groupName) ? n + 2 : n;
       const list = (groups[groupName] || []).filter(e=> !excludedNames.includes(e.name));
-      return list.slice(0, Math.min(n, list.length));
+      return list.slice(0, Math.min(boosted, list.length));
     }
     let plan = [];
     if(answers.days <= 2){
