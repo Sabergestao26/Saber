@@ -376,6 +376,11 @@
   }
   .fr-field textarea{ min-height:80px; resize:vertical; font-family:'Inter',sans-serif; line-height:1.5;}
   .fr-field input:focus, .fr-field select:focus, .fr-field textarea:focus{ outline:2px solid var(--green); outline-offset:1px; }
+  select{
+    font-family:'Inter',sans-serif; font-size:14px; padding:9px 11px; border:1px solid var(--border);
+    border-radius:7px; background:var(--surface); color:var(--ink);
+  }
+  select:focus{ outline:2px solid var(--green); outline-offset:1px; }
   .fr-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .fr-row4{ display:grid; grid-template-columns: repeat(4,1fr); gap:10px; }
   .fr-hint{ font-size:11.5px; color: var(--ink-soft); margin-top:4px; }
@@ -543,7 +548,6 @@
 <div id="ficharo-root" style="display:none">
   <div class="fr-user-bar">
     <span id="fr-user-label"></span>
-    <button class="fr-logout-btn" id="fr-logout-btn">Sair</button>
   </div>
 
   <div class="fr-header">
@@ -817,10 +821,6 @@
     }
     authSubmit.disabled = false;
     authSubmit.textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
-  });
-
-  document.getElementById('fr-logout-btn').addEventListener('click', async ()=>{
-    await sb.auth.signOut();
   });
 
   async function loadProfessionalLinkStatus(){
