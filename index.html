@@ -886,6 +886,12 @@
         <div id="fr-acc-pass-msg"></div>
       </div>`;
 
+    html += `
+      <div class="fr-settings-section">
+        <h4>Balança (Withings)</h4>
+        <div id="fr-withings-area"><div class="fr-loading">Carregando...</div></div>
+      </div>`;
+
     if(isPro){
       html += `
       <div class="fr-settings-section">
@@ -998,6 +1004,7 @@
       renderClientsList(container);
     }
     renderLinkedArea(container);
+    renderWithingsArea(container);
     if(isAdmin){
       renderSuggestionsArea(container);
       renderAssessmentsArea(container);
@@ -1129,6 +1136,98 @@
         openClientRecipesModal(client);
       });
     });
+  }
+
+  const WITHINGS_CLIENT_ID = '93b8137c6ca62be92f25630f554f242be66bcce95d97388c1b444ac7dcda087b';
+
+  async function renderWithingsArea(container){
+    const el = container.querySelector('#fr-withings-area');
+    if(!el) return;
+    const { data: conn } = await sb.from('withings_connections').select('*').eq('user_id', currentUser.id).maybeSingle();
+
+    if(!conn){
+      el.innerHTML = `
+        <p class="fr-hint" style="margin-bottom:10px;">Nenhuma balança conectada ainda.</p>
+        <button class="fr-btn-primary" id="fr-withings-connect" style="width:100%;">Conectar balança Withings</button>
+      `;
+      el.querySelector('#fr-withings-connect').addEventListener('click', ()=>{
+        const redirectUri = encodeURIComponent(`${SUPABASE_URL}/functions/v1/withings-callback`);
+        const state = encodeURIComponent(currentUser.id);
+        const authUrl = `https://account.withings.com/oauth2_user/authorize2?response_type=code&client_id=${WITHINGS_CLIENT_ID}&redirect_uri=${redirectUri}&scope=user.metrics&state=${state}`;
+        window.location.href = authUrl;
+      });
+      return;
+    }
+
+    el.innerHTML = `
+      <div class="fr-linked-card">
+        <div>
+          <div class="fr-linked-name">Balança conectada</div>
+          <div class="fr-linked-role">Desde ${esc(formatDateLabel(conn.connected_at.slice(0,10)))}</div>
+        </div>
+        <button class="fr-btn-ghost" id="fr-withings-disconnect">Desconectar</button>
+      </div>
+      <button class="fr-btn-ghost" id="fr-withings-sync" style="width:100%;margin-top:10px;">🔄 Sincronizar agora</button>
+      <div id="fr-withings-msg"></div>
+      <div id="fr-withings-history" style="margin-top:14px;"></div>
+    `;
+
+    el.querySelector('#fr-withings-disconnect').addEventListener('click', async function(){
+      const btn = this;
+      btn.disabled = true; btn.textContent = 'Desconectando...';
+      const { error } = await sb.from('withings_connections').delete().eq('user_id', currentUser.id);
+      if(error){ showToast('Não foi possível desconectar.', 'err'); btn.disabled=false; btn.textContent='Desconectar'; return; }
+      showToast('Balança desconectada.', 'ok');
+      renderWithingsArea(container);
+    });
+
+    el.querySelector('#fr-withings-sync').addEventListener('click', async function(){
+      const btn = this;
+      const msgEl = el.querySelector('#fr-withings-msg');
+      btn.disabled = true; btn.textContent = 'Sincronizando...';
+      try{
+        const { data: sessionData } = await sb.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/withings-sync`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+        if(!res.ok || result.error){
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível sincronizar agora. Tente de novo em instantes.</p>`;
+        } else {
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Sincronizado!</p>`;
+          renderWithingsHistory(el);
+        }
+      }catch(err){
+        console.error(err);
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível sincronizar agora.</p>`;
+      }
+      btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
+    });
+
+    renderWithingsHistory(el);
+  }
+
+  async function renderWithingsHistory(el){
+    const box = el.querySelector('#fr-withings-history');
+    if(!box) return;
+    box.innerHTML = `<div class="fr-loading">Carregando medições...</div>`;
+    const { data, error } = await sb.from('body_measurements').select('*').eq('user_id', currentUser.id).order('date', {ascending:false}).limit(10);
+    if(error || !data || data.length===0){ box.innerHTML = `<p class="fr-hint">Nenhuma medição sincronizada ainda.</p>`; return; }
+    const latest = data[0];
+    box.innerHTML = `
+      <div class="fr-evo-title">Última medição — ${esc(formatDateLabel(latest.date))}</div>
+      <div class="fr-weekly-goals-grid" style="margin-bottom:14px;">
+        ${latest.weight_kg!=null ? `<div class="fr-weekly-goal-card"><div class="fr-weekly-goal-label">Peso</div><div class="fr-weekly-goal-val">${latest.weight_kg.toFixed(1)} <span>kg</span></div></div>` : ''}
+        ${latest.fat_percent!=null ? `<div class="fr-weekly-goal-card"><div class="fr-weekly-goal-label">Gordura corporal</div><div class="fr-weekly-goal-val">${latest.fat_percent.toFixed(1)} <span>%</span></div></div>` : ''}
+        ${latest.muscle_mass_kg!=null ? `<div class="fr-weekly-goal-card"><div class="fr-weekly-goal-label">Massa muscular</div><div class="fr-weekly-goal-val">${latest.muscle_mass_kg.toFixed(1)} <span>kg</span></div></div>` : ''}
+        ${latest.bone_mass_kg!=null ? `<div class="fr-weekly-goal-card"><div class="fr-weekly-goal-label">Massa óssea</div><div class="fr-weekly-goal-val">${latest.bone_mass_kg.toFixed(2)} <span>kg</span></div></div>` : ''}
+        ${latest.hydration_kg!=null ? `<div class="fr-weekly-goal-card"><div class="fr-weekly-goal-label">Hidratação</div><div class="fr-weekly-goal-val">${latest.hydration_kg.toFixed(1)} <span>kg</span></div></div>` : ''}
+      </div>
+      <div class="fr-evo-title">Histórico recente</div>
+      ${data.map(m=>`<div class="fr-session-hist-row"><span>${esc(formatDateLabel(m.date))}</span><b>${m.weight_kg!=null ? m.weight_kg.toFixed(1)+'kg' : '—'}</b></div>`).join('')}
+    `;
   }
 
   function renderLinkedArea(overlay){
@@ -1273,6 +1372,20 @@
     label.innerHTML = `${esc(currentUser.email)} ${badges.join(' ')}`;
   }
 
+  function handleWithingsReturn(){
+    const params = new URLSearchParams(window.location.search);
+    if(params.has('withings_connected')){
+      showToast('Balança conectada com sucesso!', 'ok');
+      if(currentView==='settings') renderSettingsView();
+    } else if(params.has('withings_error')){
+      showToast('Não foi possível conectar a balança. Tente de novo.', 'err');
+    } else {
+      return;
+    }
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+
   async function boot(){
     await ensureProfile();
     authScreen.style.display = 'none';
@@ -1288,6 +1401,7 @@
     loadProfessionalLinkStatus();
     loadMyClients();
     loadWorkouts();
+    handleWithingsReturn();
     if(currentView==='diary') renderDiary();
     if(!currentProfile.onboarding_done){
       try{
