@@ -876,6 +876,14 @@
 
     html += `
       <div class="fr-settings-section">
+        <h4>Som do cronômetro de descanso</h4>
+        <p class="fr-hint" style="margin-bottom:10px;">Toque no botão abaixo pra confirmar se o som toca nesse aparelho/navegador.</p>
+        <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;">🔊 Testar som</button>
+        <p class="fr-hint" style="margin-top:10px;">Se o som não tocar durante um treino de verdade, mesmo funcionando aqui no teste, é porque a tela apagou ou você trocou de aplicativo durante o descanso — isso bloqueia som em qualquer site, não só no Saber. Deixando a tela ligada e o Saber em primeiro plano durante o descanso, o som toca normalmente.</p>
+      </div>`;
+
+    html += `
+      <div class="fr-settings-section">
         <h4>Sua conta</h4>
         <div class="fr-field"><label for="fr-acc-email">E-mail atual</label><input type="email" id="fr-acc-email" value="${esc(currentUser.email)}"></div>
         <button class="fr-btn-ghost" id="fr-acc-email-save" style="width:100%;margin-bottom:6px;">Salvar novo e-mail</button>
@@ -946,6 +954,12 @@
 
     container.querySelector('#fr-theme-pref').addEventListener('change', function(){
       setThemePref(this.value);
+    });
+
+    container.querySelector('#fr-test-sound').addEventListener('click', function(){
+      unlockAudio();
+      playTimerEndSound();
+      showToast('Se você ouviu os beeps, o som funciona nesse aparelho.', 'ok');
     });
 
     container.querySelector('#fr-settings-logout').addEventListener('click', async function(){
@@ -2186,15 +2200,18 @@
       if(!sharedAudioCtx){
         sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
-      if(sharedAudioCtx.state === 'suspended'){
-        sharedAudioCtx.resume().catch(()=>{});
+      const ctx = sharedAudioCtx;
+      if(ctx.state === 'suspended'){
+        ctx.resume();
       }
-      // toca um som inaudível pra "destravar" o áudio no iOS/Safari nesse gesto do usuário
-      const osc = sharedAudioCtx.createOscillator();
-      const gain = sharedAudioCtx.createGain();
-      gain.gain.value = 0;
-      osc.connect(gain); gain.connect(sharedAudioCtx.destination);
-      osc.start(); osc.stop(sharedAudioCtx.currentTime + 0.01);
+      // toca um som quase inaudível (não totalmente zero) pra "destravar" o áudio no iOS/Safari
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.001;
+      osc.frequency.value = 440;
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.05);
     }catch(err){
       console.error('Não foi possível preparar o áudio', err);
     }
