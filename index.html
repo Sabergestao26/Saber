@@ -878,8 +878,9 @@
       <div class="fr-settings-section">
         <h4>Som do cronômetro de descanso</h4>
         <p class="fr-hint" style="margin-bottom:10px;">Toque no botão abaixo pra confirmar se o som toca nesse aparelho/navegador.</p>
-        <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;">🔊 Testar som</button>
-        <p class="fr-hint" style="margin-top:10px;">Se o som não tocar durante um treino de verdade, mesmo funcionando aqui no teste, é porque a tela apagou ou você trocou de aplicativo durante o descanso — isso bloqueia som em qualquer site, não só no Saber. Deixando a tela ligada e o Saber em primeiro plano durante o descanso, o som toca normalmente.</p>
+        <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;margin-bottom:12px;">🔊 Testar som</button>
+        <button class="fr-btn-ghost" id="fr-enable-notifications" style="width:100%;">🔔 ${('Notification' in window && Notification.permission === 'granted') ? 'Notificações ativadas' : 'Ativar notificações'}</button>
+        <p class="fr-hint" style="margin-top:10px;">Se o som e a notificação não chegarem durante um treino de verdade, mesmo funcionando aqui no teste, é porque a tela apagou ou você trocou de aplicativo durante o descanso — isso pausa qualquer site (não só o Saber) por economia de bateria do próprio celular. Deixando a tela ligada e o Saber em primeiro plano durante o descanso, funciona normalmente — e agora, se você voltar um pouco atrasada, o cronômetro se corrige sozinho assim que reabrir o app.</p>
       </div>`;
 
     html += `
@@ -960,6 +961,10 @@
       unlockAudio();
       playTimerEndSound();
       showToast('Se você ouviu os beeps, o som funciona nesse aparelho.', 'ok');
+    });
+
+    container.querySelector('#fr-enable-notifications').addEventListener('click', function(){
+      requestNotificationPermission();
     });
 
     container.querySelector('#fr-settings-logout').addEventListener('click', async function(){
@@ -2252,7 +2257,7 @@
     if(activeRestTimers[exerciseId] && activeRestTimers[exerciseId].interval){
       clearInterval(activeRestTimers[exerciseId].interval);
     }
-    activeRestTimers[exerciseId] = { remaining: seconds, seconds, paused: false, interval: null };
+    activeRestTimers[exerciseId] = { endTime: Date.now() + seconds*1000, seconds, paused: false, pausedRemaining: null, interval: null };
     renderTimerBox(exerciseId);
     runTimerInterval(exerciseId);
   }
@@ -2261,9 +2266,10 @@
     const box = document.getElementById('fr-ex-timer-box-'+exerciseId);
     const state = activeRestTimers[exerciseId];
     if(!box || !state) return;
+    const remaining = state.paused ? state.pausedRemaining : Math.max(0, Math.ceil((state.endTime - Date.now())/1000));
     box.innerHTML = `
       <div class="fr-timer-box">
-        <div class="fr-timer-num" id="fr-timer-num-${exerciseId}">${formatTimer(state.remaining)}</div>
+        <div class="fr-timer-num" id="fr-timer-num-${exerciseId}">${formatTimer(remaining)}</div>
         <div class="fr-timer-label">${state.paused ? 'pausado' : 'descansando'}</div>
         <div class="fr-timer-controls">
           <button type="button" class="fr-timer-btn" id="fr-timer-pause-${exerciseId}">${state.paused ? '▶ Continuar' : '⏸ Pausar'}</button>
@@ -2274,6 +2280,21 @@
     document.getElementById(`fr-timer-restart-${exerciseId}`).addEventListener('click', ()=> restartTimer(exerciseId));
   }
 
+  function finishRestTimer(exerciseId, state){
+    clearInterval(state.interval);
+    const box = document.getElementById('fr-ex-timer-box-'+exerciseId);
+    if(box){
+      box.innerHTML = `<div class="fr-timer-box"><div class="fr-timer-num" style="color:var(--rust)">Descanso concluído!</div><button type="button" class="fr-timer-btn" id="fr-timer-again-${exerciseId}" style="margin-top:8px;">↺ Descansar de novo</button></div>`;
+      const again = document.getElementById(`fr-timer-again-${exerciseId}`);
+      if(again) again.addEventListener('click', ()=> startRestTimer(exerciseId, state.seconds));
+    }
+    playTimerEndSound();
+    if('Notification' in window && Notification.permission === 'granted'){
+      try{ new Notification('Descanso concluído!', { body: 'Hora de voltar pro treino.', icon: 'icon-192.png' }); }catch(e){}
+    }
+    delete activeRestTimers[exerciseId];
+  }
+
   function runTimerInterval(exerciseId){
     const state = activeRestTimers[exerciseId];
     if(!state) return;
@@ -2281,38 +2302,71 @@
       const s = activeRestTimers[exerciseId];
       if(!s){ clearInterval(state.interval); return; }
       if(s.paused) return;
-      s.remaining -= 1;
       const numEl = document.getElementById('fr-timer-num-'+exerciseId);
       if(!numEl){ clearInterval(s.interval); delete activeRestTimers[exerciseId]; return; }
-      if(s.remaining <= 0){
-        clearInterval(s.interval);
-        const box = document.getElementById('fr-ex-timer-box-'+exerciseId);
-        if(box){
-          box.innerHTML = `<div class="fr-timer-box"><div class="fr-timer-num" style="color:var(--rust)">Descanso concluído!</div><button type="button" class="fr-timer-btn" id="fr-timer-again-${exerciseId}" style="margin-top:8px;">↺ Descansar de novo</button></div>`;
-          const again = document.getElementById(`fr-timer-again-${exerciseId}`);
-          if(again) again.addEventListener('click', ()=> startRestTimer(exerciseId, s.seconds));
-        }
-        playTimerEndSound();
-        delete activeRestTimers[exerciseId];
+      const remaining = Math.max(0, Math.ceil((s.endTime - Date.now())/1000));
+      if(remaining <= 0){
+        finishRestTimer(exerciseId, s);
         return;
       }
-      numEl.textContent = formatTimer(s.remaining);
+      numEl.textContent = formatTimer(remaining);
     }, 1000);
   }
+
+  // Quando a pessoa volta pro app (troca de aba/aplicativo e retorna, ou destrava a tela),
+  // recalcula todos os cronômetros ativos na hora — corrige sozinho qualquer atraso
+  // causado pelo navegador pausando a contagem enquanto estava em segundo plano.
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState !== 'visible') return;
+    Object.keys(activeRestTimers).forEach(exerciseId=>{
+      const state = activeRestTimers[exerciseId];
+      if(!state || state.paused) return;
+      const remaining = Math.max(0, Math.ceil((state.endTime - Date.now())/1000));
+      if(remaining <= 0){
+        finishRestTimer(exerciseId, state);
+      } else {
+        const numEl = document.getElementById('fr-timer-num-'+exerciseId);
+        if(numEl) numEl.textContent = formatTimer(remaining);
+      }
+    });
+  });
 
   function toggleTimerPause(exerciseId){
     const state = activeRestTimers[exerciseId];
     if(!state) return;
-    state.paused = !state.paused;
+    if(state.paused){
+      state.endTime = Date.now() + state.pausedRemaining*1000;
+      state.paused = false;
+      state.pausedRemaining = null;
+    } else {
+      state.pausedRemaining = Math.max(0, Math.ceil((state.endTime - Date.now())/1000));
+      state.paused = true;
+    }
     renderTimerBox(exerciseId);
   }
 
   function restartTimer(exerciseId){
     const state = activeRestTimers[exerciseId];
     if(!state) return;
-    state.remaining = state.seconds;
+    state.endTime = Date.now() + state.seconds*1000;
     state.paused = false;
+    state.pausedRemaining = null;
     renderTimerBox(exerciseId);
+  }
+
+  function requestNotificationPermission(){
+    if(!('Notification' in window)){
+      showToast('Esse navegador não suporta notificações.', 'err');
+      return;
+    }
+    Notification.requestPermission().then(perm=>{
+      if(perm === 'granted'){
+        showToast('Notificações ativadas!', 'ok');
+      } else if(perm === 'denied'){
+        showToast('Permissão negada — pode reativar nas configurações do navegador.', 'err');
+      }
+      if(currentView==='settings') renderSettingsView();
+    });
   }
 
   function openSubmissionForm(exerciseId){
