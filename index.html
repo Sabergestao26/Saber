@@ -877,7 +877,13 @@
     html += `
       <div class="fr-settings-section">
         <h4>Som do cronômetro de descanso</h4>
-        <p class="fr-hint" style="margin-bottom:10px;">Toque no botão abaixo pra confirmar se o som toca nesse aparelho/navegador.</p>
+        <p class="fr-hint" style="margin-bottom:8px;">Escolha o som que toca quando o descanso termina.</p>
+        <select id="fr-sound-pref" style="margin-bottom:10px;">
+          <option value="classico" ${getSoundPref()==='classico'?'selected':''}>Clássico (3 beeps)</option>
+          <option value="suave" ${getSoundPref()==='suave'?'selected':''}>Suave (2 tons)</option>
+          <option value="urgente" ${getSoundPref()==='urgente'?'selected':''}>Urgente (4 beeps rápidos)</option>
+          <option value="sino" ${getSoundPref()==='sino'?'selected':''}>Sino</option>
+        </select>
         <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;margin-bottom:12px;">🔊 Testar som</button>
         <button class="fr-btn-ghost" id="fr-enable-notifications" style="width:100%;">🔔 ${('Notification' in window && Notification.permission === 'granted') ? 'Notificações ativadas' : 'Ativar notificações'}</button>
         <p class="fr-hint" style="margin-top:10px;">Se o som e a notificação não chegarem durante um treino de verdade, mesmo funcionando aqui no teste, é porque a tela apagou ou você trocou de aplicativo durante o descanso — isso pausa qualquer site (não só o Saber) por economia de bateria do próprio celular. Deixando a tela ligada e o Saber em primeiro plano durante o descanso, funciona normalmente — e agora, se você voltar um pouco atrasada, o cronômetro se corrige sozinho assim que reabrir o app.</p>
@@ -955,6 +961,12 @@
 
     container.querySelector('#fr-theme-pref').addEventListener('change', function(){
       setThemePref(this.value);
+    });
+
+    container.querySelector('#fr-sound-pref').addEventListener('change', function(){
+      setSoundPref(this.value);
+      unlockAudio();
+      playTimerEndSound();
     });
 
     container.querySelector('#fr-test-sound').addEventListener('click', function(){
@@ -2199,6 +2211,47 @@
     return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
   }
 
+  function getSoundPref(){
+    try{ return localStorage.getItem('saber_timer_sound') || 'classico'; }catch(e){ return 'classico'; }
+  }
+  function setSoundPref(pref){
+    try{ localStorage.setItem('saber_timer_sound', pref); }catch(e){}
+  }
+
+  function beepAt(ctx, freq, startTime, duration, waveType){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = waveType || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.35, startTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.02);
+  }
+
+  function playSoundPattern(ctx, pattern){
+    const now = ctx.currentTime;
+    if(pattern === 'suave'){
+      beepAt(ctx, 523, now, 0.3, 'sine');
+      beepAt(ctx, 659, now + 0.35, 0.4, 'sine');
+    } else if(pattern === 'urgente'){
+      beepAt(ctx, 1046, now, 0.1, 'square');
+      beepAt(ctx, 1046, now + 0.14, 0.1, 'square');
+      beepAt(ctx, 1046, now + 0.28, 0.1, 'square');
+      beepAt(ctx, 1046, now + 0.42, 0.18, 'square');
+    } else if(pattern === 'sino'){
+      beepAt(ctx, 784, now, 0.6, 'triangle');
+      beepAt(ctx, 1568, now + 0.05, 0.5, 'triangle');
+    } else { // 'classico'
+      beepAt(ctx, 880, now, 0.16, 'sine');
+      beepAt(ctx, 880, now + 0.22, 0.16, 'sine');
+      beepAt(ctx, 1175, now + 0.44, 0.3, 'sine');
+    }
+  }
+
   let sharedAudioCtx = null;
   function unlockAudio(){
     try{
@@ -2226,23 +2279,7 @@
     try{
       const ctx = sharedAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
       if(ctx.state === 'suspended'){ ctx.resume().catch(()=>{}); }
-      const beep = (freq, startTime, duration)=>{
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.35, startTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(startTime);
-        osc.stop(startTime + duration + 0.02);
-      };
-      const now = ctx.currentTime;
-      beep(880, now, 0.16);
-      beep(880, now + 0.22, 0.16);
-      beep(1175, now + 0.44, 0.3);
+      playSoundPattern(ctx, getSoundPref());
     }catch(err){
       console.error('Não foi possível tocar o som do cronômetro', err);
     }
