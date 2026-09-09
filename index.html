@@ -1002,6 +1002,14 @@
         </select>
       </div>`;
 
+    html += `
+      <div class="fr-settings-section">
+        <h4>Tenho um código promocional</h4>
+        <div class="fr-field"><label for="fr-redeem-code">Código</label><input type="text" id="fr-redeem-code" placeholder="Ex.: SABER-ABC123" style="text-transform:uppercase;"></div>
+        <button class="fr-btn-primary" id="fr-redeem-btn" style="width:100%;">Resgatar</button>
+        <div id="fr-redeem-msg"></div>
+      </div>`;
+
     if(isAdmin){
       html += `
       <div class="fr-settings-section">
@@ -1011,6 +1019,12 @@
       <div class="fr-settings-section">
         <h4>Avaliações de treino pendentes</h4>
         <div id="fr-assessments-area"><div class="fr-loading">Carregando...</div></div>
+      </div>
+      <div class="fr-settings-section">
+        <h4>Códigos promocionais</h4>
+        <div class="fr-field"><label for="fr-promo-email">E-mail de quem vai usar (deixe vazio pra qualquer pessoa)</label><input type="email" id="fr-promo-email" placeholder="pessoa@exemplo.com"></div>
+        <button class="fr-btn-ghost" id="fr-promo-create" style="width:100%;margin-bottom:12px;">+ Gerar código</button>
+        <div id="fr-promo-list"><div class="fr-loading">Carregando...</div></div>
       </div>`;
     }
 
@@ -1105,10 +1119,68 @@
     }
     renderLinkedArea(container);
     renderWithingsArea(container);
+
+    container.querySelector('#fr-redeem-btn').addEventListener('click', async function(){
+      const btn = this;
+      const codeInput = container.querySelector('#fr-redeem-code');
+      const msgEl = container.querySelector('#fr-redeem-msg');
+      const code = codeInput.value.trim().toUpperCase();
+      if(!code){ codeInput.focus(); return; }
+      btn.disabled = true; btn.textContent = 'Resgatando...';
+      const { data, error } = await sb.rpc('redeem_promo_code', { p_code: code });
+      btn.disabled = false; btn.textContent = 'Resgatar';
+      if(error || !data){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível resgatar agora. Tente de novo.</p>`;
+        return;
+      }
+      if(!data.success){
+        const messages = {
+          not_found: 'Código não encontrado. Confira se digitou certinho.',
+          already_redeemed: 'Esse código já foi usado.',
+          expired: 'Esse código expirou.',
+          wrong_email: 'Esse código é pra outra conta — confira se está logada com o e-mail certo.'
+        };
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(messages[data.error] || 'Não foi possível resgatar esse código.')}</p>`;
+        return;
+      }
+      currentProfile.has_free_access = true;
+      msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Código resgatado! Acesso liberado.</p>`;
+      codeInput.value = '';
+    });
+
     if(isAdmin){
       renderSuggestionsArea(container);
       renderAssessmentsArea(container);
+      renderPromoCodesList(container);
+      container.querySelector('#fr-promo-create').addEventListener('click', async function(){
+        const btn = this;
+        const email = container.querySelector('#fr-promo-email').value.trim();
+        const code = 'SABER-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        btn.disabled = true; btn.textContent = 'Gerando...';
+        const { error } = await sb.from('promo_codes').insert({
+          code, intended_email: email || null, created_by: currentUser.id
+        });
+        btn.disabled = false; btn.textContent = '+ Gerar código';
+        if(error){ showToast('Não foi possível gerar o código.', 'err'); return; }
+        container.querySelector('#fr-promo-email').value = '';
+        showToast(`Código gerado: ${code}`, 'ok');
+        renderPromoCodesList(container);
+      });
     }
+  }
+
+  async function renderPromoCodesList(container){
+    const el = container.querySelector('#fr-promo-list');
+    if(!el) return;
+    const { data, error } = await sb.from('promo_codes').select('*').order('created_at', {ascending:false}).limit(20);
+    if(error){ el.innerHTML = `<p class="fr-hint">Não foi possível carregar.</p>`; return; }
+    const list = data || [];
+    if(list.length===0){ el.innerHTML = `<p class="fr-hint">Nenhum código gerado ainda.</p>`; return; }
+    el.innerHTML = list.map(c=>`
+      <div class="fr-session-hist-row">
+        <span>${esc(c.code)}${c.intended_email ? ' · ' + esc(c.intended_email) : ' · qualquer pessoa'}</span>
+        <b style="color:${c.redeemed_by ? 'var(--ink-soft)' : 'var(--green-deep)'}">${c.redeemed_by ? 'Usado' : 'Disponível'}</b>
+      </div>`).join('');
   }
 
   async function renderAssessmentsArea(overlay){
