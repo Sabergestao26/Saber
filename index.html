@@ -976,6 +976,7 @@
           <div class="fr-code-label">Compartilhe com seus clientes</div>
           <div class="fr-code-val">${esc(currentProfile.professional_code || '—')}</div>
         </div>
+        <label class="fr-ex-check" style="margin-top:14px;"><input type="checkbox" id="fr-notify-client-reports" ${currentProfile.notify_client_reports ? 'checked' : ''}> Notificar quando o relatório semanal de um cliente ficar pronto</label>
         <div id="fr-clients-list"></div>
       </div>`;
     }
@@ -1094,6 +1095,13 @@
 
     if(isPro){
       renderClientsList(container);
+      container.querySelector('#fr-notify-client-reports').addEventListener('change', async function(){
+        const val = this.checked;
+        const { error } = await sb.from('profiles').update({ notify_client_reports: val }).eq('id', currentUser.id);
+        if(error){ showToast('Não foi possível salvar agora.', 'err'); this.checked = !val; return; }
+        currentProfile.notify_client_reports = val;
+        showToast('Preferência salva.', 'ok');
+      });
     }
     renderLinkedArea(container);
     renderWithingsArea(container);
@@ -1219,15 +1227,85 @@
       return;
     }
     el.innerHTML = `<div class="fr-hint" style="margin-bottom:8px;">Meus clientes (${myClients.length})</div>` +
-      myClients.map(c=>`<div class="fr-client-row" data-client="${c.client_id}"><span class="fr-client-name">${esc(c.email)}</span><span class="fr-client-arrow">›</span></div>`).join('');
-    el.querySelectorAll('.fr-client-row').forEach(row=>{
-      row.addEventListener('click', ()=>{
-        const clientId = row.getAttribute('data-client');
+      myClients.map(c=>`
+        <div class="fr-client-row" data-client="${c.client_id}" style="cursor:default;">
+          <span class="fr-client-name">${esc(c.email)}</span>
+          <span style="display:flex;gap:6px;">
+            <button type="button" class="fr-chip fr-chip-video" data-report="${c.client_id}">📊 Relatório</button>
+            <button type="button" class="fr-chip fr-chip-upload" data-recipes="${c.client_id}">Receitas ›</button>
+          </span>
+        </div>`).join('');
+    el.querySelectorAll('[data-recipes]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const clientId = btn.getAttribute('data-recipes');
         const client = myClients.find(c=>c.client_id===clientId);
         closeOverlay();
         openClientRecipesModal(client);
       });
     });
+    el.querySelectorAll('[data-report]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const clientId = btn.getAttribute('data-report');
+        const client = myClients.find(c=>c.client_id===clientId);
+        viewClientWeeklyReport(client);
+      });
+    });
+  }
+
+  async function viewClientWeeklyReport(client){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Relatório semanal — ${esc(client.email)}</h3>
+      <div id="fr-client-report-content"><div class="fr-loading">Carregando...</div></div>
+    `);
+    const contentEl = overlay.querySelector('#fr-client-report-content');
+
+    const end = todayStr();
+    const start = shiftDateStr(end, -6);
+    const [{ data: targetsRow }, { data: completions }, { data: waters }, { data: logs }, { data: burns }] = await Promise.all([
+      sb.from('daily_targets').select('*').eq('user_id', client.client_id).maybeSingle(),
+      sb.from('workout_completions').select('date').eq('user_id', client.client_id).gte('date', start).lte('date', end),
+      sb.from('water_logs').select('date, amount_ml').eq('user_id', client.client_id).gte('date', start).lte('date', end),
+      sb.from('diary_logs').select('date, protein, calories').eq('user_id', client.client_id).gte('date', start).lte('date', end),
+      sb.from('calories_burned_logs').select('amount').eq('user_id', client.client_id).gte('date', start).lte('date', end)
+    ]);
+
+    if(!targetsRow){
+      contentEl.innerHTML = `<p class="fr-hint">Esse cliente ainda não definiu metas diárias, então não dá pra calcular o relatório.</p>`;
+      return;
+    }
+
+    const trainedDays = new Set((completions||[]).map(c=>c.date));
+    const waterByDay = {}; (waters||[]).forEach(w=>{ waterByDay[w.date]=(waterByDay[w.date]||0)+n0(w.amount_ml); });
+    const proteinByDay = {}, calByDay = {};
+    (logs||[]).forEach(l=>{
+      proteinByDay[l.date] = (proteinByDay[l.date]||0) + n0(l.protein);
+      calByDay[l.date] = (calByDay[l.date]||0) + n0(l.calories);
+    });
+    const burnedTotal = (burns||[]).reduce((s,b)=> s+n0(b.amount), 0);
+    const waterGoal = Number(targetsRow.water_goal_ml) || 0;
+    const proteinGoal = Number(targetsRow.protein) || 0;
+    const calGoal = Number(targetsRow.calories) || 0;
+    const burnGoal = Number(targetsRow.weekly_calories_burned) || 0;
+
+    let trainedCount=0, waterCount=0, proteinCount=0, calCount=0;
+    for(let i=0;i<7;i++){
+      const d = shiftDateStr(start, i);
+      if(trainedDays.has(d)) trainedCount++;
+      if(waterGoal>0 && (waterByDay[d]||0)>=waterGoal) waterCount++;
+      if(proteinGoal>0 && (proteinByDay[d]||0)>=proteinGoal) proteinCount++;
+      if(calGoal>0 && calByDay[d]!==undefined && calByDay[d]<=calGoal) calCount++;
+    }
+
+    contentEl.innerHTML = `
+      <p class="fr-hint" style="margin-bottom:14px;">${esc(formatDateLabel(start))} até ${esc(formatDateLabel(end))}</p>
+      <div class="fr-report-grid">
+        <div class="fr-report-stat"><span class="fr-report-num">${trainedCount}/7</span><span class="fr-report-label">dias treinados</span></div>
+        <div class="fr-report-stat"><span class="fr-report-num">${waterCount}/7</span><span class="fr-report-label">meta de água</span></div>
+        <div class="fr-report-stat"><span class="fr-report-num">${proteinCount}/7</span><span class="fr-report-label">meta de proteína</span></div>
+        <div class="fr-report-stat"><span class="fr-report-num">${calCount}/7</span><span class="fr-report-label">dentro das calorias</span></div>
+        ${burnGoal>0 ? `<div class="fr-report-stat"><span class="fr-report-num">${Math.round(burnedTotal)}</span><span class="fr-report-label">kcal gastas / ${burnGoal}</span></div>` : ''}
+      </div>
+    `;
   }
 
   const WITHINGS_CLIENT_ID = '93b8137c6ca62be92f25630f554f242be66bcce95d97388c1b444ac7dcda087b';
@@ -3533,6 +3611,20 @@
     generateWeeklyReport();
   }
 
+  async function notifyLinkedProfessionalOfReport(){
+    try{
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if(!token) return;
+      fetch(`${SUPABASE_URL}/functions/v1/notify-professional-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+      }).catch(err=> console.error('Não foi possível avisar o profissional', err));
+    }catch(err){
+      console.error(err);
+    }
+  }
+
   async function generateWeeklyReport(){
     const end = todayStr();
     const start = shiftDateStr(end, -6);
@@ -3574,6 +3666,7 @@
     if(tips.length===0) tips.push('Semana muito consistente! Continue assim.');
 
     showWeeklyReportModal({ trainedCount, waterCount, proteinCount, calCount, burnedTotal, burnGoal, tips, start, end });
+    notifyLinkedProfessionalOfReport();
 
     const { error } = await sb.from('profiles').update({ last_report_shown_date: todayStr() }).eq('id', currentUser.id);
     if(!error){ currentProfile.last_report_shown_date = todayStr(); }
