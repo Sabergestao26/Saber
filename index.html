@@ -2133,22 +2133,20 @@
       fullBodyGroups.forEach(g=> exs.push(...pick(g, Math.max(1, Math.round(exPerGroup/2)))));
       plan.push({ name: 'Treino Full Body (gerado pela avaliação)', exercises: exs });
     } else if(answers.days === 3){
-      plan.push({ name: 'Treino A — Superiores (gerado pela avaliação)', exercises: [
-        ...pick('Treino de Peito', exPerGroup), ...pick('Treino de Costas', exPerGroup),
-        ...pick('Treino de Ombros', Math.max(1,exPerGroup-1)), ...pick('Treino de Bíceps', Math.max(1,exPerGroup-1)), ...pick('Treino de Tríceps', Math.max(1,exPerGroup-1))
+      plan.push({ name: 'Treino A — Superiores 1 (gerado pela avaliação)', exercises: [
+        ...pick('Treino de Peito', exPerGroup), ...pick('Treino de Ombros', Math.max(1,exPerGroup-1)), ...pick('Treino de Tríceps', Math.max(1,exPerGroup-1))
       ]});
       plan.push({ name: 'Treino B — Inferiores (gerado pela avaliação)', exercises: [
         ...pick('Treino de Pernas', exPerGroup+1), ...pick('Treino de Glúteos', exPerGroup), ...pick('Treino de Panturrilhas', 2), ...pick('Treino de Abdômen', exPerGroup)
       ]});
-      plan.push({ name: 'Treino C — Full Body (gerado pela avaliação)', exercises: [
-        ...pick('Treino de Peito', Math.max(1,exPerGroup-1)), ...pick('Treino de Costas', Math.max(1,exPerGroup-1)),
-        ...pick('Treino de Pernas', Math.max(1,exPerGroup-1)), ...pick('Treino de Ombros', 1), ...pick('Treino de Abdômen', 1)
+      plan.push({ name: 'Treino C — Superiores 2 (gerado pela avaliação)', exercises: [
+        ...pick('Treino de Costas', exPerGroup), ...pick('Treino de Bíceps', Math.max(1,exPerGroup-1)), ...pick('Treino de Trapézio', 2)
       ]});
     } else if(answers.days === 4){
       plan.push({ name: 'Treino A — Superiores 1 (gerado pela avaliação)', exercises: [...pick('Treino de Peito', exPerGroup), ...pick('Treino de Ombros', exPerGroup), ...pick('Treino de Tríceps', exPerGroup)] });
       plan.push({ name: 'Treino B — Inferiores 1 (gerado pela avaliação)', exercises: [...pick('Treino de Pernas', exPerGroup+1), ...pick('Treino de Abdômen', exPerGroup)] });
-      plan.push({ name: 'Treino C — Superiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Costas', exPerGroup), ...pick('Treino de Trapézio', 2), ...pick('Treino de Bíceps', exPerGroup)] });
-      plan.push({ name: 'Treino D — Inferiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Glúteos', exPerGroup), ...pick('Treino de Panturrilhas', 2), ...pick('Treino de Antebraço', 2)] });
+      plan.push({ name: 'Treino C — Superiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Costas', exPerGroup), ...pick('Treino de Trapézio', 2), ...pick('Treino de Bíceps', exPerGroup), ...pick('Treino de Antebraço', 2)] });
+      plan.push({ name: 'Treino D — Inferiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Glúteos', exPerGroup), ...pick('Treino de Panturrilhas', 2)] });
     } else {
       plan.push({ name: 'Treino de Peito (gerado pela avaliação)', exercises: pick('Treino de Peito', exPerGroup+2) });
       plan.push({ name: 'Treino de Costas (gerado pela avaliação)', exercises: pick('Treino de Costas', exPerGroup+2) });
