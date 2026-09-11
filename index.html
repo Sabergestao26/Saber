@@ -459,8 +459,9 @@
   .fr-cal-day-empty{ background:none; border:none; min-height:0; }
   .fr-cal-day-today{ border-color:var(--green-deep); border-width:2px; }
   .fr-cal-day-num{ font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; }
-  .fr-cal-metrics{ display:flex; flex-direction:column; align-items:center; gap:0; margin-top:2px; }
-  .fr-cal-metric{ font-family:'IBM Plex Mono',monospace; font-size:8.5px; line-height:1.5; white-space:nowrap; }
+  .fr-cal-metrics{ display:flex; flex-direction:column; align-items:flex-start; gap:0; margin-top:2px; }
+  .fr-cal-metric{ display:flex; align-items:center; gap:2px; font-family:'IBM Plex Mono',monospace; font-size:8.5px; line-height:1.5; white-space:nowrap; }
+  .fr-cal-metric i{ width:4px; height:4px; min-width:4px; border-radius:50%; display:inline-block; }
 
   .fr-report-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:6px; }
   .fr-report-stat{ background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:14px; text-align:center; }
@@ -3643,11 +3644,12 @@
     const endDate = `${calendarYear}-${pad(calendarMonth+1)}-${pad(daysInMonth)}`;
 
     await loadTargetsOnce();
-    const [{ data: completions }, { data: waters }, { data: logs }, { data: burns }] = await Promise.all([
+    const [{ data: completions }, { data: waters }, { data: logs }, { data: burns }, { data: sessions }] = await Promise.all([
       sb.from('workout_completions').select('date').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
       sb.from('water_logs').select('date, amount_ml').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
       sb.from('diary_logs').select('date, protein, calories').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
-      sb.from('calories_burned_logs').select('date, amount').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate)
+      sb.from('calories_burned_logs').select('date, amount').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
+      sb.from('workout_sessions').select('started_at, duration_seconds').eq('user_id', currentUser.id).not('duration_seconds', 'is', null).gte('started_at', startDate).lte('started_at', endDate+'T23:59:59')
     ]);
 
     const trainedDays = new Set((completions||[]).map(c=>c.date));
@@ -3660,6 +3662,17 @@
     });
     const burnedByDay = {};
     (burns||[]).forEach(b=>{ burnedByDay[b.date] = n0(b.amount); });
+    const durationByDay = {};
+    (sessions||[]).forEach(s=>{
+      const d = s.started_at.slice(0,10);
+      durationByDay[d] = (durationByDay[d]||0) + n0(s.duration_seconds);
+    });
+    function fmtDuration(seconds){
+      const mins = Math.round(seconds/60);
+      if(mins < 60) return `${mins}min`;
+      const h = Math.floor(mins/60), m = mins%60;
+      return m>0 ? `${h}h${String(m).padStart(2,'0')}` : `${h}h`;
+    }
 
     const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
     let html = `<div class="fr-cal-weekdays">${['D','S','T','Q','Q','S','S'].map(d=>`<span>${d}</span>`).join('')}</div><div class="fr-cal-days">`;
@@ -3669,11 +3682,14 @@
       const isFuture = dateStr > todayStr();
       const lines = [];
       if(!isFuture){
-        if(trainedDays.has(dateStr)) lines.push(`<span class="fr-cal-metric" style="color:var(--blue)">🏋</span>`);
-        if(waterByDay[dateStr]) lines.push(`<span class="fr-cal-metric" style="color:var(--green)">${(waterByDay[dateStr]/1000).toFixed(1)}L</span>`);
-        if(proteinByDay[dateStr]) lines.push(`<span class="fr-cal-metric" style="color:var(--mustard)">${Math.round(proteinByDay[dateStr])}g</span>`);
-        if(calByDay[dateStr]) lines.push(`<span class="fr-cal-metric" style="color:var(--rust)">${Math.round(calByDay[dateStr])}kcal</span>`);
-        if(burnedByDay[dateStr]) lines.push(`<span class="fr-cal-metric" style="color:var(--plum)">-${Math.round(burnedByDay[dateStr])}kcal</span>`);
+        if(trainedDays.has(dateStr)){
+          const durLabel = durationByDay[dateStr] ? fmtDuration(durationByDay[dateStr]) : 'treino';
+          lines.push(`<span class="fr-cal-metric"><i style="background:var(--blue)"></i><span style="color:var(--blue)">${durLabel}</span></span>`);
+        }
+        if(waterByDay[dateStr]) lines.push(`<span class="fr-cal-metric"><i style="background:var(--green)"></i><span style="color:var(--green)">${(waterByDay[dateStr]/1000).toFixed(1)}L</span></span>`);
+        if(proteinByDay[dateStr]) lines.push(`<span class="fr-cal-metric"><i style="background:var(--mustard)"></i><span style="color:var(--mustard)">${Math.round(proteinByDay[dateStr])}g</span></span>`);
+        if(calByDay[dateStr]) lines.push(`<span class="fr-cal-metric"><i style="background:var(--rust)"></i><span style="color:var(--rust)">${Math.round(calByDay[dateStr])}kcal</span></span>`);
+        if(burnedByDay[dateStr]) lines.push(`<span class="fr-cal-metric"><i style="background:var(--plum)"></i><span style="color:var(--plum)">-${Math.round(burnedByDay[dateStr])}kcal</span></span>`);
       }
       const isToday = dateStr === todayStr();
       html += `<div class="fr-cal-day ${isToday?'fr-cal-day-today':''}"><span class="fr-cal-day-num">${d}</span><div class="fr-cal-metrics">${lines.join('')}</div></div>`;
