@@ -1219,7 +1219,7 @@
               (LIMITATION_EXCLUSIONS[l]||[]).forEach(name=> excluded.push(name));
             });
             await loadExerciseLibrary();
-            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio }, excluded);
+            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio, includeCardioFinisher: assessment.include_cardio_finisher, cardioFinisherType: assessment.cardio_finisher_type }, excluded);
             for(const day of plan){
               await sb.from('workouts').insert({ name: day.name, assigned_to_user_id: assessment.user_id, created_by: currentUser.id, notes: 'Gerado a partir da avaliação, revisado pelo admin.' })
                 .select().single().then(async ({data:w, error:wErr})=>{
@@ -2046,6 +2046,19 @@
         <div class="fr-field">
           <label class="fr-pick-row"><input type="checkbox" id="fr-as-cardio"><span>Quero incluir um <strong>treino de cardio</strong> também (fica separado dos outros, você escolhe fazer ou não em qualquer dia)</span></label>
         </div>
+        <div class="fr-field">
+          <label class="fr-pick-row"><input type="checkbox" id="fr-as-cardio-finisher"><span>Adicionar <strong>10-15min de cardio no final de cada treino</strong> (dentro do próprio treino de musculação)</span></label>
+          <select id="fr-as-cardio-finisher-type" style="display:none;margin-top:8px;">
+            <option>Caminhada rápida</option>
+            <option>Corrida (esteira ou rua)</option>
+            <option>Bicicleta ergométrica</option>
+            <option>Elíptico (transport)</option>
+            <option>Pular corda</option>
+            <option>Subir escada / step</option>
+            <option>HIIT (intervalado de alta intensidade)</option>
+            <option>Remo (ergômetro)</option>
+          </select>
+        </div>
         <div class="fr-field"><label>Tem alguma área específica que você quer focar mais? (opcional)</label>
           <p class="fr-hint" style="margin-bottom:6px;">Pode marcar de forma ampla (superiores/inferiores) ou específica por grupo muscular.</p>
           <div id="fr-as-focus-broad" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
@@ -2094,6 +2107,10 @@
       if(this.checked) noneBox.checked = false;
     }));
 
+    overlay.querySelector('#fr-as-cardio-finisher').addEventListener('change', function(){
+      overlay.querySelector('#fr-as-cardio-finisher-type').style.display = this.checked ? '' : 'none';
+    });
+
     overlay.querySelector('#fr-assess-form').addEventListener('submit', async function(e){
       e.preventDefault();
       const btn = overlay.querySelector('button[type="submit"]');
@@ -2109,11 +2126,13 @@
       let focusAreas = [...focusAreasGranular];
       focusAreasBroad.forEach(g=>{ FOCUS_AREA_GROUPS[g].forEach(name=>{ if(!focusAreas.includes(name)) focusAreas.push(name); }); });
       const includeCardio = document.getElementById('fr-as-cardio').checked;
+      const includeCardioFinisher = document.getElementById('fr-as-cardio-finisher').checked;
+      const cardioFinisherType = document.getElementById('fr-as-cardio-finisher-type').value;
       const answers = {
         goal: document.getElementById('fr-as-goal').value,
         level: document.getElementById('fr-as-level').value,
         days: parseInt(document.getElementById('fr-as-days').value, 10),
-        medical, limitations, focusAreas, includeCardio,
+        medical, limitations, focusAreas, includeCardio, includeCardioFinisher, cardioFinisherType,
         notes: document.getElementById('fr-as-notes').value.trim()
       };
       btn.disabled = true; btn.textContent = 'Enviando...';
@@ -2121,7 +2140,8 @@
       if(limitations.length > 0){
         const { error } = await sb.from('assessment_submissions').insert({
           user_id: currentUser.id, goal: answers.goal, level: answers.level, days_per_week: answers.days,
-          medical_clearance: medical, limitations, limitations_notes: answers.notes, include_cardio: includeCardio
+          medical_clearance: medical, limitations, limitations_notes: answers.notes, include_cardio: includeCardio,
+          include_cardio_finisher: includeCardioFinisher, cardio_finisher_type: includeCardioFinisher ? cardioFinisherType : null
         });
         if(error){ showToast('Não foi possível enviar. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Gerar meu treino'; return; }
         showToast('Avaliação enviada! Seu treino será liberado depois da revisão.', 'ok');
@@ -2181,6 +2201,13 @@
       plan.push({ name: 'Treino de Pernas (gerado pela avaliação)', exercises: pick('Treino de Pernas', exPerGroup+2) });
       plan.push({ name: 'Treino de Ombros (gerado pela avaliação)', exercises: pick('Treino de Ombros', exPerGroup+1) });
       plan.push({ name: 'Treino de Braços (gerado pela avaliação)', exercises: [...pick('Treino de Bíceps', exPerGroup), ...pick('Treino de Tríceps', exPerGroup)] });
+    }
+    if(answers.includeCardioFinisher && answers.cardioFinisherType && groups['Treino de Cardio']){
+      const finisherEx = groups['Treino de Cardio'].find(e=> e.name === answers.cardioFinisherType);
+      if(finisherEx && !excludedNames.includes(finisherEx.name)){
+        const finisherCopy = { ...finisherEx, sets:1, reps:'10-15 minutos', rest_seconds:0 };
+        plan.forEach(day=>{ day.exercises = [...day.exercises, finisherCopy]; });
+      }
     }
     if(answers.includeCardio && groups['Treino de Cardio'] && groups['Treino de Cardio'].length){
       const cardioExercises = groups['Treino de Cardio'].filter(e=> !excludedNames.includes(e.name));
@@ -2781,9 +2808,18 @@
   async function openWorkoutExerciseManager(workoutId, workoutName){
     const w = workouts.find(x=>x.id===workoutId);
     const isLibraryWorkout = w && w.assigned_to_user_id === null;
+    await loadExerciseLibrary();
+    const cardioOptions = (groupLibraryByMuscle()['Treino de Cardio'] || []);
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Exercícios — ${esc(workoutName)}</h3>
-      <button class="fr-btn-primary" id="fr-wkex-add" style="width:100%;margin-bottom:16px;">${PLUS_SVG} Adicionar exercício</button>
+      <button class="fr-btn-primary" id="fr-wkex-add" style="width:100%;margin-bottom:10px;">${PLUS_SVG} Adicionar exercício</button>
+      ${cardioOptions.length ? `<button class="fr-btn-ghost" id="fr-wkex-add-cardio-toggle" style="width:100%;margin-bottom:16px;">🏃 Adicionar cardio no final (10-15min)</button>
+      <div id="fr-wkex-cardio-picker" style="display:none;margin-bottom:16px;">
+        <select id="fr-wkex-cardio-select">
+          ${cardioOptions.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}
+        </select>
+        <button class="fr-btn-primary" id="fr-wkex-cardio-confirm" style="width:100%;margin-top:8px;">Adicionar</button>
+      </div>` : ''}
       <div id="fr-wkex-list"><div class="fr-loading">Carregando...</div></div>
       <button class="fr-btn-ghost" id="fr-wkex-done" style="width:100%;margin-top:14px;">Concluir</button>
       ${isLibraryWorkout ? `<p class="fr-hint" style="margin-top:14px;">Este é um treino de referência da biblioteca — não pode ser excluído por aqui, só editado (adicionar/editar exercícios).</p>` : `
@@ -2793,6 +2829,28 @@
     `);
     overlay.querySelector('#fr-wkex-done').addEventListener('click', ()=>{ closeOverlay(); loadWorkouts(); });
     overlay.querySelector('#fr-wkex-add').addEventListener('click', ()=> openExerciseFormModal(workoutId, workoutName, null));
+    const cardioToggle = overlay.querySelector('#fr-wkex-add-cardio-toggle');
+    if(cardioToggle){
+      cardioToggle.addEventListener('click', ()=>{
+        const picker = overlay.querySelector('#fr-wkex-cardio-picker');
+        picker.style.display = picker.style.display==='none' ? '' : 'none';
+      });
+      overlay.querySelector('#fr-wkex-cardio-confirm').addEventListener('click', async function(){
+        const btn = this; btn.disabled = true; btn.textContent = 'Adicionando...';
+        const selectedId = overlay.querySelector('#fr-wkex-cardio-select').value;
+        const cardioEx = cardioOptions.find(e=>e.id===selectedId);
+        const { count } = await sb.from('workout_exercises').select('id', {count:'exact', head:true}).eq('workout_id', workoutId);
+        const { error } = await sb.from('workout_exercises').insert({
+          workout_id: workoutId, position: (count||0)+1, name: cardioEx.name, sets: 1, reps: '10-15 minutos',
+          rest_seconds: 0, video_url: cardioEx.video_url, notes: cardioEx.notes
+        });
+        btn.disabled = false; btn.textContent = 'Adicionar';
+        if(error){ showToast('Não foi possível adicionar.', 'err'); return; }
+        showToast('Cardio adicionado no final do treino!', 'ok');
+        closeOverlay();
+        openWorkoutExerciseManager(workoutId, workoutName);
+      });
+    }
     const deleteBtn = overlay.querySelector('#fr-wkex-delete-workout');
     if(deleteBtn){
       deleteBtn.addEventListener('click', function(){
