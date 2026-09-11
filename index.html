@@ -2174,6 +2174,8 @@
     const w = workouts.find(x=>x.id===id);
     if(!w) return;
     const canEdit = w.created_by === currentUser.id;
+    const isLibraryWorkout = w.assigned_to_user_id === null;
+    const canDelete = !isLibraryWorkout && (w.created_by === currentUser.id || w.assigned_to_user_id === currentUser.id);
 
     const { data: openSession } = await sb.from('workout_sessions').select('*').eq('user_id', currentUser.id).eq('workout_id', id).is('finished_at', null).order('started_at', {ascending:false}).limit(1).maybeSingle();
     const STALE_SESSION_HOURS = 6;
@@ -2198,10 +2200,35 @@
       <button type="button" class="fr-btn-ghost" id="fr-session-history-toggle" style="width:100%;margin-top:14px;">📅 Ver histórico de sessões deste treino</button>
       <div id="fr-session-history-box"></div>
       ${canEdit ? `<button class="fr-btn-ghost" id="fr-workout-edit" style="width:100%;margin-top:10px;">Gerenciar exercícios / editar treino</button>` : ''}
+      ${canDelete ? `
+      <div id="fr-detail-delete-area" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+        <button class="fr-btn-danger" id="fr-detail-delete-workout" style="width:100%;">Excluir este treino</button>
+      </div>` : ''}
     `);
     overlay.querySelector('#fr-session-history-toggle').addEventListener('click', ()=> toggleSessionHistory(id));
     if(canEdit){
       overlay.querySelector('#fr-workout-edit').addEventListener('click', ()=>{ stopSessionTimerDisplay(); closeOverlay(); openWorkoutExerciseManager(w.id, w.name); });
+    }
+    if(canDelete){
+      overlay.querySelector('#fr-detail-delete-workout').addEventListener('click', function(){
+        const area = overlay.querySelector('#fr-detail-delete-area');
+        area.innerHTML = `
+          <div class="fr-confirm-row">
+            <span class="fr-confirm-text">Excluir "${esc(w.name)}"? Não pode ser desfeito.</span>
+            <button class="fr-btn-ghost" id="fr-detail-cancel-delete">Cancelar</button>
+            <button class="fr-btn-danger" id="fr-detail-confirm-delete">Confirmar exclusão</button>
+          </div>`;
+        area.querySelector('#fr-detail-cancel-delete').addEventListener('click', ()=>{ stopSessionTimerDisplay(); closeOverlay(); openWorkoutDetail(id); });
+        area.querySelector('#fr-detail-confirm-delete').addEventListener('click', async function(){
+          const btn = this; btn.disabled = true; btn.textContent = 'Excluindo...';
+          const { error } = await sb.from('workouts').delete().eq('id', id);
+          if(error){ showToast('Não foi possível excluir. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Confirmar exclusão'; return; }
+          showToast('Treino excluído.', 'ok');
+          stopSessionTimerDisplay();
+          closeOverlay();
+          loadWorkouts();
+        });
+      });
     }
 
     renderSessionBox(overlay, id, w.name);
