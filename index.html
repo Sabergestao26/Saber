@@ -1219,7 +1219,7 @@
               (LIMITATION_EXCLUSIONS[l]||[]).forEach(name=> excluded.push(name));
             });
             await loadExerciseLibrary();
-            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week }, excluded);
+            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio }, excluded);
             for(const day of plan){
               await sb.from('workouts').insert({ name: day.name, assigned_to_user_id: assessment.user_id, created_by: currentUser.id, notes: 'Gerado a partir da avaliação, revisado pelo admin.' })
                 .select().single().then(async ({data:w, error:wErr})=>{
@@ -1913,6 +1913,7 @@
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Montar meu treino</h3>
       <div class="fr-field"><label for="fr-pick-name">Nome do treino</label><input type="text" id="fr-pick-name" placeholder="ex.: Treino de hoje" value="Meu treino"></div>
+      <button type="button" class="fr-btn-ghost" id="fr-pick-only-cardio" style="width:100%;margin-bottom:12px;">🏃 Só cardio hoje (marca só as opções de cardio)</button>
       <div id="fr-pick-list"><div class="fr-loading">Carregando exercícios...</div></div>
       <button class="fr-btn-primary" id="fr-pick-save" style="width:100%;margin-top:16px;">Salvar meu treino</button>
     `);
@@ -1932,6 +1933,16 @@
             <span>${esc(e.name)} <small>${e.sets||'?'}x${esc(e.reps||'?')}</small></span>
           </label>`).join('')}
       </div>`).join('');
+
+    overlay.querySelector('#fr-pick-only-cardio').addEventListener('click', function(){
+      overlay.querySelectorAll('.fr-pick-checkbox').forEach(cb=>{ cb.checked = false; });
+      const cardioExs = groups['Treino de Cardio'] || [];
+      const cardioIds = new Set(cardioExs.map(e=>e.id));
+      overlay.querySelectorAll('.fr-pick-checkbox').forEach(cb=>{ if(cardioIds.has(cb.value)) cb.checked = true; });
+      document.getElementById('fr-pick-name').value = 'Cardio';
+      const cardioGroupEl = Array.from(overlay.querySelectorAll('.fr-pick-group-title')).find(el=> el.textContent==='Treino de Cardio');
+      if(cardioGroupEl) cardioGroupEl.scrollIntoView({behavior:'smooth', block:'start'});
+    });
 
     overlay.querySelector('#fr-pick-save').addEventListener('click', async function(){
       const checked = Array.from(overlay.querySelectorAll('.fr-pick-checkbox:checked')).map(c=>c.value);
@@ -2032,6 +2043,9 @@
             <option value="5">5 ou mais dias</option>
           </select>
         </div>
+        <div class="fr-field">
+          <label class="fr-pick-row"><input type="checkbox" id="fr-as-cardio"><span>Quero incluir um <strong>treino de cardio</strong> também (fica separado dos outros, você escolhe fazer ou não em qualquer dia)</span></label>
+        </div>
         <div class="fr-field"><label>Tem alguma área específica que você quer focar mais? (opcional)</label>
           <p class="fr-hint" style="margin-bottom:6px;">Pode marcar de forma ampla (superiores/inferiores) ou específica por grupo muscular.</p>
           <div id="fr-as-focus-broad" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
@@ -2094,11 +2108,12 @@
       const focusAreasBroad = Array.from(overlay.querySelectorAll('.fr-as-focus-broad-box:checked')).map(b=>b.value);
       let focusAreas = [...focusAreasGranular];
       focusAreasBroad.forEach(g=>{ FOCUS_AREA_GROUPS[g].forEach(name=>{ if(!focusAreas.includes(name)) focusAreas.push(name); }); });
+      const includeCardio = document.getElementById('fr-as-cardio').checked;
       const answers = {
         goal: document.getElementById('fr-as-goal').value,
         level: document.getElementById('fr-as-level').value,
         days: parseInt(document.getElementById('fr-as-days').value, 10),
-        medical, limitations, focusAreas,
+        medical, limitations, focusAreas, includeCardio,
         notes: document.getElementById('fr-as-notes').value.trim()
       };
       btn.disabled = true; btn.textContent = 'Enviando...';
@@ -2106,7 +2121,7 @@
       if(limitations.length > 0){
         const { error } = await sb.from('assessment_submissions').insert({
           user_id: currentUser.id, goal: answers.goal, level: answers.level, days_per_week: answers.days,
-          medical_clearance: medical, limitations, limitations_notes: answers.notes
+          medical_clearance: medical, limitations, limitations_notes: answers.notes, include_cardio: includeCardio
         });
         if(error){ showToast('Não foi possível enviar. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Gerar meu treino'; return; }
         showToast('Avaliação enviada! Seu treino será liberado depois da revisão.', 'ok');
@@ -2166,6 +2181,10 @@
       plan.push({ name: 'Treino de Pernas (gerado pela avaliação)', exercises: pick('Treino de Pernas', exPerGroup+2) });
       plan.push({ name: 'Treino de Ombros (gerado pela avaliação)', exercises: pick('Treino de Ombros', exPerGroup+1) });
       plan.push({ name: 'Treino de Braços (gerado pela avaliação)', exercises: [...pick('Treino de Bíceps', exPerGroup), ...pick('Treino de Tríceps', exPerGroup)] });
+    }
+    if(answers.includeCardio && groups['Treino de Cardio'] && groups['Treino de Cardio'].length){
+      const cardioExercises = groups['Treino de Cardio'].filter(e=> !excludedNames.includes(e.name));
+      plan.push({ name: 'Cardio (gerado pela avaliação)', exercises: cardioExercises });
     }
     return plan.filter(day=> day.exercises.length>0);
   }
