@@ -2176,7 +2176,13 @@
     const canEdit = w.created_by === currentUser.id;
 
     const { data: openSession } = await sb.from('workout_sessions').select('*').eq('user_id', currentUser.id).eq('workout_id', id).is('finished_at', null).order('started_at', {ascending:false}).limit(1).maybeSingle();
-    if(openSession){
+    const STALE_SESSION_HOURS = 6;
+    if(openSession && (Date.now() - new Date(openSession.started_at).getTime()) > STALE_SESSION_HOURS*3600*1000){
+      // Sessão antiga demais pra ainda ser considerada "em andamento" — provavelmente
+      // a pessoa fechou o app sem finalizar. Encerra sem contar uma duração inventada,
+      // em vez de deixar a contagem seguir rodando desde então.
+      await sb.from('workout_sessions').update({ finished_at: new Date().toISOString(), duration_seconds: null }).eq('id', openSession.id);
+    } else if(openSession){
       activeSessionId = openSession.id;
       activeSessionWorkoutId = id;
       sessionStartTime = new Date(openSession.started_at).getTime();
@@ -2280,13 +2286,19 @@
     sessionTimerInterval = setInterval(updateSessionTimerDisplay, 1000);
     box.querySelector('#fr-finish-session').addEventListener('click', async function(){
       this.disabled = true; this.textContent = 'Finalizando...';
-      const durationSeconds = Math.floor((Date.now() - sessionStartTime)/1000);
+      let durationSeconds = Math.floor((Date.now() - sessionStartTime)/1000);
+      const MAX_REASONABLE_SECONDS = 6*3600;
+      if(durationSeconds > MAX_REASONABLE_SECONDS){
+        // Duração implausível pra um treino — provavelmente o app ficou fechado
+        // no meio. Guarda sem duração, em vez de um número claramente errado.
+        durationSeconds = null;
+      }
       const { error } = await sb.from('workout_sessions').update({ finished_at: new Date().toISOString(), duration_seconds: durationSeconds }).eq('id', activeSessionId);
       if(error){ showToast('Não foi possível finalizar. Tente novamente.', 'err'); this.disabled=false; this.textContent='■ Finalizar treino'; return; }
       await sb.from('workout_completions').insert({ user_id: currentUser.id, workout_id: workoutId, date: todayStr() });
       stopSessionTimerDisplay();
       activeSessionId = null; activeSessionWorkoutId = null; sessionStartTime = null;
-      showToast(`Treino finalizado! Duração: ${formatTimer(durationSeconds)}.`, 'ok');
+      showToast(durationSeconds ? `Treino finalizado! Duração: ${formatTimer(durationSeconds)}.` : 'Treino finalizado!', 'ok');
       closeOverlay();
     });
   }
