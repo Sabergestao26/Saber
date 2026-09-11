@@ -455,12 +455,12 @@
   .fr-cal-month-label{ font-family:'Fraunces',serif; font-weight:600; font-size:16px; color:var(--green-deep); min-width:140px; text-align:center; }
   .fr-cal-weekdays{ display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); margin-bottom:6px; }
   .fr-cal-days{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
-  .fr-cal-day{ aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:6px; background:var(--surface); border:1px solid var(--border); }
-  .fr-cal-day-empty{ background:none; border:none; }
+  .fr-cal-day{ min-height:56px; display:flex; flex-direction:column; align-items:center; padding:4px 1px; border-radius:6px; background:var(--surface); border:1px solid var(--border); }
+  .fr-cal-day-empty{ background:none; border:none; min-height:0; }
   .fr-cal-day-today{ border-color:var(--green-deep); border-width:2px; }
-  .fr-cal-day-num{ font-family:'IBM Plex Mono',monospace; font-size:11px; }
-  .fr-cal-dots{ display:flex; gap:2px; margin-top:2px; min-height:5px; }
-  .fr-cal-dots span{ width:4px; height:4px; border-radius:50%; display:inline-block; }
+  .fr-cal-day-num{ font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; }
+  .fr-cal-metrics{ display:flex; flex-direction:column; align-items:center; gap:0; margin-top:2px; }
+  .fr-cal-metric{ font-family:'IBM Plex Mono',monospace; font-size:8.5px; line-height:1.5; white-space:nowrap; }
 
   .fr-report-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:6px; }
   .fr-report-stat{ background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:14px; text-align:center; }
@@ -1989,6 +1989,10 @@
     ['Treino de Trapézio', 'Trapézio'],
     ['Treino de Antebraço', 'Antebraço']
   ];
+  const FOCUS_AREA_GROUPS = {
+    superiores: ['Treino de Peito', 'Treino de Costas', 'Treino de Ombros', 'Treino de Bíceps', 'Treino de Tríceps', 'Treino de Trapézio', 'Treino de Antebraço'],
+    inferiores: ['Treino de Pernas', 'Treino de Glúteos', 'Treino de Panturrilhas']
+  };
   const LIMITATION_EXCLUSIONS = {
     coluna: ['Levantamento terra','Levantamento terra romeno','Stiff','Remada curvada','Remada cavalinho','Agachamento livre','Agachamento frontal','Agachamento sumô (pés afastados)','Agachamento búlgaro','Roda abdominal','Agachamento no hack'],
     joelhos: ['Agachamento livre','Agachamento frontal','Agachamento no hack','Agachamento búlgaro','Leg press','Extensora','Passada','Elevação de panturrilha no leg press'],
@@ -2028,6 +2032,11 @@
           </select>
         </div>
         <div class="fr-field"><label>Tem alguma área específica que você quer focar mais? (opcional)</label>
+          <p class="fr-hint" style="margin-bottom:6px;">Pode marcar de forma ampla (superiores/inferiores) ou específica por grupo muscular.</p>
+          <div id="fr-as-focus-broad" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
+            <label class="fr-pick-row"><input type="checkbox" class="fr-as-focus-broad-box" value="superiores"><span><strong>Superiores</strong> (peito, costas, ombros, braços)</span></label>
+            <label class="fr-pick-row"><input type="checkbox" class="fr-as-focus-broad-box" value="inferiores"><span><strong>Inferiores</strong> (pernas, glúteos, panturrilha)</span></label>
+          </div>
           <div id="fr-as-focus">
             ${FOCUS_AREA_LABELS.map(([key,label])=>`
               <label class="fr-pick-row"><input type="checkbox" class="fr-as-focus-box" value="${key}"><span>${esc(label)}</span></label>
@@ -2080,7 +2089,10 @@
         return;
       }
       const limitations = Array.from(overlay.querySelectorAll('.fr-as-limit-box:checked')).map(b=>b.value).filter(v=>v!=='nenhuma');
-      const focusAreas = Array.from(overlay.querySelectorAll('.fr-as-focus-box:checked')).map(b=>b.value);
+      const focusAreasGranular = Array.from(overlay.querySelectorAll('.fr-as-focus-box:checked')).map(b=>b.value);
+      const focusAreasBroad = Array.from(overlay.querySelectorAll('.fr-as-focus-broad-box:checked')).map(b=>b.value);
+      let focusAreas = [...focusAreasGranular];
+      focusAreasBroad.forEach(g=>{ FOCUS_AREA_GROUPS[g].forEach(name=>{ if(!focusAreas.includes(name)) focusAreas.push(name); }); });
       const answers = {
         goal: document.getElementById('fr-as-goal').value,
         level: document.getElementById('fr-as-level').value,
@@ -3593,10 +3605,11 @@
       <div class="fr-section-label" style="max-width:1080px;margin:24px auto 12px;">Calendário de desempenho</div>
       <div class="fr-cal-card">
         <div class="fr-cal-legend">
-          <span><i style="background:var(--blue)"></i> Treino</span>
-          <span><i style="background:var(--green)"></i> Água</span>
-          <span><i style="background:var(--mustard)"></i> Proteína</span>
-          <span><i style="background:var(--rust)"></i> Calorias</span>
+          <span><i style="background:var(--blue)"></i> 🏋 Treino</span>
+          <span><i style="background:var(--green)"></i> Água (litros)</span>
+          <span><i style="background:var(--mustard)"></i> Proteína (g)</span>
+          <span><i style="background:var(--rust)"></i> Calorias consumidas</span>
+          <span><i style="background:var(--plum)"></i> Calorias gastas</span>
         </div>
         <div class="fr-cal-nav">
           <button class="fr-date-btn" id="fr-cal-prev" aria-label="Mês anterior">&lsaquo;</button>
@@ -3630,10 +3643,11 @@
     const endDate = `${calendarYear}-${pad(calendarMonth+1)}-${pad(daysInMonth)}`;
 
     await loadTargetsOnce();
-    const [{ data: completions }, { data: waters }, { data: logs }] = await Promise.all([
+    const [{ data: completions }, { data: waters }, { data: logs }, { data: burns }] = await Promise.all([
       sb.from('workout_completions').select('date').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
       sb.from('water_logs').select('date, amount_ml').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
-      sb.from('diary_logs').select('date, protein, calories').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate)
+      sb.from('diary_logs').select('date, protein, calories').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
+      sb.from('calories_burned_logs').select('date, amount').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate)
     ]);
 
     const trainedDays = new Set((completions||[]).map(c=>c.date));
@@ -3644,10 +3658,8 @@
       proteinByDay[l.date] = (proteinByDay[l.date]||0) + n0(l.protein);
       calByDay[l.date] = (calByDay[l.date]||0) + n0(l.calories);
     });
-
-    const waterGoal = Number(targets && targets.water_goal_ml) || 0;
-    const proteinGoal = Number(targets && targets.protein) || 0;
-    const calGoal = Number(targets && targets.calories) || 0;
+    const burnedByDay = {};
+    (burns||[]).forEach(b=>{ burnedByDay[b.date] = n0(b.amount); });
 
     const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
     let html = `<div class="fr-cal-weekdays">${['D','S','T','Q','Q','S','S'].map(d=>`<span>${d}</span>`).join('')}</div><div class="fr-cal-days">`;
@@ -3655,15 +3667,16 @@
     for(let d=1; d<=daysInMonth; d++){
       const dateStr = `${calendarYear}-${pad(calendarMonth+1)}-${pad(d)}`;
       const isFuture = dateStr > todayStr();
-      const dots = [];
+      const lines = [];
       if(!isFuture){
-        if(trainedDays.has(dateStr)) dots.push('var(--blue)');
-        if(waterGoal>0 && (waterByDay[dateStr]||0) >= waterGoal) dots.push('var(--green)');
-        if(proteinGoal>0 && (proteinByDay[dateStr]||0) >= proteinGoal) dots.push('var(--mustard)');
-        if(calGoal>0 && calByDay[dateStr]!==undefined && calByDay[dateStr] <= calGoal) dots.push('var(--rust)');
+        if(trainedDays.has(dateStr)) lines.push(`<span class="fr-cal-metric" style="color:var(--blue)">🏋</span>`);
+        if(waterByDay[dateStr]) lines.push(`<span class="fr-cal-metric" style="color:var(--green)">${(waterByDay[dateStr]/1000).toFixed(1)}L</span>`);
+        if(proteinByDay[dateStr]) lines.push(`<span class="fr-cal-metric" style="color:var(--mustard)">${Math.round(proteinByDay[dateStr])}g</span>`);
+        if(calByDay[dateStr]) lines.push(`<span class="fr-cal-metric" style="color:var(--rust)">${Math.round(calByDay[dateStr])}kcal</span>`);
+        if(burnedByDay[dateStr]) lines.push(`<span class="fr-cal-metric" style="color:var(--plum)">-${Math.round(burnedByDay[dateStr])}kcal</span>`);
       }
       const isToday = dateStr === todayStr();
-      html += `<div class="fr-cal-day ${isToday?'fr-cal-day-today':''}"><span class="fr-cal-day-num">${d}</span><div class="fr-cal-dots">${dots.map(c=>`<span style="background:${c}"></span>`).join('')}</div></div>`;
+      html += `<div class="fr-cal-day ${isToday?'fr-cal-day-today':''}"><span class="fr-cal-day-num">${d}</span><div class="fr-cal-metrics">${lines.join('')}</div></div>`;
     }
     html += `</div>`;
     gridEl.innerHTML = html;
