@@ -1219,7 +1219,7 @@
               (LIMITATION_EXCLUSIONS[l]||[]).forEach(name=> excluded.push(name));
             });
             await loadExerciseLibrary();
-            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio, includeCardioFinisher: assessment.include_cardio_finisher, cardioFinisherUpper: assessment.cardio_finisher_upper, cardioFinisherLower: assessment.cardio_finisher_lower }, excluded);
+            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio, includeCardioFinisher: assessment.include_cardio_finisher, cardioFinisherUpper: assessment.cardio_finisher_upper, cardioFinisherLower: assessment.cardio_finisher_lower, limitations: assessment.limitations }, excluded);
             for(const day of plan){
               await sb.from('workouts').insert({ name: day.name, assigned_to_user_id: assessment.user_id, created_by: currentUser.id, notes: 'Gerado a partir da avaliação, revisado pelo admin.' })
                 .select().single().then(async ({data:w, error:wErr})=>{
@@ -2039,6 +2039,17 @@
     quadril: ['Agachamento livre','Agachamento frontal','Agachamento búlgaro','Agachamento sumô (pés afastados)','Passada','Levantamento terra romeno','Elevação pélvica (ponte com barra)','Extensão de quadril na polia'],
     tornozelo_pe: ['Elevação de panturrilha em pé (máquina)','Elevação de panturrilha no leg press','Elevação de panturrilha com peso do corpo','Elevação de panturrilha com barra livre','Elevação de panturrilha sentado (máquina)','Elevação de panturrilha sentado com halteres','Passada','Agachamento búlgaro','Corrida (esteira ou rua)','Pular corda','HIIT (intervalado de alta intensidade)','Subir escada / step']
   };
+  // Além de excluir os exercícios mais arriscados (acima), reduz também a
+  // QUANTIDADE de exercícios nos grupos musculares afetados pela limitação —
+  // uma camada extra de segurança, mesmo entre os exercícios considerados seguros.
+  const LIMITATION_REDUCED_GROUPS = {
+    coluna: ['Treino de Costas', 'Treino de Abdômen'],
+    joelhos: ['Treino de Pernas', 'Treino de Panturrilhas'],
+    ombros: ['Treino de Ombros', 'Treino de Peito'],
+    punhos_cotovelos: ['Treino de Bíceps', 'Treino de Tríceps', 'Treino de Antebraço'],
+    quadril: ['Treino de Pernas', 'Treino de Glúteos'],
+    tornozelo_pe: ['Treino de Panturrilhas', 'Treino de Pernas']
+  };
 
   function openAssessmentModal(){
     const overlay = buildOverlay(`
@@ -2215,10 +2226,16 @@
     const focusAreas = answers.focusAreas || [];
     const groups = groupLibraryByMuscle();
     const exPerGroup = answers.level==='iniciante' ? 2 : (answers.level==='avancado' ? 4 : 3);
+    const reducedGroups = new Set();
+    (answers.limitations || []).forEach(lim=>{ (LIMITATION_REDUCED_GROUPS[lim] || []).forEach(g=> reducedGroups.add(g)); });
     function pick(groupName, n){
-      const boosted = focusAreas.includes(groupName) ? n + 2 : n;
+      let target = focusAreas.includes(groupName) ? n + 2 : n;
+      // Camada extra de segurança: além de excluir os exercícios mais arriscados,
+      // reduz também a quantidade nos grupos afetados pela limitação da pessoa —
+      // menos volume ali, mesmo entre os exercícios considerados seguros.
+      if(reducedGroups.has(groupName)) target = Math.max(1, Math.ceil(target/2));
       const list = (groups[groupName] || []).filter(e=> !excludedNames.includes(e.name));
-      return list.slice(0, Math.min(boosted, list.length));
+      return list.slice(0, Math.min(target, list.length));
     }
     let plan = [];
     if(answers.days <= 2){
