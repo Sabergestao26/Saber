@@ -1769,6 +1769,24 @@
     document.getElementById('fr-shop-generate').addEventListener('click', ()=> generateShoppingList(list));
   }
 
+  // Fatores de rendimento (peso cozido ÷ peso cru) pros alimentos mais comuns que
+  // aparecem "já cozidos" nas receitas. Usado só pra converter de volta pra uma
+  // estimativa de quanto comprar cru — sem isso, a lista de compras pediria pra
+  // comprar a quantidade já cozida, que não é o que se encontra no mercado.
+  const COOKED_YIELD_FACTORS = [
+    [/arroz/i, 2.75], [/feij[aã]o/i, 2.3], [/lentilha/i, 2.2], [/gr[aã]o.?de.?bico/i, 2.2],
+    [/macarr[aã]o/i, 2.1], [/quinoa/i, 2.8], [/canjica/i, 2.5],
+    [/frango/i, 0.75], [/\bcarne\b/i, 0.7], [/porco|su[íi]n[oa]|lombo/i, 0.7],
+    [/peixe|merluza|til[aá]pia|salm[ãa]o/i, 0.8], [/camar[ãa]o/i, 0.85]
+  ];
+  function estimateRawQuantity(itemName, qty){
+    if(!/cozid[oa]s?/i.test(itemName)) return { qty, converted:false };
+    const match = COOKED_YIELD_FACTORS.find(([re])=> re.test(itemName));
+    if(!match) return { qty, converted:false };
+    const [, factor] = match;
+    return { qty: qty/factor, converted:true };
+  }
+
   function generateShoppingList(list){
     const resultEl = document.getElementById('fr-shop-result');
     const chosen = list.filter(r=> shoppingQuantities[r.id] > 0);
@@ -1779,6 +1797,7 @@
     const aggregated = new Map();
     const freeform = new Map();
     let anyMissingIngredients = false;
+    let anyConverted = false;
     chosen.forEach(r=>{
       const desired = shoppingQuantities[r.id];
       const base = Number(r.portions) || 1;
@@ -1791,10 +1810,16 @@
           freeform.set(key, { item: ing.item, unit: ing.unit });
           return;
         }
-        const scaledQty = Number(ing.quantity) * multiplier;
+        let scaledQty = Number(ing.quantity) * multiplier;
+        let converted = false;
+        if((ing.unit||'').toLowerCase()==='g' || (ing.unit||'').toLowerCase()==='kg'){
+          const est = estimateRawQuantity(ing.item, scaledQty);
+          scaledQty = est.qty; converted = est.converted;
+          if(converted) anyConverted = true;
+        }
         const key = normalize(ing.item) + '|' + (ing.unit||'');
-        if(aggregated.has(key)){ aggregated.get(key).quantity += scaledQty; }
-        else { aggregated.set(key, { item: ing.item, unit: ing.unit, quantity: scaledQty }); }
+        if(aggregated.has(key)){ aggregated.get(key).quantity += scaledQty; if(converted) aggregated.get(key).converted = true; }
+        else { aggregated.set(key, { item: ing.item, unit: ing.unit, quantity: scaledQty, converted }); }
       });
     });
     const items = Array.from(aggregated.values()).sort((a,b)=>a.item.localeCompare(b.item,'pt-BR'));
@@ -1806,8 +1831,9 @@
     resultEl.innerHTML = `
       <h3 class="fr-form-title" style="font-size:17px;">Sua lista de compras</h3>
       ${anyMissingIngredients ? `<div class="fr-hint" style="color:var(--rust);margin-bottom:10px;">Alguma receita escolhida ainda não tem ingredientes cadastrados — edite-a pra completar a lista.</div>` : ''}
+      ${anyConverted ? `<div class="fr-hint" style="margin-bottom:10px;">Itens com <b>*</b> foram convertidos pra quantidade crua estimada, já que a receita descreve eles já cozidos.</div>` : ''}
       <div class="fr-shop-list">
-        ${items.map(i=>`<div class="fr-shop-item"><span>${esc(i.item)}</span><b>${formatQty(i.quantity)} ${esc(i.unit||'')}</b></div>`).join('')}
+        ${items.map(i=>`<div class="fr-shop-item"><span>${esc(i.item)}${i.converted?' *':''}</span><b>${formatQty(i.quantity)} ${esc(i.unit||'')}</b></div>`).join('')}
         ${freeItems.map(i=>`<div class="fr-shop-item"><span>${esc(i.item)}</span><b>${esc(i.unit||'a gosto')}</b></div>`).join('')}
       </div>
     `;
