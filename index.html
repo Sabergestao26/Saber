@@ -2837,7 +2837,13 @@
     await loadExerciseLibrary();
     const cardioOptions = (groupLibraryByMuscle()['Treino de Cardio'] || []);
     const overlay = buildOverlay(`
-      <h3 class="fr-form-title">Exercícios — ${esc(workoutName)}</h3>
+      <h3 class="fr-form-title">Exercícios</h3>
+      <div class="fr-field"><label for="fr-wkex-name">Nome do treino</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="fr-wkex-name" value="${esc(workoutName)}" style="flex:1;">
+          <button class="fr-btn-ghost" id="fr-wkex-rename-save" style="flex:0 0 auto;">Salvar</button>
+        </div>
+      </div>
       <button class="fr-btn-primary" id="fr-wkex-add" style="width:100%;margin-bottom:10px;">${PLUS_SVG} Adicionar exercício</button>
       ${cardioOptions.length ? `<button class="fr-btn-ghost" id="fr-wkex-add-cardio-toggle" style="width:100%;margin-bottom:16px;">🏃 Adicionar cardio no final (10-15min)</button>
       <div id="fr-wkex-cardio-picker" style="display:none;margin-bottom:16px;">
@@ -2854,6 +2860,18 @@
       </div>`}
     `);
     overlay.querySelector('#fr-wkex-done').addEventListener('click', ()=>{ closeOverlay(); loadWorkouts(); });
+    overlay.querySelector('#fr-wkex-rename-save').addEventListener('click', async function(){
+      const btn = this;
+      const newName = document.getElementById('fr-wkex-name').value.trim();
+      if(!newName){ showToast('O nome não pode ficar vazio.', 'err'); return; }
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.from('workouts').update({ name: newName }).eq('id', workoutId);
+      btn.disabled = false; btn.textContent = 'Salvar';
+      if(error){ showToast('Não foi possível salvar o nome.', 'err'); return; }
+      showToast('Nome atualizado!', 'ok');
+      workoutName = newName;
+      loadWorkouts();
+    });
     overlay.querySelector('#fr-wkex-add').addEventListener('click', ()=> openExerciseFormModal(workoutId, workoutName, null));
     const cardioToggle = overlay.querySelector('#fr-wkex-add-cardio-toggle');
     if(cardioToggle){
