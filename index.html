@@ -2867,7 +2867,7 @@
       btn.disabled = true; btn.textContent = 'Salvando...';
       const { error } = await sb.from('workouts').update({ name: newName }).eq('id', workoutId);
       btn.disabled = false; btn.textContent = 'Salvar';
-      if(error){ showToast('Não foi possível salvar o nome.', 'err'); return; }
+      if(error){ showToast('Erro: ' + (error.message || JSON.stringify(error)), 'err'); return; }
       showToast('Nome atualizado!', 'ok');
       workoutName = newName;
       loadWorkouts();
@@ -2994,7 +2994,7 @@
         openWorkoutExerciseManager(workoutId, workoutName);
       }catch(err){
         console.error(err);
-        showToast('Não foi possível salvar agora. Tente novamente.', 'err');
+        showToast('Erro: ' + (err.message || JSON.stringify(err)), 'err');
         btn.disabled = false;
         btn.textContent = isEdit ? 'Salvar' : 'Adicionar';
       }
