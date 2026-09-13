@@ -2245,7 +2245,7 @@
   async function openWorkoutDetail(id){
     const w = workouts.find(x=>x.id===id);
     if(!w) return;
-    const canEdit = w.created_by === currentUser.id;
+    const canEdit = w.created_by === currentUser.id || w.assigned_to_user_id === currentUser.id;
     const isLibraryWorkout = w.assigned_to_user_id === null;
     const canDelete = !isLibraryWorkout && (w.created_by === currentUser.id || w.assigned_to_user_id === currentUser.id);
 
