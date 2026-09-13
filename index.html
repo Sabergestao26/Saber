@@ -2985,7 +2985,8 @@
           if(error) throw error;
         } else {
           payload.workout_id = workoutId;
-          payload.position = Date.now();
+          const { count } = await sb.from('workout_exercises').select('id', {count:'exact', head:true}).eq('workout_id', workoutId);
+          payload.position = (count||0) + 1;
           const { error } = await sb.from('workout_exercises').insert(payload);
           if(error) throw error;
         }
