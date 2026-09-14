@@ -2464,6 +2464,14 @@
       if(error){ showToast('Não foi possível desmarcar.', 'err'); return; }
       sessionCompletedExerciseIds.delete(exerciseId);
     }
+    // Atualiza a aparência na hora, sem precisar sair e voltar da tela.
+    const checkbox = document.getElementById(`fr-ex-done-${exerciseId}`);
+    const card = checkbox ? checkbox.closest('.fr-exercise') : null;
+    if(card){
+      card.classList.toggle('fr-exercise-done', checked);
+      const numEl = card.querySelector('.fr-exercise-num');
+      if(numEl) numEl.textContent = checked ? '✓' : numEl.getAttribute('data-num');
+    }
   }
 
   async function saveExerciseLoad(ex){
@@ -2485,6 +2493,14 @@
     btn.disabled = false; btn.textContent = 'Salvar cargas';
     if(error){ showToast('Não foi possível salvar. Tente novamente.', 'err'); return; }
     showToast('Carga registrada!', 'ok');
+    // Recolhe a caixa de registrar carga depois de salvar, pra liberar espaço na tela.
+    box.style.display = 'none';
+    const historyBox = document.getElementById(`fr-ex-load-history-box-${ex.id}`);
+    if(historyBox) historyBox.innerHTML = '';
+    rows.forEach(row=>{
+      row.querySelector('.fr-load-weight').value = '';
+      row.querySelector('.fr-load-reps').value = '';
+    });
   }
 
   async function toggleLoadHistory(ex){
@@ -2557,7 +2573,7 @@
     return `
       <div class="fr-exercise ${isCompleted ? 'fr-exercise-done' : ''}">
         <div class="fr-exercise-head">
-          <div class="fr-exercise-num">${isCompleted ? '✓' : num}</div>
+          <div class="fr-exercise-num" data-num="${num}">${isCompleted ? '✓' : num}</div>
           <div class="fr-exercise-name">${esc(ex.name)}</div>
         </div>
         ${metaParts.length ? `<div class="fr-exercise-meta">${metaParts.join(' · ')}</div>` : ''}
