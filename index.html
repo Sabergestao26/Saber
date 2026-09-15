@@ -1032,6 +1032,12 @@
     html += `
       <div class="fr-settings-section">
         <button class="fr-btn-danger" id="fr-settings-logout" style="width:100%;">Sair da conta</button>
+      </div>
+      <div class="fr-settings-section">
+        <h4>Excluir conta</h4>
+        <p class="fr-hint" style="margin-bottom:10px;">Isso apaga sua conta e todos os seus dados (diário, metas, treinos, avaliações, medições) de forma permanente. Não pode ser desfeito.</p>
+        <button class="fr-btn-danger" id="fr-delete-account-btn" style="width:100%;">Excluir minha conta e todos os meus dados</button>
+        <div id="fr-delete-account-area"></div>
       </div>`;
 
     container.innerHTML = `<div class="fr-settings-wrap">${html}</div>`;
@@ -1058,6 +1064,43 @@
 
     container.querySelector('#fr-settings-logout').addEventListener('click', async function(){
       await sb.auth.signOut();
+    });
+
+    container.querySelector('#fr-delete-account-btn').addEventListener('click', function(){
+      const area = container.querySelector('#fr-delete-account-area');
+      area.innerHTML = `
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <p class="fr-hint" style="color:var(--rust);margin-bottom:8px;">Pra confirmar, digite <b>EXCLUIR</b> no campo abaixo:</p>
+          <input type="text" id="fr-delete-confirm-input" style="margin-bottom:8px;">
+          <button class="fr-btn-ghost" id="fr-delete-cancel" style="width:100%;margin-bottom:6px;">Cancelar</button>
+          <button class="fr-btn-danger" id="fr-delete-confirm" style="width:100%;">Excluir permanentemente</button>
+        </div>`;
+      area.querySelector('#fr-delete-cancel').addEventListener('click', ()=>{ area.innerHTML = ''; });
+      area.querySelector('#fr-delete-confirm').addEventListener('click', async function(){
+        const typed = document.getElementById('fr-delete-confirm-input').value.trim().toUpperCase();
+        if(typed !== 'EXCLUIR'){ showToast('Digite EXCLUIR, exatamente assim, pra confirmar.', 'err'); return; }
+        const btn = this; btn.disabled = true; btn.textContent = 'Excluindo...';
+        try{
+          const { data: sessionData } = await sb.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const result = await res.json();
+          if(!res.ok || result.error){
+            showToast('Não foi possível excluir a conta agora. Tente novamente ou entre em contato pelo suporte.', 'err');
+            btn.disabled = false; btn.textContent = 'Excluir permanentemente';
+            return;
+          }
+          await sb.auth.signOut();
+          window.location.reload();
+        }catch(err){
+          console.error(err);
+          showToast('Não foi possível excluir a conta agora.', 'err');
+          btn.disabled = false; btn.textContent = 'Excluir permanentemente';
+        }
+      });
     });
 
     container.querySelector('#fr-acc-email-save').addEventListener('click', async function(){
