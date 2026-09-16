@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saber — Painel de Gestão</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #E7DFC7; --card: #FFFCF3; --surface: #FFFEFA; --ink: #262B1E; --ink-soft: #6B6A57;
+    --green-deep: #2E4F37; --mustard: #BF8A2E; --plum: #5B3A52; --blue: #46687A; --rust: #A8481F;
+    --border: rgba(38,43,30,0.14); --shadow: 0 3px 10px rgba(38,43,30,0.10); --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; padding:24px 16px; }
+  h1{ font-family:'Fraunces',serif; font-size:26px; margin:0 0 4px; }
+  .fr-eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); }
+  .wrap{ max-width:960px; margin:0 auto; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; }
+  .stat-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .stat-label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:6px; }
+  .stat-val{ font-family:'Fraunces',serif; font-weight:700; font-size:28px; }
+  .stat-note{ font-size:11px; color:var(--ink-soft); margin-top:4px; }
+  .placeholder{ opacity:0.55; }
+  input{ font-family:'Inter',sans-serif; font-size:14px; padding:10px 12px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--ink); width:100%; margin-bottom:10px; }
+  button{ font-family:'Inter',sans-serif; font-weight:600; font-size:14px; padding:11px 16px; border-radius:8px; border:none; cursor:pointer; background:var(--green-deep); color:#fff; width:100%; }
+  button:hover{ opacity:0.9; }
+  .hint{ font-size:12px; color:var(--ink-soft); }
+  .err{ color:var(--rust); font-size:13px; margin-top:8px; }
+  #login-screen{ max-width:360px; margin:80px auto; }
+  h4{ font-family:'Fraunces',serif; margin:0 0 12px; font-size:18px; }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="card">
+  <span class="fr-eyebrow">Saber</span>
+  <h1 style="margin-bottom:16px;">Painel de gestão</h1>
+  <input type="email" id="login-email" placeholder="E-mail">
+  <input type="password" id="login-pass" placeholder="Senha">
+  <button id="login-btn">Entrar</button>
+  <p class="hint" style="margin-top:10px;">Acesso restrito à equipe administrativa do Saber.</p>
+  <div id="login-err" class="err"></div>
+</div>
+
+<div id="dashboard" class="wrap" style="display:none;">
+  <span class="fr-eyebrow">Saber · Uso interno</span>
+  <h1>Painel de gestão</h1>
+  <p class="hint" style="margin-bottom:20px;">Visão geral de uso, cadastros e conteúdo — separado do app que as pessoas usam.</p>
+
+  <div class="card">
+    <h4>Pessoas</h4>
+    <div class="grid" id="stats-people"></div>
+  </div>
+
+  <div class="card">
+    <h4>Assinaturas</h4>
+    <div class="grid" id="stats-billing"></div>
+    <p class="hint" style="margin-top:10px;">Esses números ficam disponíveis assim que o sistema de assinatura paga for implementado.</p>
+  </div>
+
+  <div class="card">
+    <h4>Notas fiscais</h4>
+    <div class="grid" id="stats-invoices"></div>
+    <p class="hint" style="margin-top:10px;">Emissão de nota costuma ser controlada direto na plataforma de pagamento ou no sistema do contador — aqui pode entrar um resumo assim que essa integração existir.</p>
+  </div>
+
+  <div class="card">
+    <h4>Conteúdo</h4>
+    <div class="grid" id="stats-content"></div>
+  </div>
+
+  <div class="card">
+    <h4>Engajamento</h4>
+    <div class="grid" id="stats-engagement"></div>
+  </div>
+
+  <div class="card">
+    <h4>Pendências</h4>
+    <div class="grid" id="stats-pending"></div>
+  </div>
+
+  <button id="logout-btn" style="background:var(--rust);max-width:200px;">Sair</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = 'https://dzkugfwflxdhvktyqkwx.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_MkDlFWdXkUnkB-ds8OG8wA_9JMlqU8n';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  function statCard(label, val, note){
+    return `<div class="stat-card${val===null?' placeholder':''}"><div class="stat-label">${label}</div><div class="stat-val">${val===null?'—':val}</div>${note?`<div class="stat-note">${note}</div>`:''}</div>`;
+  }
+
+  async function loadDashboard(){
+    const { data, error } = await sb.rpc('admin_dashboard_stats');
+    if(error){
+      document.getElementById('dashboard').innerHTML = `<p class="err">Não foi possível carregar os números. Confirme que sua conta é admin.</p>`;
+      return;
+    }
+    document.getElementById('stats-people').innerHTML =
+      statCard('Total de usuários', data.total_users) +
+      statCard('Novos (7 dias)', data.signups_last_7_days) +
+      statCard('Novos (30 dias)', data.signups_last_30_days) +
+      statCard('Profissionais cadastrados', data.total_professionals) +
+      statCard('Vínculos profissional-cliente', data.total_client_links) +
+      statCard('Acesso gratuito (código promo)', data.free_access_users);
+
+    document.getElementById('stats-billing').innerHTML =
+      statCard('Assinantes ativos', null, 'Aguardando sistema de pagamento') +
+      statCard('Plano mensal', null, 'Aguardando sistema de pagamento') +
+      statCard('Cancelamentos no mês', null, 'Aguardando sistema de pagamento');
+
+    document.getElementById('stats-invoices').innerHTML =
+      statCard('Notas emitidas no mês', null, 'Aguardando integração fiscal');
+
+    document.getElementById('stats-content').innerHTML =
+      statCard('Receitas no catálogo', data.total_recipes) +
+      statCard('Treinos na biblioteca', data.total_library_workouts) +
+      statCard('Treinos pessoais/atribuídos', data.total_personal_workouts);
+
+    document.getElementById('stats-engagement').innerHTML =
+      statCard('Conexões com Withings', data.withings_connections) +
+      statCard('Notificações push ativas', data.push_subscriptions);
+
+    document.getElementById('stats-pending').innerHTML =
+      statCard('Avaliações aguardando revisão', data.pending_assessments) +
+      statCard('Sugestões de alimento aguardando revisão', data.pending_food_suggestions);
+  }
+
+  async function checkSession(){
+    const { data: { session } } = await sb.auth.getSession();
+    if(session){
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('dashboard').style.display = '';
+      loadDashboard();
+    }
+  }
+
+  document.getElementById('login-btn').addEventListener('click', async ()=>{
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-pass').value;
+    const errEl = document.getElementById('login-err');
+    errEl.textContent = '';
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){ errEl.textContent = 'E-mail ou senha incorretos.'; return; }
+    checkSession();
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', async ()=>{
+    await sb.auth.signOut();
+    location.reload();
+  });
+
+  checkSession();
+</script>
+</body>
+</html>
