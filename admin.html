@@ -23,13 +23,21 @@
   .stat-val{ font-family:'Fraunces',serif; font-weight:700; font-size:28px; }
   .stat-note{ font-size:11px; color:var(--ink-soft); margin-top:4px; }
   .placeholder{ opacity:0.55; }
-  input{ font-family:'Inter',sans-serif; font-size:14px; padding:10px 12px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--ink); width:100%; margin-bottom:10px; }
+  input, select{ font-family:'Inter',sans-serif; font-size:14px; padding:10px 12px; border:1px solid var(--border); border-radius:7px; background:var(--surface); color:var(--ink); width:100%; margin-bottom:10px; }
   button{ font-family:'Inter',sans-serif; font-weight:600; font-size:14px; padding:11px 16px; border-radius:8px; border:none; cursor:pointer; background:var(--green-deep); color:#fff; width:100%; }
   button:hover{ opacity:0.9; }
+  button:disabled{ opacity:0.5; cursor:default; }
+  button.ghost{ background:var(--surface); color:var(--ink); border:1px solid var(--border); }
+  button.danger{ background:var(--rust); }
   .hint{ font-size:12px; color:var(--ink-soft); }
   .err{ color:var(--rust); font-size:13px; margin-top:8px; }
   #login-screen{ max-width:360px; margin:80px auto; }
   h4{ font-family:'Fraunces',serif; margin:0 0 12px; font-size:18px; }
+  .review-item{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:10px; }
+  .review-name{ font-weight:600; margin-bottom:4px; }
+  .review-meta{ font-size:12.5px; color:var(--ink-soft); margin-bottom:10px; line-height:1.6; }
+  .review-actions{ display:flex; gap:8px; }
+  .review-actions button{ width:auto; flex:1; font-size:13px; padding:9px 12px; }
 </style>
 </head>
 <body>
@@ -48,6 +56,22 @@
   <span class="fr-eyebrow">Saber · Uso interno</span>
   <h1>Painel de gestão</h1>
   <p class="hint" style="margin-bottom:20px;">Visão geral de uso, cadastros e conteúdo — separado do app que as pessoas usam.</p>
+
+  <div class="card">
+    <h4>Notificações</h4>
+    <p class="hint" style="margin-bottom:10px;">Receba um aviso, mesmo com essa aba fechada, quando chegar algo novo pra revisar.</p>
+    <button class="ghost" id="enable-notif-btn">🔔 Ativar notificações</button>
+  </div>
+
+  <div class="card">
+    <h4>Avaliações de treino pendentes</h4>
+    <div id="assessments-area"><p class="hint">Carregando...</p></div>
+  </div>
+
+  <div class="card">
+    <h4>Sugestões de alimentos</h4>
+    <div id="suggestions-area"><p class="hint">Carregando...</p></div>
+  </div>
 
   <div class="card">
     <h4>Pessoas</h4>
@@ -76,24 +100,250 @@
     <div class="grid" id="stats-engagement"></div>
   </div>
 
-  <div class="card">
-    <h4>Pendências</h4>
-    <div class="grid" id="stats-pending"></div>
-  </div>
-
-  <button id="logout-btn" style="background:var(--rust);max-width:200px;">Sair</button>
+  <button class="danger" id="logout-btn" style="max-width:200px;">Sair</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = 'https://dzkugfwflxdhvktyqkwx.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_MkDlFWdXkUnkB-ds8OG8wA_9JMlqU8n';
+  const VAPID_PUBLIC_KEY = 'BKXKLuS4ekfLnqNGmM7BHPK1p7hcJRvuBxybiFEVRTLlHEPJgYpZzip5IeQDtGxtUCE5Oy-whckZiYd4LXIlfgE';
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  let currentUser = null;
 
+  function esc(str){
+    const d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    return d.innerHTML;
+  }
+
+  /* ---------- Notificações push ---------- */
+  function urlBase64ToUint8Array(base64String){
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for(let i=0; i<rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+  async function subscribeToPush(){
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+      alert('Esse navegador não suporta notificações push.');
+      return;
+    }
+    try{
+      await navigator.serviceWorker.register('./sw.js');
+      const permission = await Notification.requestPermission();
+      if(permission !== 'granted'){ alert('Permissão não concedida.'); return; }
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if(!sub){
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+      }
+      const subJson = sub.toJSON();
+      const { error } = await sb.from('push_subscriptions').upsert({
+        user_id: currentUser.id, endpoint: subJson.endpoint, p256dh: subJson.keys.p256dh, auth: subJson.keys.auth
+      }, { onConflict: 'user_id,endpoint' });
+      if(error){ alert('Não foi possível salvar a inscrição.'); return; }
+      alert('Notificações ativadas!');
+    }catch(err){
+      console.error(err);
+      alert('Não foi possível ativar as notificações.');
+    }
+  }
+  document.getElementById('enable-notif-btn').addEventListener('click', subscribeToPush);
+
+  /* ---------- Biblioteca de exercícios (pra gerar treino ao aprovar avaliação) ---------- */
+  let exerciseLibrary = [];
+  let exerciseLibraryLoaded = false;
+  async function loadExerciseLibrary(){
+    if(exerciseLibraryLoaded) return;
+    const { data: libWorkouts } = await sb.from('workouts').select('id, name').is('assigned_to_user_id', null);
+    if(!libWorkouts || libWorkouts.length===0){ exerciseLibrary = []; exerciseLibraryLoaded = true; return; }
+    const ids = libWorkouts.map(w=>w.id);
+    const { data: exs } = await sb.from('workout_exercises').select('*').in('workout_id', ids).order('position');
+    const nameById = {}; libWorkouts.forEach(w=> nameById[w.id]=w.name);
+    exerciseLibrary = (exs||[]).map(e=> ({ ...e, group_name: nameById[e.workout_id] || 'Outros' }));
+    exerciseLibraryLoaded = true;
+  }
+  function groupLibraryByMuscle(){
+    const groups = {};
+    exerciseLibrary.forEach(e=>{ if(!groups[e.group_name]) groups[e.group_name] = []; groups[e.group_name].push(e); });
+    return groups;
+  }
+
+  const LIMITATION_LABELS = {
+    coluna: 'Coluna / lombar', joelhos: 'Joelhos', ombros: 'Ombros',
+    punhos_cotovelos: 'Punhos ou cotovelos', quadril: 'Quadril', tornozelo_pe: 'Tornozelo ou pé'
+  };
+  const LIMITATION_EXCLUSIONS = {
+    coluna: ['Levantamento terra','Levantamento terra romeno','Stiff','Remada curvada','Remada cavalinho','Agachamento livre','Agachamento frontal','Agachamento sumô (pés afastados)','Agachamento búlgaro','Roda abdominal','Agachamento no hack'],
+    joelhos: ['Agachamento livre','Agachamento frontal','Agachamento no hack','Agachamento búlgaro','Leg press','Extensora','Passada','Elevação de panturrilha no leg press','Corrida (esteira ou rua)','Pular corda','HIIT (intervalado de alta intensidade)','Subir escada / step'],
+    ombros: ['Desenvolvimento com barra','Desenvolvimento com halteres','Desenvolvimento Arnold','Supino inclinado','Supino reto','Supino declinado','Remada alta com barra','Remada alta com halteres','Elevação frontal com halteres','Elevação frontal com barra','Paralelas','Paralelas (foco em peito)'],
+    punhos_cotovelos: ['Flexão diamante','Rosca punho','Rosca punho invertida','Rolo de punho','Rosca testa','Tríceps francês','Supino fechado'],
+    quadril: ['Agachamento livre','Agachamento frontal','Agachamento búlgaro','Agachamento sumô (pés afastados)','Passada','Levantamento terra romeno','Elevação pélvica (ponte com barra)','Extensão de quadril na polia'],
+    tornozelo_pe: ['Elevação de panturrilha em pé (máquina)','Elevação de panturrilha no leg press','Elevação de panturrilha com peso do corpo','Elevação de panturrilha com barra livre','Elevação de panturrilha sentado (máquina)','Elevação de panturrilha sentado com halteres','Passada','Agachamento búlgaro','Corrida (esteira ou rua)','Pular corda','HIIT (intervalado de alta intensidade)','Subir escada / step']
+  };
+  const LIMITATION_REDUCED_GROUPS = {
+    coluna: ['Treino de Costas', 'Treino de Abdômen'],
+    joelhos: ['Treino de Pernas', 'Treino de Panturrilhas'],
+    ombros: ['Treino de Ombros', 'Treino de Peito'],
+    punhos_cotovelos: ['Treino de Bíceps', 'Treino de Tríceps', 'Treino de Antebraço'],
+    quadril: ['Treino de Pernas', 'Treino de Glúteos'],
+    tornozelo_pe: ['Treino de Panturrilhas', 'Treino de Pernas']
+  };
+
+  function generateWorkoutPlan(answers, excludedNames){
+    excludedNames = excludedNames || [];
+    const focusAreas = answers.focusAreas || [];
+    const groups = groupLibraryByMuscle();
+    const exPerGroup = answers.level==='iniciante' ? 2 : (answers.level==='avancado' ? 4 : 3);
+    const reducedGroups = new Set();
+    (answers.limitations || []).forEach(lim=>{ (LIMITATION_REDUCED_GROUPS[lim] || []).forEach(g=> reducedGroups.add(g)); });
+    function pick(groupName, n){
+      let target = focusAreas.includes(groupName) ? n + 2 : n;
+      if(reducedGroups.has(groupName)) target = Math.max(1, Math.ceil(target/2));
+      const list = (groups[groupName] || []).filter(e=> !excludedNames.includes(e.name));
+      return list.slice(0, Math.min(target, list.length));
+    }
+    let plan = [];
+    if(answers.days <= 2){
+      const fullBodyGroups = ['Treino de Peito','Treino de Costas','Treino de Pernas','Treino de Ombros','Treino de Bíceps','Treino de Tríceps','Treino de Abdômen'];
+      const exs = [];
+      fullBodyGroups.forEach(g=> exs.push(...pick(g, Math.max(1, Math.round(exPerGroup/2)))));
+      plan.push({ name: 'Treino Full Body (gerado pela avaliação)', exercises: exs });
+    } else if(answers.days === 3){
+      plan.push({ name: 'Treino A — Superiores 1 (gerado pela avaliação)', exercises: [...pick('Treino de Peito', exPerGroup), ...pick('Treino de Ombros', Math.max(1,exPerGroup-1)), ...pick('Treino de Tríceps', Math.max(1,exPerGroup-1))] });
+      plan.push({ name: 'Treino B — Inferiores (gerado pela avaliação)', exercises: [...pick('Treino de Pernas', exPerGroup+1), ...pick('Treino de Glúteos', exPerGroup), ...pick('Treino de Panturrilhas', 2), ...pick('Treino de Abdômen', exPerGroup)] });
+      plan.push({ name: 'Treino C — Superiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Costas', exPerGroup), ...pick('Treino de Bíceps', Math.max(1,exPerGroup-1)), ...pick('Treino de Trapézio', 2)] });
+    } else if(answers.days === 4){
+      plan.push({ name: 'Treino A — Superiores 1 (gerado pela avaliação)', exercises: [...pick('Treino de Peito', exPerGroup), ...pick('Treino de Ombros', exPerGroup), ...pick('Treino de Tríceps', exPerGroup)] });
+      plan.push({ name: 'Treino B — Inferiores 1 (gerado pela avaliação)', exercises: [...pick('Treino de Pernas', exPerGroup+1), ...pick('Treino de Abdômen', exPerGroup)] });
+      plan.push({ name: 'Treino C — Superiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Costas', exPerGroup), ...pick('Treino de Trapézio', 2), ...pick('Treino de Bíceps', exPerGroup), ...pick('Treino de Antebraço', 2)] });
+      plan.push({ name: 'Treino D — Inferiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Glúteos', exPerGroup), ...pick('Treino de Panturrilhas', 2)] });
+    } else {
+      plan.push({ name: 'Treino de Peito (gerado pela avaliação)', exercises: pick('Treino de Peito', exPerGroup+2) });
+      plan.push({ name: 'Treino de Costas (gerado pela avaliação)', exercises: pick('Treino de Costas', exPerGroup+2) });
+      plan.push({ name: 'Treino de Pernas (gerado pela avaliação)', exercises: pick('Treino de Pernas', exPerGroup+2) });
+      plan.push({ name: 'Treino de Ombros (gerado pela avaliação)', exercises: pick('Treino de Ombros', exPerGroup+1) });
+      plan.push({ name: 'Treino de Braços (gerado pela avaliação)', exercises: [...pick('Treino de Bíceps', exPerGroup), ...pick('Treino de Tríceps', exPerGroup)] });
+    }
+    if(answers.includeCardioFinisher && groups['Treino de Cardio']){
+      plan.forEach(day=>{
+        const isLower = /inferior/i.test(day.name);
+        const finisherName = isLower ? answers.cardioFinisherLower : answers.cardioFinisherUpper;
+        if(!finisherName) return;
+        const finisherEx = groups['Treino de Cardio'].find(e=> e.name === finisherName);
+        if(finisherEx && !excludedNames.includes(finisherEx.name)){
+          day.exercises = [...day.exercises, { ...finisherEx, sets:1, reps:'10-15 minutos', rest_seconds:0 }];
+        }
+      });
+    }
+    if(answers.includeCardio && groups['Treino de Cardio'] && groups['Treino de Cardio'].length){
+      const cardioExercises = groups['Treino de Cardio'].filter(e=> !excludedNames.includes(e.name));
+      plan.push({ name: 'Cardio (gerado pela avaliação)', exercises: cardioExercises });
+    }
+    return plan.filter(day=> day.exercises.length>0);
+  }
+
+  /* ---------- Avaliações pendentes ---------- */
+  async function renderAssessmentsArea(){
+    const el = document.getElementById('assessments-area');
+    const { data, error } = await sb.from('assessment_submissions').select('*').eq('status', 'pending').order('created_at');
+    if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
+    const list = data || [];
+    if(list.length===0){ el.innerHTML = `<p class="hint">Nenhuma avaliação pendente.</p>`; return; }
+    const userIds = list.map(a=>a.user_id);
+    const { data: profs } = await sb.from('profiles').select('id, email').in('id', userIds);
+    const emailById = {}; (profs||[]).forEach(p=> emailById[p.id]=p.email);
+    el.innerHTML = list.map(a=>`
+      <div class="review-item" data-id="${a.id}">
+        <div class="review-name">${esc(emailById[a.user_id]||'Pessoa')}</div>
+        <div class="review-meta">
+          Objetivo: ${esc(a.goal)} · Nível: ${esc(a.level)} · ${esc(a.days_per_week)}x/semana · Liberação médica: ${esc(a.medical_clearance)}<br>
+          Limitações: ${a.limitations && a.limitations.length ? esc(a.limitations.map(l=>LIMITATION_LABELS[l]||l).join(', ')) : '—'}
+          ${a.limitations_notes ? `<br>Nota da pessoa: "${esc(a.limitations_notes)}"` : ''}
+        </div>
+        <div class="review-actions">
+          <button data-action="approve" data-id="${a.id}">Aprovar e gerar treino</button>
+          <button class="danger" data-action="professional" data-id="${a.id}">Recomendar profissional</button>
+        </div>
+      </div>`).join('');
+    el.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.addEventListener('click', async function(){
+        const id = this.getAttribute('data-id');
+        const action = this.getAttribute('data-action');
+        const assessment = list.find(a=>a.id===id);
+        this.disabled = true; this.textContent = '...';
+        try{
+          if(action==='approve'){
+            const excluded = [];
+            (assessment.limitations||[]).forEach(l=>{ (LIMITATION_EXCLUSIONS[l]||[]).forEach(name=> excluded.push(name)); });
+            await loadExerciseLibrary();
+            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio, includeCardioFinisher: assessment.include_cardio_finisher, cardioFinisherUpper: assessment.cardio_finisher_upper, cardioFinisherLower: assessment.cardio_finisher_lower, limitations: assessment.limitations }, excluded);
+            for(const day of plan){
+              const { data: w, error: wErr } = await sb.from('workouts').insert({ name: day.name, assigned_to_user_id: assessment.user_id, created_by: currentUser.id, notes: 'Gerado a partir da avaliação, revisado pelo admin.' }).select().single();
+              if(wErr || !w) continue;
+              const rows = day.exercises.map((ex,i)=> ({ workout_id: w.id, position:i+1, name:ex.name, sets:ex.sets, reps:ex.reps, rest_seconds:ex.rest_seconds, video_url:ex.video_url, notes:ex.notes }));
+              if(rows.length) await sb.from('workout_exercises').insert(rows);
+            }
+            await sb.from('assessment_submissions').update({ status:'approved', reviewed_at:new Date().toISOString() }).eq('id', id);
+          } else {
+            await sb.from('assessment_submissions').update({ status:'needs_professional', reviewed_at:new Date().toISOString() }).eq('id', id);
+          }
+          document.querySelector(`.review-item[data-id="${id}"]`).remove();
+        }catch(err){
+          console.error(err);
+          alert('Não foi possível concluir. Tente novamente.');
+          this.disabled = false; this.textContent = action==='approve' ? 'Aprovar e gerar treino' : 'Recomendar profissional';
+        }
+      });
+    });
+  }
+
+  /* ---------- Sugestões de alimentos ---------- */
+  async function renderSuggestionsArea(){
+    const el = document.getElementById('suggestions-area');
+    const { data, error } = await sb.from('food_suggestions').select('*').eq('status', 'pending').order('created_at');
+    if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
+    const list = data || [];
+    if(list.length===0){ el.innerHTML = `<p class="hint">Nenhuma sugestão pendente.</p>`; return; }
+    el.innerHTML = list.map(s=>`
+      <div class="review-item" data-id="${s.id}">
+        <div class="review-name">${esc(s.name)}</div>
+        <div class="review-meta">${Math.round(s.kcal||0)} kcal · P:${Math.round(s.protein||0)}g C:${Math.round(s.carbs||0)}g G:${Math.round(s.fat||0)}g <i>(por porção informada)</i></div>
+        <div class="review-actions">
+          <button data-action="approve" data-id="${s.id}">Aprovar e adicionar</button>
+          <button class="danger" data-action="reject" data-id="${s.id}">Rejeitar</button>
+        </div>
+      </div>`).join('');
+    el.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.addEventListener('click', async function(){
+        const id = this.getAttribute('data-id');
+        const action = this.getAttribute('data-action');
+        const suggestion = list.find(s=>s.id===id);
+        this.disabled = true; this.textContent = '...';
+        try{
+          if(action==='approve'){
+            const { error: insErr } = await sb.from('foods').insert({ name: suggestion.name, category: null, kcal: suggestion.kcal||0, protein: suggestion.protein||0, carbs: suggestion.carbs||0, fat: suggestion.fat||0 });
+            if(insErr) throw insErr;
+          }
+          const { error: updErr } = await sb.from('food_suggestions').update({ status: action==='approve'?'approved':'rejected', reviewed_at: new Date().toISOString() }).eq('id', id);
+          if(updErr) throw updErr;
+          document.querySelector(`.review-item[data-id="${id}"]`).remove();
+        }catch(err){
+          console.error(err);
+          alert('Não foi possível concluir. Tente novamente.');
+          this.disabled = false; this.textContent = action==='approve' ? 'Aprovar e adicionar' : 'Rejeitar';
+        }
+      });
+    });
+  }
+
+  /* ---------- Estatísticas ---------- */
   function statCard(label, val, note){
     return `<div class="stat-card${val===null?' placeholder':''}"><div class="stat-label">${label}</div><div class="stat-val">${val===null?'—':val}</div>${note?`<div class="stat-note">${note}</div>`:''}</div>`;
   }
-
   async function loadDashboard(){
     const { data, error } = await sb.rpc('admin_dashboard_stats');
     if(error){
@@ -101,44 +351,30 @@
       return;
     }
     document.getElementById('stats-people').innerHTML =
-      statCard('Total de usuários', data.total_users) +
-      statCard('Novos (7 dias)', data.signups_last_7_days) +
-      statCard('Novos (30 dias)', data.signups_last_30_days) +
-      statCard('Profissionais cadastrados', data.total_professionals) +
-      statCard('Vínculos profissional-cliente', data.total_client_links) +
-      statCard('Acesso gratuito (código promo)', data.free_access_users);
-
+      statCard('Total de usuários', data.total_users) + statCard('Novos (7 dias)', data.signups_last_7_days) +
+      statCard('Novos (30 dias)', data.signups_last_30_days) + statCard('Profissionais cadastrados', data.total_professionals) +
+      statCard('Vínculos profissional-cliente', data.total_client_links) + statCard('Acesso gratuito (código promo)', data.free_access_users);
     document.getElementById('stats-billing').innerHTML =
-      statCard('Assinantes ativos', null, 'Aguardando sistema de pagamento') +
-      statCard('Plano mensal', null, 'Aguardando sistema de pagamento') +
-      statCard('Cancelamentos no mês', null, 'Aguardando sistema de pagamento');
-
-    document.getElementById('stats-invoices').innerHTML =
-      statCard('Notas emitidas no mês', null, 'Aguardando integração fiscal');
-
+      statCard('Assinantes ativos', null, 'Aguardando sistema de pagamento') + statCard('Plano mensal', null, 'Aguardando sistema de pagamento') + statCard('Cancelamentos no mês', null, 'Aguardando sistema de pagamento');
+    document.getElementById('stats-invoices').innerHTML = statCard('Notas emitidas no mês', null, 'Aguardando integração fiscal');
     document.getElementById('stats-content').innerHTML =
-      statCard('Receitas no catálogo', data.total_recipes) +
-      statCard('Treinos na biblioteca', data.total_library_workouts) +
-      statCard('Treinos pessoais/atribuídos', data.total_personal_workouts);
-
+      statCard('Receitas no catálogo', data.total_recipes) + statCard('Treinos na biblioteca', data.total_library_workouts) + statCard('Treinos pessoais/atribuídos', data.total_personal_workouts);
     document.getElementById('stats-engagement').innerHTML =
-      statCard('Conexões com Withings', data.withings_connections) +
-      statCard('Notificações push ativas', data.push_subscriptions);
-
-    document.getElementById('stats-pending').innerHTML =
-      statCard('Avaliações aguardando revisão', data.pending_assessments) +
-      statCard('Sugestões de alimento aguardando revisão', data.pending_food_suggestions);
+      statCard('Conexões com Withings', data.withings_connections) + statCard('Notificações push ativas', data.push_subscriptions);
   }
 
+  /* ---------- Login ---------- */
   async function checkSession(){
     const { data: { session } } = await sb.auth.getSession();
     if(session){
+      currentUser = session.user;
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('dashboard').style.display = '';
       loadDashboard();
+      renderAssessmentsArea();
+      renderSuggestionsArea();
     }
   }
-
   document.getElementById('login-btn').addEventListener('click', async ()=>{
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-pass').value;
@@ -148,12 +384,10 @@
     if(error){ errEl.textContent = 'E-mail ou senha incorretos.'; return; }
     checkSession();
   });
-
   document.getElementById('logout-btn').addEventListener('click', async ()=>{
     await sb.auth.signOut();
     location.reload();
   });
-
   checkSession();
 </script>
 </body>

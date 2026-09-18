@@ -1014,14 +1014,6 @@
     if(isAdmin){
       html += `
       <div class="fr-settings-section">
-        <h4>Sugestões de alimentos</h4>
-        <div id="fr-suggestions-area"><div class="fr-loading">Carregando...</div></div>
-      </div>
-      <div class="fr-settings-section">
-        <h4>Avaliações de treino pendentes</h4>
-        <div id="fr-assessments-area"><div class="fr-loading">Carregando...</div></div>
-      </div>
-      <div class="fr-settings-section">
         <h4>Códigos promocionais</h4>
         <div class="fr-field"><label for="fr-promo-email">E-mail de quem vai usar (deixe vazio pra qualquer pessoa)</label><input type="email" id="fr-promo-email" placeholder="pessoa@exemplo.com"></div>
         <button class="fr-btn-ghost" id="fr-promo-create" style="width:100%;margin-bottom:12px;">+ Gerar código</button>
@@ -1193,8 +1185,6 @@
     });
 
     if(isAdmin){
-      renderSuggestionsArea(container);
-      renderAssessmentsArea(container);
       renderPromoCodesList(container);
       container.querySelector('#fr-promo-create').addEventListener('click', async function(){
         const btn = this;
@@ -1225,115 +1215,6 @@
         <span>${esc(c.code)}${c.intended_email ? ' · ' + esc(c.intended_email) : ' · qualquer pessoa'}</span>
         <b style="color:${c.redeemed_by ? 'var(--ink-soft)' : 'var(--green-deep)'}">${c.redeemed_by ? 'Usado' : 'Disponível'}</b>
       </div>`).join('');
-  }
-
-  async function renderAssessmentsArea(overlay){
-    const el = overlay.querySelector('#fr-assessments-area');
-    const { data, error } = await sb.from('assessment_submissions').select('*').eq('status', 'pending').order('created_at');
-    if(error){ el.innerHTML = `<p class="fr-hint">Não foi possível carregar.</p>`; return; }
-    const list = data || [];
-    if(list.length===0){ el.innerHTML = `<p class="fr-hint">Nenhuma avaliação pendente.</p>`; return; }
-    const userIds = list.map(a=>a.user_id);
-    const { data: profs } = await sb.from('profiles').select('id, email').in('id', userIds);
-    const emailById = {}; (profs||[]).forEach(p=> emailById[p.id]=p.email);
-    el.innerHTML = list.map(a=>`
-      <div class="fr-suggestion" data-id="${a.id}">
-        <div class="fr-suggestion-head"><span class="fr-suggestion-name">${esc(emailById[a.user_id]||'Pessoa')}</span></div>
-        <div class="fr-suggestion-macros">
-          Objetivo: ${esc(a.goal)} · Nível: ${esc(a.level)} · ${esc(a.days_per_week)}x/semana · Liberação médica: ${esc(a.medical_clearance)}<br>
-          Limitações: ${a.limitations && a.limitations.length ? esc(a.limitations.map(l=>LIMITATION_LABELS[l]||l).join(', ')) : '—'}
-          ${a.limitations_notes ? `<br>Nota da pessoa: "${esc(a.limitations_notes)}"` : ''}
-        </div>
-        <div class="fr-suggestion-actions">
-          <button class="fr-btn-primary" data-action="approve" data-id="${a.id}" style="font-size:12px;padding:7px 12px;">Aprovar e gerar treino</button>
-          <button class="fr-btn-danger" data-action="professional" data-id="${a.id}" style="font-size:12px;padding:7px 12px;">Recomendar profissional</button>
-        </div>
-      </div>`).join('');
-    el.querySelectorAll('button[data-action]').forEach(btn=>{
-      btn.addEventListener('click', async function(){
-        const id = this.getAttribute('data-id');
-        const action = this.getAttribute('data-action');
-        const assessment = list.find(a=>a.id===id);
-        this.disabled = true; this.textContent = '...';
-        try{
-          if(action==='approve'){
-            const excluded = [];
-            (assessment.limitations||[]).forEach(l=>{
-              (LIMITATION_EXCLUSIONS[l]||[]).forEach(name=> excluded.push(name));
-            });
-            await loadExerciseLibrary();
-            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio, includeCardioFinisher: assessment.include_cardio_finisher, cardioFinisherUpper: assessment.cardio_finisher_upper, cardioFinisherLower: assessment.cardio_finisher_lower, limitations: assessment.limitations }, excluded);
-            for(const day of plan){
-              await sb.from('workouts').insert({ name: day.name, assigned_to_user_id: assessment.user_id, created_by: currentUser.id, notes: 'Gerado a partir da avaliação, revisado pelo admin.' })
-                .select().single().then(async ({data:w, error:wErr})=>{
-                  if(wErr || !w) return;
-                  const rows = day.exercises.map((ex,i)=> ({ workout_id: w.id, position:i+1, name:ex.name, sets:ex.sets, reps:ex.reps, rest_seconds:ex.rest_seconds, video_url:ex.video_url, notes:ex.notes }));
-                  if(rows.length) await sb.from('workout_exercises').insert(rows);
-                });
-            }
-            await sb.from('assessment_submissions').update({ status:'approved', reviewed_at:new Date().toISOString() }).eq('id', id);
-            showToast('Treino gerado e liberado.', 'ok');
-          } else {
-            await sb.from('assessment_submissions').update({ status:'needs_professional', reviewed_at:new Date().toISOString() }).eq('id', id);
-            showToast('Marcado como recomendado buscar profissional.', 'ok');
-          }
-          overlay.querySelector(`.fr-suggestion[data-id="${id}"]`).remove();
-        }catch(err){
-          console.error(err);
-          showToast('Não foi possível concluir. Tente novamente.', 'err');
-          this.disabled = false; this.textContent = action==='approve' ? 'Aprovar e gerar treino' : 'Recomendar profissional';
-        }
-      });
-    });
-  }
-
-  async function renderSuggestionsArea(overlay){
-    const el = overlay.querySelector('#fr-suggestions-area');
-    const { data, error } = await sb.from('food_suggestions').select('*').eq('status', 'pending').order('created_at');
-    if(error){ el.innerHTML = `<p class="fr-hint">Não foi possível carregar.</p>`; return; }
-    const list = data || [];
-    if(list.length===0){
-      el.innerHTML = `<p class="fr-hint">Nenhuma sugestão pendente.</p>`;
-      return;
-    }
-    el.innerHTML = list.map(s=>`
-      <div class="fr-suggestion" data-id="${s.id}">
-        <div class="fr-suggestion-head">
-          <span class="fr-suggestion-name">${esc(s.name)}</span>
-        </div>
-        <div class="fr-suggestion-macros">${Math.round(s.kcal||0)} kcal · P:${Math.round(s.protein||0)}g C:${Math.round(s.carbs||0)}g G:${Math.round(s.fat||0)}g <i>(por porção informada)</i></div>
-        <div class="fr-suggestion-actions">
-          <button class="fr-btn-primary" data-action="approve" data-id="${s.id}" style="font-size:12px;padding:7px 12px;">Aprovar e adicionar</button>
-          <button class="fr-btn-danger" data-action="reject" data-id="${s.id}" style="font-size:12px;padding:7px 12px;">Rejeitar</button>
-        </div>
-      </div>`).join('');
-    el.querySelectorAll('button[data-action]').forEach(btn=>{
-      btn.addEventListener('click', async function(){
-        const id = this.getAttribute('data-id');
-        const action = this.getAttribute('data-action');
-        const suggestion = list.find(s=>s.id===id);
-        this.disabled = true; this.textContent = '...';
-        try{
-          if(action==='approve'){
-            const { error: insErr } = await sb.from('foods').insert({
-              name: suggestion.name, category: null,
-              kcal: suggestion.kcal || 0, protein: suggestion.protein || 0,
-              carbs: suggestion.carbs || 0, fat: suggestion.fat || 0
-            });
-            if(insErr) throw insErr;
-            foodsLoaded = false; loadFoods();
-          }
-          const { error: updErr } = await sb.from('food_suggestions').update({ status: action==='approve' ? 'approved' : 'rejected', reviewed_at: new Date().toISOString() }).eq('id', id);
-          if(updErr) throw updErr;
-          showToast(action==='approve' ? 'Adicionado à base de alimentos.' : 'Sugestão rejeitada.', 'ok');
-          overlay.querySelector(`.fr-suggestion[data-id="${id}"]`).remove();
-        }catch(err){
-          console.error(err);
-          showToast('Não foi possível concluir. Tente novamente.', 'err');
-          this.disabled = false; this.textContent = action==='approve' ? 'Aprovar e adicionar' : 'Rejeitar';
-        }
-      });
-    });
   }
 
   function renderClientsList(overlay){
@@ -2244,6 +2125,7 @@
           cardio_finisher_lower: includeCardioFinisher ? cardioFinisherLower : null
         });
         if(error){ showToast('Não foi possível enviar. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Gerar meu treino'; return; }
+        notifyAdminsPendingReview('assessment');
         showToast('Avaliação enviada! Seu treino será liberado depois da revisão.', 'ok');
         closeOverlay();
         renderWorkoutsView();
@@ -3989,6 +3871,21 @@
     generateWeeklyReport();
   }
 
+  async function notifyAdminsPendingReview(kind){
+    try{
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if(!token) return;
+      fetch(`${SUPABASE_URL}/functions/v1/notify-admins-pending-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ kind })
+      }).catch(err=> console.error('Não foi possível avisar a administração', err));
+    }catch(err){
+      console.error(err);
+    }
+  }
+
   async function notifyLinkedProfessionalOfReport(){
     try{
       const { data: sessionData } = await sb.auth.getSession();
@@ -4334,7 +4231,10 @@
           sb.from('food_suggestions').insert({
             submitted_by: currentUser.id, name,
             kcal: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat
-          }).then(({error})=>{ if(error) console.error('Erro ao enviar sugestão de alimento', error); });
+          }).then(({error})=>{
+            if(error){ console.error('Erro ao enviar sugestão de alimento', error); return; }
+            notifyAdminsPendingReview('food');
+          });
         }
       }
       btn.disabled = true; btn.textContent = 'Salvando...';
