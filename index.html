@@ -157,6 +157,21 @@
     margin:14px 0 8px;
   }
   .fr-faq-group-title:first-child{ margin-top:0; }
+  .fr-settings-cat{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:10px; overflow:hidden;
+  }
+  .fr-settings-cat > summary{
+    padding:16px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .fr-settings-cat > summary::-webkit-details-marker{ display:none; }
+  .fr-settings-cat-label{ font-family:'Fraunces',serif; font-weight:700; font-size:16px; }
+  .fr-settings-cat-sub{ display:block; font-family:'Inter',sans-serif; font-weight:400; font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .fr-settings-cat-arrow{ color:var(--ink-soft); font-size:20px; transform:rotate(90deg); transition:transform .15s; flex-shrink:0; }
+  .fr-settings-cat[open] .fr-settings-cat-arrow{ transform:rotate(270deg); }
+  .fr-settings-cat-body{ padding:0 16px 18px; border-top:1px solid var(--border); padding-top:16px; margin-top:-2px; }
+  .fr-settings-cat-body .fr-settings-section{ margin-bottom:20px; }
+  .fr-settings-cat-body .fr-settings-section h4{ border-top:none; padding-top:0; }
+  .fr-settings-menu{ margin-bottom:22px; }
   .fr-settings-section{ margin-bottom:22px; }
   .fr-settings-section:last-child{ margin-bottom:0; }
   .fr-settings-section h4{
@@ -632,8 +647,8 @@
   const FAQ_GROUPS = [
     { title: 'Conta e cadastro', items: [
       { q: 'Esqueci minha senha, e agora?', a: 'Na tela de login, toque em "Esqueci minha senha" e siga o link enviado por e-mail.' },
-      { q: 'Como troco meu e-mail ou senha?', a: 'Vá em Configurações > Sua conta. Trocar o e-mail exige confirmar pelo link enviado antes de valer de verdade.' },
-      { q: 'Como excluo minha conta e meus dados?', a: 'Vá em Configurações > Excluir conta. Você precisa digitar "EXCLUIR" pra confirmar — depois disso, a conta e todos os dados ligados a ela (diário, metas, treinos, avaliações, medições) são apagados de forma permanente e imediata. Não temos como recuperar depois de confirmado.' },
+      { q: 'Como troco meu e-mail ou senha?', a: 'Vá em Configurações > Dados da conta. Trocar o e-mail exige confirmar pelo link enviado antes de valer de verdade.' },
+      { q: 'Como excluo minha conta e meus dados?', a: 'Vá em Configurações > Dados da conta > Excluir conta. Você precisa digitar "EXCLUIR" pra confirmar — depois disso, a conta e todos os dados ligados a ela (diário, metas, treinos, avaliações, medições) são apagados de forma permanente e imediata. Não temos como recuperar depois de confirmado.' },
     ]},
     { title: 'Diário e metas', items: [
       { q: 'Como defino minhas metas de calorias e água?', a: 'Vá em Diário do Dia > "Metas diárias" (aparece quando ainda não tiver meta definida), ou use a calculadora automática baseada em peso, altura, idade e objetivo.' },
@@ -643,7 +658,7 @@
     { title: 'Treinos', items: [
       { q: 'Fiz a avaliação, mas meu treino não apareceu na hora.', a: 'Se você marcou alguma limitação física (coluna, joelho, ombro, etc.), o treino passa por revisão manual antes de ser liberado — pode levar um tempo até aparecer.' },
       { q: 'Posso editar um treino que a avaliação gerou pra mim?', a: 'Sim — abra o treino, toque em "Gerenciar exercícios / editar treino". Dá pra adicionar, editar, remover exercícios e até renomear o treino.' },
-      { q: 'O som do cronômetro de descanso não toca quando saio do app.', a: 'Isso é uma limitação do próprio celular (economia de bateria), não só do Saber — nenhum site consegue continuar contando som em segundo plano depois que a tela apaga ou o app é fechado de verdade. Ative as notificações push (Configurações > 🔔 Ativar notificações) pra ainda receber um aviso mesmo com o app fechado.' },
+      { q: 'O som do cronômetro de descanso não toca quando saio do app.', a: 'Isso é uma limitação do próprio celular (economia de bateria), não só do Saber — nenhum site consegue continuar contando som em segundo plano depois que a tela apaga ou o app é fechado de verdade. Ative as notificações push (Configurações > Notificações > 🔔 Ativar notificações) pra ainda receber um aviso mesmo com o app fechado.' },
       { q: 'Como funciona a avaliação com limitação física?', a: 'Excluímos os exercícios mais arriscados pra aquela área e reduzimos a quantidade de exercícios ali, como precaução extra. Isso não substitui uma avaliação médica ou fisioterapêutica — é só uma camada de segurança dentro do que um aplicativo consegue oferecer.' },
     ]},
     { title: 'Balança e notificações', items: [
@@ -979,32 +994,108 @@
         </select>
       </div>`;
 
-    html += `
-      <div class="fr-settings-section">
-        <h4>Som do cronômetro de descanso</h4>
-        <p class="fr-hint" style="margin-bottom:8px;">Escolha o som que toca quando o descanso termina.</p>
-        <select id="fr-sound-pref" style="margin-bottom:10px;">
-          <option value="classico" ${getSoundPref()==='classico'?'selected':''}>Clássico (3 beeps)</option>
-          <option value="suave" ${getSoundPref()==='suave'?'selected':''}>Suave (2 tons)</option>
-          <option value="urgente" ${getSoundPref()==='urgente'?'selected':''}>Urgente (4 beeps rápidos)</option>
-          <option value="sino" ${getSoundPref()==='sino'?'selected':''}>Sino</option>
-        </select>
-        <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;margin-bottom:12px;">🔊 Testar som</button>
-        <button class="fr-btn-ghost" id="fr-enable-notifications" style="width:100%;">🔔 ${('Notification' in window && Notification.permission === 'granted') ? 'Notificações ativadas' : 'Ativar notificações'}</button>
-        <p class="fr-hint" style="margin-top:10px;">Se o som e a notificação não chegarem durante um treino de verdade, mesmo funcionando aqui no teste, é porque a tela apagou ou você trocou de aplicativo durante o descanso — isso pausa qualquer site (não só o Saber) por economia de bateria do próprio celular. Deixando a tela ligada e o Saber em primeiro plano durante o descanso, funciona normalmente — e agora, se você voltar um pouco atrasada, o cronômetro se corrige sozinho assim que reabrir o app.</p>
-      </div>`;
+    html += `<div class="fr-settings-menu">`;
 
+    // ---- Dados da conta ----
     html += `
-      <div class="fr-settings-section">
-        <h4>Sua conta</h4>
-        <div class="fr-field"><label for="fr-acc-email">E-mail atual</label><input type="email" id="fr-acc-email" value="${esc(currentUser.email)}"></div>
-        <button class="fr-btn-ghost" id="fr-acc-email-save" style="width:100%;margin-bottom:6px;">Salvar novo e-mail</button>
-        <div id="fr-acc-email-msg"></div>
-        <div class="fr-field" style="margin-top:14px;"><label for="fr-acc-pass">Nova senha</label><input type="password" id="fr-acc-pass" minlength="6" placeholder="Mínimo 6 caracteres"></div>
-        <div class="fr-field"><label for="fr-acc-pass2">Confirmar nova senha</label><input type="password" id="fr-acc-pass2" minlength="6"></div>
-        <button class="fr-btn-ghost" id="fr-acc-pass-save" style="width:100%;">Salvar nova senha</button>
-        <div id="fr-acc-pass-msg"></div>
-      </div>`;
+      <details class="fr-settings-cat">
+        <summary>
+          <span class="fr-settings-cat-label">Dados da conta<span class="fr-settings-cat-sub">E-mail, senha e exclusão de conta</span></span>
+          <span class="fr-settings-cat-arrow">›</span>
+        </summary>
+        <div class="fr-settings-cat-body">
+          <div class="fr-settings-section">
+            <h4>E-mail e senha</h4>
+            <div class="fr-field"><label for="fr-acc-email">E-mail atual</label><input type="email" id="fr-acc-email" value="${esc(currentUser.email)}"></div>
+            <button class="fr-btn-ghost" id="fr-acc-email-save" style="width:100%;margin-bottom:6px;">Salvar novo e-mail</button>
+            <div id="fr-acc-email-msg"></div>
+            <div class="fr-field" style="margin-top:14px;"><label for="fr-acc-pass">Nova senha</label><input type="password" id="fr-acc-pass" minlength="6" placeholder="Mínimo 6 caracteres"></div>
+            <div class="fr-field"><label for="fr-acc-pass2">Confirmar nova senha</label><input type="password" id="fr-acc-pass2" minlength="6"></div>
+            <button class="fr-btn-ghost" id="fr-acc-pass-save" style="width:100%;">Salvar nova senha</button>
+            <div id="fr-acc-pass-msg"></div>
+          </div>
+          <div class="fr-settings-section">
+            <h4>Excluir conta</h4>
+            <p class="fr-hint" style="margin-bottom:10px;">Isso apaga sua conta e todos os seus dados (diário, metas, treinos, avaliações, medições) de forma permanente. Não pode ser desfeito.</p>
+            <button class="fr-btn-danger" id="fr-delete-account-btn" style="width:100%;">Excluir minha conta e todos os meus dados</button>
+            <div id="fr-delete-account-area"></div>
+          </div>
+        </div>
+      </details>`;
+
+    // ---- Notificações ----
+    html += `
+      <details class="fr-settings-cat">
+        <summary>
+          <span class="fr-settings-cat-label">Notificações<span class="fr-settings-cat-sub">Sons e avisos push</span></span>
+          <span class="fr-settings-cat-arrow">›</span>
+        </summary>
+        <div class="fr-settings-cat-body">
+          <div class="fr-settings-section">
+            <h4>Sons de notificação</h4>
+            <label class="fr-ex-check" style="margin-bottom:12px;"><input type="checkbox" id="fr-sound-enabled" ${getSoundEnabled() ? 'checked' : ''}> Tocar som quando o descanso terminar</label>
+            <p class="fr-hint" style="margin-bottom:8px;">Escolha o som que toca quando o descanso termina.</p>
+            <select id="fr-sound-pref" style="margin-bottom:10px;">
+              <option value="classico" ${getSoundPref()==='classico'?'selected':''}>Clássico (3 beeps)</option>
+              <option value="suave" ${getSoundPref()==='suave'?'selected':''}>Suave (2 tons)</option>
+              <option value="urgente" ${getSoundPref()==='urgente'?'selected':''}>Urgente (4 beeps rápidos)</option>
+              <option value="sino" ${getSoundPref()==='sino'?'selected':''}>Sino</option>
+            </select>
+            <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;margin-bottom:12px;">🔊 Testar som</button>
+            <button class="fr-btn-ghost" id="fr-enable-notifications" style="width:100%;">🔔 ${('Notification' in window && Notification.permission === 'granted') ? 'Notificações ativadas' : 'Ativar notificações'}</button>
+            <p class="fr-hint" style="margin-top:10px;">Se o som e a notificação não chegarem durante um treino de verdade, mesmo funcionando aqui no teste, é porque a tela apagou ou você trocou de aplicativo durante o descanso — isso pausa qualquer site (não só o Saber) por economia de bateria do próprio celular. Deixando a tela ligada e o Saber em primeiro plano durante o descanso, funciona normalmente — e agora, se você voltar um pouco atrasada, o cronômetro se corrige sozinho assim que reabrir o app.</p>
+          </div>
+        </div>
+      </details>`;
+
+    // ---- Assinatura ----
+    html += `
+      <details class="fr-settings-cat">
+        <summary>
+          <span class="fr-settings-cat-label">Assinatura<span class="fr-settings-cat-sub">Pagamento e plano</span></span>
+          <span class="fr-settings-cat-arrow">›</span>
+        </summary>
+        <div class="fr-settings-cat-body">
+          <div class="fr-settings-section">
+            <h4>Sua assinatura</h4>
+            <p class="fr-hint" style="margin-bottom:14px;">Essa área ainda está em construção — assim que o sistema de pagamento estiver pronto, você vai poder assinar e gerenciar sua assinatura por aqui.</p>
+            <button class="fr-btn-ghost" style="width:100%;margin-bottom:8px;" disabled>Assinar o Saber</button>
+            <button class="fr-btn-ghost" style="width:100%;" disabled>Alterar assinatura</button>
+          </div>
+        </div>
+      </details>`;
+
+    // ---- Central de ajudas ----
+    html += `
+      <details class="fr-settings-cat">
+        <summary>
+          <span class="fr-settings-cat-label">Central de ajudas<span class="fr-settings-cat-sub">Perguntas frequentes e suporte</span></span>
+          <span class="fr-settings-cat-arrow">›</span>
+        </summary>
+        <div class="fr-settings-cat-body">
+          <div class="fr-settings-section">
+            <h4>Perguntas frequentes</h4>
+            <p class="fr-hint" style="margin-bottom:10px;">Não achou sua dúvida aqui? Fala com a gente por e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a> <i>(em breve, também por WhatsApp)</i>.</p>
+            <div id="fr-faq-area">${FAQ_GROUPS.map(group => `
+              <div class="fr-faq-group-title">${esc(group.title)}</div>
+              ${group.items.map((item, idx) => `
+                <details class="fr-faq-item">
+                  <summary>${esc(item.q)}</summary>
+                  <div class="fr-faq-body">${esc(item.a)}</div>
+                </details>`).join('')}
+            `).join('')}</div>
+          </div>
+          <div class="fr-settings-section">
+            <h4>Reportar um problema</h4>
+            <p class="fr-hint" style="margin-bottom:10px;">Encontrou algo que não funcionou como devia? Conta pra gente aqui embaixo — a equipe recebe e revisa. Pra dúvidas urgentes, prefira o e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>.</p>
+            <div class="fr-field"><label for="fr-report-msg">O que aconteceu?</label><textarea id="fr-report-msg" rows="4" placeholder="Descreva o problema com o máximo de detalhes possível (o que você estava fazendo, o que esperava que acontecesse, e o que aconteceu de fato)."></textarea></div>
+            <button class="fr-btn-primary" id="fr-report-send" style="width:100%;">Enviar</button>
+            <div id="fr-report-msg-area"></div>
+          </div>
+        </div>
+      </details>`;
+
+    html += `</div>`;
 
     html += `
       <div class="fr-settings-section">
@@ -1066,32 +1157,7 @@
 
     html += `
       <div class="fr-settings-section">
-        <h4>Central de Ajuda</h4>
-        <p class="fr-hint" style="margin-bottom:10px;">Respostas rápidas pras dúvidas mais comuns. Não achou a sua? Fala com a gente por e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a> <i>(em breve, também por WhatsApp)</i>.</p>
-        <div id="fr-faq-area">${FAQ_GROUPS.map(group => `
-          <div class="fr-faq-group-title">${esc(group.title)}</div>
-          ${group.items.map((item, idx) => `
-            <details class="fr-faq-item">
-              <summary>${esc(item.q)}</summary>
-              <div class="fr-faq-body">${esc(item.a)}</div>
-            </details>`).join('')}
-        `).join('')}</div>
-      </div>
-      <div class="fr-settings-section">
-        <h4>Reportar um problema</h4>
-        <p class="fr-hint" style="margin-bottom:10px;">Encontrou algo que não funcionou como devia? Conta pra gente aqui embaixo — a equipe recebe e revisa. Pra dúvidas urgentes, prefira o e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>.</p>
-        <div class="fr-field"><label for="fr-report-msg">O que aconteceu?</label><textarea id="fr-report-msg" rows="4" placeholder="Descreva o problema com o máximo de detalhes possível (o que você estava fazendo, o que esperava que acontecesse, e o que aconteceu de fato)."></textarea></div>
-        <button class="fr-btn-primary" id="fr-report-send" style="width:100%;">Enviar</button>
-        <div id="fr-report-msg-area"></div>
-      </div>
-      <div class="fr-settings-section">
         <button class="fr-btn-danger" id="fr-settings-logout" style="width:100%;">Sair da conta</button>
-      </div>
-      <div class="fr-settings-section">
-        <h4>Excluir conta</h4>
-        <p class="fr-hint" style="margin-bottom:10px;">Isso apaga sua conta e todos os seus dados (diário, metas, treinos, avaliações, medições) de forma permanente. Não pode ser desfeito.</p>
-        <button class="fr-btn-danger" id="fr-delete-account-btn" style="width:100%;">Excluir minha conta e todos os meus dados</button>
-        <div id="fr-delete-account-area"></div>
       </div>`;
 
     container.innerHTML = `<div class="fr-settings-wrap">${html}</div>`;
@@ -1100,15 +1166,20 @@
       setThemePref(this.value);
     });
 
+    container.querySelector('#fr-sound-enabled').addEventListener('change', function(){
+      setSoundEnabled(this.checked);
+      showToast(this.checked ? 'Som de notificação ativado.' : 'Som de notificação desativado.', 'ok');
+    });
+
     container.querySelector('#fr-sound-pref').addEventListener('change', function(){
       setSoundPref(this.value);
       unlockAudio();
-      playTimerEndSound();
+      playTimerEndSound(true);
     });
 
     container.querySelector('#fr-test-sound').addEventListener('click', function(){
       unlockAudio();
-      playTimerEndSound();
+      playTimerEndSound(true);
       showToast('Se você ouviu os beeps, o som funciona nesse aparelho.', 'ok');
     });
 
@@ -2620,6 +2691,12 @@
   function setSoundPref(pref){
     try{ localStorage.setItem('saber_timer_sound', pref); }catch(e){}
   }
+  function getSoundEnabled(){
+    try{ const v = localStorage.getItem('saber_sound_enabled'); return v === null ? true : v === '1'; }catch(e){ return true; }
+  }
+  function setSoundEnabled(enabled){
+    try{ localStorage.setItem('saber_sound_enabled', enabled ? '1' : '0'); }catch(e){}
+  }
 
   function beepAt(ctx, freq, startTime, duration, waveType){
     const osc = ctx.createOscillator();
@@ -2678,7 +2755,8 @@
     }
   }
 
-  function playTimerEndSound(){
+  function playTimerEndSound(force){
+    if(!force && !getSoundEnabled()) return;
     try{
       const ctx = sharedAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
       if(ctx.state === 'suspended'){ ctx.resume().catch(()=>{}); }
