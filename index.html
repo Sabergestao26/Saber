@@ -988,102 +988,23 @@
 
   function renderSettingsView(){
     const container = document.getElementById('fr-settings-content');
-    const isPro = currentProfile && currentProfile.is_professional;
 
     if(settingsSubView){
       renderSettingsSubView(container);
       return;
     }
 
-    const themePref = getThemePref();
     let html = '';
 
-    html += `
-      <div class="fr-settings-section">
-        <h4>Aparência</h4>
-        <p class="fr-hint" style="margin-bottom:8px;">Como você quer que o Saber apareça nesse aparelho?</p>
-        <select id="fr-theme-pref">
-          <option value="light" ${themePref==='light'?'selected':''}>Modo claro</option>
-          <option value="dark" ${themePref==='dark'?'selected':''}>Modo escuro</option>
-          <option value="auto" ${themePref==='auto'?'selected':''}>Sincronizado com o celular</option>
-        </select>
-      </div>`;
-
     html += `<div class="fr-settings-menu">`;
-    html += settingsNavRow('account', 'Dados da conta', 'E-mail, senha e exclusão de conta');
+    html += settingsNavRow('general', 'Configurações gerais', 'Aparência, balança, profissional e mais');
+    html += settingsNavRow('account', 'Dados da conta', 'E-mail, senha, sair e exclusão de conta');
     html += settingsNavRow('notifications', 'Notificações', 'Sons e avisos push');
     html += settingsNavRow('subscription', 'Assinatura', 'Pagamento e plano');
     html += settingsNavRow('help', 'Central de ajudas', 'Perguntas frequentes e suporte');
     html += `</div>`;
 
-    html += `
-      <div class="fr-settings-section">
-        <h4>Balança (Withings)</h4>
-        <div id="fr-withings-area"><div class="fr-loading">Carregando...</div></div>
-      </div>`;
-
-    if(isPro){
-      html += `
-      <div class="fr-settings-section">
-        <h4>Seu código de profissional</h4>
-        <div class="fr-code-box">
-          <div class="fr-code-label">Compartilhe com seus clientes</div>
-          <div class="fr-code-val">${esc(currentProfile.professional_code || '—')}</div>
-        </div>
-        <label class="fr-ex-check" style="margin-top:14px;"><input type="checkbox" id="fr-notify-client-reports" ${currentProfile.notify_client_reports ? 'checked' : ''}> Notificar quando o relatório semanal de um cliente ficar pronto</label>
-        <div id="fr-clients-list"></div>
-      </div>`;
-    }
-
-    html += `
-      <div class="fr-settings-section">
-        <h4>Profissional vinculado</h4>
-        <div id="fr-linked-area"></div>
-      </div>`;
-
-    html += `
-      <div class="fr-settings-section">
-        <h4>Relatório semanal</h4>
-        <p class="fr-hint" style="margin-bottom:8px;">Em que dia da semana você quer ver o resumo dos últimos 7 dias?</p>
-        <select id="fr-report-day">
-          <option value="0" ${currentProfile.report_day===0?'selected':''}>Domingo</option>
-          <option value="1" ${currentProfile.report_day===1?'selected':''}>Segunda-feira</option>
-          <option value="2" ${currentProfile.report_day===2?'selected':''}>Terça-feira</option>
-          <option value="3" ${currentProfile.report_day===3?'selected':''}>Quarta-feira</option>
-          <option value="4" ${currentProfile.report_day===4?'selected':''}>Quinta-feira</option>
-          <option value="5" ${currentProfile.report_day===5?'selected':''}>Sexta-feira</option>
-          <option value="6" ${currentProfile.report_day===6?'selected':''}>Sábado</option>
-        </select>
-      </div>`;
-
-    html += `
-      <div class="fr-settings-section">
-        <h4>Tenho um código promocional</h4>
-        <div class="fr-field"><label for="fr-redeem-code">Código</label><input type="text" id="fr-redeem-code" placeholder="Ex.: SABER-ABC123" style="text-transform:uppercase;"></div>
-        <button class="fr-btn-primary" id="fr-redeem-btn" style="width:100%;">Resgatar</button>
-        <div id="fr-redeem-msg"></div>
-      </div>`;
-
-    if(isAdmin){
-      html += `
-      <div class="fr-settings-section">
-        <h4>Códigos promocionais</h4>
-        <div class="fr-field"><label for="fr-promo-email">E-mail de quem vai usar (deixe vazio pra qualquer pessoa)</label><input type="email" id="fr-promo-email" placeholder="pessoa@exemplo.com"></div>
-        <button class="fr-btn-ghost" id="fr-promo-create" style="width:100%;margin-bottom:12px;">+ Gerar código</button>
-        <div id="fr-promo-list"><div class="fr-loading">Carregando...</div></div>
-      </div>`;
-    }
-
-    html += `
-      <div class="fr-settings-section">
-        <button class="fr-btn-danger" id="fr-settings-logout" style="width:100%;">Sair da conta</button>
-      </div>`;
-
     container.innerHTML = `<div class="fr-settings-wrap">${html}</div>`;
-
-    container.querySelector('#fr-theme-pref').addEventListener('change', function(){
-      setThemePref(this.value);
-    });
 
     container.querySelectorAll('.fr-settings-navrow').forEach(function(btn){
       btn.addEventListener('click', function(){
@@ -1091,77 +1012,6 @@
         renderSettingsView();
       });
     });
-
-    container.querySelector('#fr-settings-logout').addEventListener('click', async function(){
-      await sb.auth.signOut();
-    });
-
-    container.querySelector('#fr-report-day').addEventListener('change', async function(){
-      const val = parseInt(this.value, 10);
-      const { error } = await sb.from('profiles').update({ report_day: val }).eq('id', currentUser.id);
-      if(error){ showToast('Não foi possível salvar agora.', 'err'); return; }
-      currentProfile.report_day = val;
-      showToast('Preferência salva.', 'ok');
-    });
-
-    if(isPro){
-      renderClientsList(container);
-      container.querySelector('#fr-notify-client-reports').addEventListener('change', async function(){
-        const val = this.checked;
-        const { error } = await sb.from('profiles').update({ notify_client_reports: val }).eq('id', currentUser.id);
-        if(error){ showToast('Não foi possível salvar agora.', 'err'); this.checked = !val; return; }
-        currentProfile.notify_client_reports = val;
-        showToast('Preferência salva.', 'ok');
-      });
-    }
-    renderLinkedArea(container);
-    renderWithingsArea(container);
-
-    container.querySelector('#fr-redeem-btn').addEventListener('click', async function(){
-      const btn = this;
-      const codeInput = container.querySelector('#fr-redeem-code');
-      const msgEl = container.querySelector('#fr-redeem-msg');
-      const code = codeInput.value.trim().toUpperCase();
-      if(!code){ codeInput.focus(); return; }
-      btn.disabled = true; btn.textContent = 'Resgatando...';
-      const { data, error } = await sb.rpc('redeem_promo_code', { p_code: code });
-      btn.disabled = false; btn.textContent = 'Resgatar';
-      if(error || !data){
-        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível resgatar agora. Tente de novo.</p>`;
-        return;
-      }
-      if(!data.success){
-        const messages = {
-          not_found: 'Código não encontrado. Confira se digitou certinho.',
-          already_redeemed: 'Esse código já foi usado.',
-          expired: 'Esse código expirou.',
-          wrong_email: 'Esse código é pra outra conta — confira se está logada com o e-mail certo.'
-        };
-        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(messages[data.error] || 'Não foi possível resgatar esse código.')}</p>`;
-        return;
-      }
-      currentProfile.has_free_access = true;
-      msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Código resgatado! Acesso liberado.</p>`;
-      codeInput.value = '';
-    });
-
-    if(isAdmin){
-      renderPromoCodesList(container);
-      container.querySelector('#fr-promo-create').addEventListener('click', async function(){
-        const btn = this;
-        const email = container.querySelector('#fr-promo-email').value.trim();
-        const code = 'SABER-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-        btn.disabled = true; btn.textContent = 'Gerando...';
-        const { error } = await sb.from('promo_codes').insert({
-          code, intended_email: email || null, created_by: currentUser.id
-        });
-        btn.disabled = false; btn.textContent = '+ Gerar código';
-        if(error){ showToast('Não foi possível gerar o código.', 'err'); return; }
-        container.querySelector('#fr-promo-email').value = '';
-        showToast(`Código gerado: ${code}`, 'ok');
-        renderPromoCodesList(container);
-      });
-    }
   }
 
   function renderSettingsSubView(container){
@@ -1180,6 +1030,9 @@
           <div class="fr-field"><label for="fr-acc-pass2">Confirmar nova senha</label><input type="password" id="fr-acc-pass2" minlength="6"></div>
           <button class="fr-btn-ghost" id="fr-acc-pass-save" style="width:100%;">Salvar nova senha</button>
           <div id="fr-acc-pass-msg"></div>
+        </div>
+        <div class="fr-settings-section">
+          <button class="fr-btn-danger" id="fr-settings-logout" style="width:100%;">Sair da conta</button>
         </div>
         <div class="fr-settings-section">
           <h4>Excluir conta</h4>
@@ -1235,6 +1088,64 @@
           <button class="fr-btn-primary" id="fr-report-send" style="width:100%;">Enviar</button>
           <div id="fr-report-msg-area"></div>
         </div>`;
+    } else if(key === 'general'){
+      title = 'Configurações gerais';
+      const isPro = currentProfile && currentProfile.is_professional;
+      const themePref = getThemePref();
+      body = `
+        <div class="fr-settings-section">
+          <h4>Aparência</h4>
+          <p class="fr-hint" style="margin-bottom:8px;">Como você quer que o Saber apareça nesse aparelho?</p>
+          <select id="fr-theme-pref">
+            <option value="light" ${themePref==='light'?'selected':''}>Modo claro</option>
+            <option value="dark" ${themePref==='dark'?'selected':''}>Modo escuro</option>
+            <option value="auto" ${themePref==='auto'?'selected':''}>Sincronizado com o celular</option>
+          </select>
+        </div>
+        <div class="fr-settings-section">
+          <h4>Balança (Withings)</h4>
+          <div id="fr-withings-area"><div class="fr-loading">Carregando...</div></div>
+        </div>
+        ${isPro ? `
+        <div class="fr-settings-section">
+          <h4>Seu código de profissional</h4>
+          <div class="fr-code-box">
+            <div class="fr-code-label">Compartilhe com seus clientes</div>
+            <div class="fr-code-val">${esc(currentProfile.professional_code || '—')}</div>
+          </div>
+          <label class="fr-ex-check" style="margin-top:14px;"><input type="checkbox" id="fr-notify-client-reports" ${currentProfile.notify_client_reports ? 'checked' : ''}> Notificar quando o relatório semanal de um cliente ficar pronto</label>
+          <div id="fr-clients-list"></div>
+        </div>` : ''}
+        <div class="fr-settings-section">
+          <h4>Profissional vinculado</h4>
+          <div id="fr-linked-area"></div>
+        </div>
+        <div class="fr-settings-section">
+          <h4>Relatório semanal</h4>
+          <p class="fr-hint" style="margin-bottom:8px;">Em que dia da semana você quer ver o resumo dos últimos 7 dias?</p>
+          <select id="fr-report-day">
+            <option value="0" ${currentProfile.report_day===0?'selected':''}>Domingo</option>
+            <option value="1" ${currentProfile.report_day===1?'selected':''}>Segunda-feira</option>
+            <option value="2" ${currentProfile.report_day===2?'selected':''}>Terça-feira</option>
+            <option value="3" ${currentProfile.report_day===3?'selected':''}>Quarta-feira</option>
+            <option value="4" ${currentProfile.report_day===4?'selected':''}>Quinta-feira</option>
+            <option value="5" ${currentProfile.report_day===5?'selected':''}>Sexta-feira</option>
+            <option value="6" ${currentProfile.report_day===6?'selected':''}>Sábado</option>
+          </select>
+        </div>
+        <div class="fr-settings-section">
+          <h4>Tenho um código promocional</h4>
+          <div class="fr-field"><label for="fr-redeem-code">Código</label><input type="text" id="fr-redeem-code" placeholder="Ex.: SABER-ABC123" style="text-transform:uppercase;"></div>
+          <button class="fr-btn-primary" id="fr-redeem-btn" style="width:100%;">Resgatar</button>
+          <div id="fr-redeem-msg"></div>
+        </div>
+        ${isAdmin ? `
+        <div class="fr-settings-section">
+          <h4>Códigos promocionais</h4>
+          <div class="fr-field"><label for="fr-promo-email">E-mail de quem vai usar (deixe vazio pra qualquer pessoa)</label><input type="email" id="fr-promo-email" placeholder="pessoa@exemplo.com"></div>
+          <button class="fr-btn-ghost" id="fr-promo-create" style="width:100%;margin-bottom:12px;">+ Gerar código</button>
+          <div id="fr-promo-list"><div class="fr-loading">Carregando...</div></div>
+        </div>` : ''}`;
     }
 
     container.innerHTML = `
@@ -1250,6 +1161,10 @@
     });
 
     if(key === 'account'){
+      container.querySelector('#fr-settings-logout').addEventListener('click', async function(){
+        await sb.auth.signOut();
+      });
+
       container.querySelector('#fr-delete-account-btn').addEventListener('click', function(){
         const area = container.querySelector('#fr-delete-account-area');
         area.innerHTML = `
@@ -1373,6 +1288,79 @@
         msgArea.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Recebemos seu relato, obrigada! A equipe vai revisar.</p>`;
         notifyAdminsPendingReview('problem');
       });
+    } else if(key === 'general'){
+      const isPro = currentProfile && currentProfile.is_professional;
+
+      container.querySelector('#fr-theme-pref').addEventListener('change', function(){
+        setThemePref(this.value);
+      });
+
+      container.querySelector('#fr-report-day').addEventListener('change', async function(){
+        const val = parseInt(this.value, 10);
+        const { error } = await sb.from('profiles').update({ report_day: val }).eq('id', currentUser.id);
+        if(error){ showToast('Não foi possível salvar agora.', 'err'); return; }
+        currentProfile.report_day = val;
+        showToast('Preferência salva.', 'ok');
+      });
+
+      if(isPro){
+        renderClientsList(container);
+        container.querySelector('#fr-notify-client-reports').addEventListener('change', async function(){
+          const val = this.checked;
+          const { error } = await sb.from('profiles').update({ notify_client_reports: val }).eq('id', currentUser.id);
+          if(error){ showToast('Não foi possível salvar agora.', 'err'); this.checked = !val; return; }
+          currentProfile.notify_client_reports = val;
+          showToast('Preferência salva.', 'ok');
+        });
+      }
+      renderLinkedArea(container);
+      renderWithingsArea(container);
+
+      container.querySelector('#fr-redeem-btn').addEventListener('click', async function(){
+        const btn = this;
+        const codeInput = container.querySelector('#fr-redeem-code');
+        const msgEl = container.querySelector('#fr-redeem-msg');
+        const code = codeInput.value.trim().toUpperCase();
+        if(!code){ codeInput.focus(); return; }
+        btn.disabled = true; btn.textContent = 'Resgatando...';
+        const { data, error } = await sb.rpc('redeem_promo_code', { p_code: code });
+        btn.disabled = false; btn.textContent = 'Resgatar';
+        if(error || !data){
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível resgatar agora. Tente de novo.</p>`;
+          return;
+        }
+        if(!data.success){
+          const messages = {
+            not_found: 'Código não encontrado. Confira se digitou certinho.',
+            already_redeemed: 'Esse código já foi usado.',
+            expired: 'Esse código expirou.',
+            wrong_email: 'Esse código é pra outra conta — confira se está logada com o e-mail certo.'
+          };
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(messages[data.error] || 'Não foi possível resgatar esse código.')}</p>`;
+          return;
+        }
+        currentProfile.has_free_access = true;
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Código resgatado! Acesso liberado.</p>`;
+        codeInput.value = '';
+      });
+
+      if(isAdmin){
+        renderPromoCodesList(container);
+        container.querySelector('#fr-promo-create').addEventListener('click', async function(){
+          const btn = this;
+          const email = container.querySelector('#fr-promo-email').value.trim();
+          const code = 'SABER-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+          btn.disabled = true; btn.textContent = 'Gerando...';
+          const { error } = await sb.from('promo_codes').insert({
+            code, intended_email: email || null, created_by: currentUser.id
+          });
+          btn.disabled = false; btn.textContent = '+ Gerar código';
+          if(error){ showToast('Não foi possível gerar o código.', 'err'); return; }
+          container.querySelector('#fr-promo-email').value = '';
+          showToast(`Código gerado: ${code}`, 'ok');
+          renderPromoCodesList(container);
+        });
+      }
     }
   }
 
