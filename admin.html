@@ -38,6 +38,15 @@
   .review-meta{ font-size:12.5px; color:var(--ink-soft); margin-bottom:10px; line-height:1.6; }
   .review-actions{ display:flex; gap:8px; }
   .review-actions button{ width:auto; flex:1; font-size:13px; padding:9px 12px; }
+  .toggle-row{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .toggle-row-label{ font-size:13.5px; font-weight:600; }
+  .toggle{ position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+  .toggle input{ position:absolute; opacity:0; width:0; height:0; }
+  .toggle-track{ position:absolute; inset:0; background:var(--border); border-radius:999px; cursor:pointer; transition:background .15s; }
+  .toggle-thumb{ position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(38,43,30,0.35); transition:transform .15s; }
+  .toggle input:checked ~ .toggle-track{ background:var(--green-deep); }
+  .toggle input:checked ~ .toggle-track .toggle-thumb{ transform:translateX(20px); }
+  .toggle input:disabled ~ .toggle-track{ opacity:0.5; cursor:default; }
 </style>
 </head>
 <body>
@@ -60,7 +69,13 @@
   <div class="card">
     <h4>Notificações</h4>
     <p class="hint" style="margin-bottom:10px;">Receba um aviso, mesmo com essa aba fechada, quando chegar algo novo pra revisar.</p>
-    <button class="ghost" id="enable-notif-btn">🔔 Ativar notificações</button>
+    <div class="toggle-row">
+      <span class="toggle-row-label">Ativar notificações push</span>
+      <label class="toggle">
+        <input type="checkbox" id="notif-toggle">
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      </label>
+    </div>
   </div>
 
   <div class="card">
@@ -134,12 +149,12 @@
   async function subscribeToPush(){
     if(!('serviceWorker' in navigator) || !('PushManager' in window)){
       alert('Esse navegador não suporta notificações push.');
-      return;
+      return false;
     }
     try{
       await navigator.serviceWorker.register('./sw.js');
       const permission = await Notification.requestPermission();
-      if(permission !== 'granted'){ alert('Permissão não concedida.'); return; }
+      if(permission !== 'granted'){ alert('Permissão não concedida.'); return false; }
       const reg = await navigator.serviceWorker.ready;
       let sub = await reg.pushManager.getSubscription();
       if(!sub){
@@ -149,14 +164,57 @@
       const { error } = await sb.from('push_subscriptions').upsert({
         user_id: currentUser.id, endpoint: subJson.endpoint, p256dh: subJson.keys.p256dh, auth: subJson.keys.auth
       }, { onConflict: 'user_id,endpoint' });
-      if(error){ alert('Não foi possível salvar a inscrição.'); return; }
-      alert('Notificações ativadas!');
+      if(error){ alert('Não foi possível salvar a inscrição.'); return false; }
+      return true;
     }catch(err){
       console.error(err);
       alert('Não foi possível ativar as notificações.');
+      return false;
     }
   }
-  document.getElementById('enable-notif-btn').addEventListener('click', subscribeToPush);
+
+  async function unsubscribeFromPush(){
+    try{
+      if(!('serviceWorker' in navigator)) return true;
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(reg){
+        const sub = await reg.pushManager.getSubscription();
+        if(sub){
+          await sb.from('push_subscriptions').delete().eq('user_id', currentUser.id).eq('endpoint', sub.endpoint);
+          await sub.unsubscribe();
+        }
+      }
+      return true;
+    }catch(err){
+      console.error(err);
+      alert('Não foi possível desativar as notificações.');
+      return false;
+    }
+  }
+
+  async function getPushSubscriptionStatus(){
+    try{
+      if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+      if(!('Notification' in window) || Notification.permission !== 'granted') return false;
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(!reg) return false;
+      const sub = await reg.pushManager.getSubscription();
+      return !!sub;
+    }catch(err){
+      return false;
+    }
+  }
+
+  const notifToggle = document.getElementById('notif-toggle');
+  getPushSubscriptionStatus().then(function(on){ notifToggle.checked = on; });
+  notifToggle.addEventListener('change', async function(){
+    const el = this;
+    const wantsOn = el.checked;
+    el.disabled = true;
+    const ok = wantsOn ? await subscribeToPush() : await unsubscribeFromPush();
+    el.disabled = false;
+    if(!ok) el.checked = !wantsOn;
+  });
 
   /* ---------- Biblioteca de exercícios (pra gerar treino ao aprovar avaliação) ---------- */
   let exerciseLibrary = [];
