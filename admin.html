@@ -74,6 +74,11 @@
   </div>
 
   <div class="card">
+    <h4>Problemas reportados</h4>
+    <div id="problems-area"><p class="hint">Carregando...</p></div>
+  </div>
+
+  <div class="card">
     <h4>Pessoas</h4>
     <div class="grid" id="stats-people"></div>
   </div>
@@ -340,6 +345,40 @@
     });
   }
 
+  /* ---------- Problemas reportados ---------- */
+  async function renderProblemsArea(){
+    const el = document.getElementById('problems-area');
+    const { data, error } = await sb.from('problem_reports').select('*').eq('status', 'pending').order('created_at');
+    if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
+    const list = data || [];
+    if(list.length===0){ el.innerHTML = `<p class="hint">Nenhum problema pendente.</p>`; return; }
+    el.innerHTML = list.map(r=>`
+      <div class="review-item" data-id="${r.id}">
+        <div class="review-meta" style="margin-bottom:6px;">${new Date(r.created_at).toLocaleString('pt-BR')}${r.page_context ? ' · tela: ' + esc(r.page_context) : ''}</div>
+        <div class="review-name" style="font-weight:400;white-space:pre-wrap;">${esc(r.message)}</div>
+        <div class="review-actions" style="margin-top:10px;">
+          <button data-action="resolve" data-id="${r.id}">Marcar como resolvido</button>
+          <button class="ghost" data-action="dismiss" data-id="${r.id}">Dispensar</button>
+        </div>
+      </div>`).join('');
+    el.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.addEventListener('click', async function(){
+        const id = this.getAttribute('data-id');
+        const action = this.getAttribute('data-action');
+        this.disabled = true; this.textContent = '...';
+        try{
+          const { error: updErr } = await sb.from('problem_reports').update({ status: action==='resolve'?'resolved':'dismissed', reviewed_at: new Date().toISOString() }).eq('id', id);
+          if(updErr) throw updErr;
+          document.querySelector(`.review-item[data-id="${id}"]`).remove();
+        }catch(err){
+          console.error(err);
+          alert('Não foi possível concluir. Tente novamente.');
+          this.disabled = false; this.textContent = action==='resolve' ? 'Marcar como resolvido' : 'Dispensar';
+        }
+      });
+    });
+  }
+
   /* ---------- Estatísticas ---------- */
   function statCard(label, val, note){
     return `<div class="stat-card${val===null?' placeholder':''}"><div class="stat-label">${label}</div><div class="stat-val">${val===null?'—':val}</div>${note?`<div class="stat-note">${note}</div>`:''}</div>`;
@@ -373,6 +412,7 @@
       loadDashboard();
       renderAssessmentsArea();
       renderSuggestionsArea();
+      renderProblemsArea();
     }
   }
   document.getElementById('login-btn').addEventListener('click', async ()=>{

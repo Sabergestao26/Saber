@@ -142,6 +142,21 @@
   .fr-client-row:hover{ background:var(--paper-deep); }
   .fr-client-name{ font-weight:600; font-size:13.5px; }
   .fr-client-arrow{ color:var(--ink-soft); }
+  .fr-faq-item{
+    background:var(--surface); border:1px solid var(--border); border-radius:9px; margin-bottom:8px; overflow:hidden;
+  }
+  .fr-faq-item summary{
+    padding:12px 14px; cursor:pointer; font-weight:600; font-size:13.5px; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .fr-faq-item summary::-webkit-details-marker{ display:none; }
+  .fr-faq-item summary::after{ content:'+'; color:var(--ink-soft); font-weight:700; flex-shrink:0; }
+  .fr-faq-item[open] summary::after{ content:'–'; }
+  .fr-faq-item .fr-faq-body{ padding:0 14px 14px; font-size:13px; color:var(--ink-soft); line-height:1.55; }
+  .fr-faq-group-title{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft);
+    margin:14px 0 8px;
+  }
+  .fr-faq-group-title:first-child{ margin-top:0; }
   .fr-settings-section{ margin-bottom:22px; }
   .fr-settings-section:last-child{ margin-bottom:0; }
   .fr-settings-section h4{
@@ -612,6 +627,34 @@
      ============================================================ */
   const SUPABASE_URL = 'https://dzkugfwflxdhvktyqkwx.supabase.co';
   const VAPID_PUBLIC_KEY = 'BKXKLuS4ekfLnqNGmM7BHPK1p7hcJRvuBxybiFEVRTLlHEPJgYpZzip5IeQDtGxtUCE5Oy-whckZiYd4LXIlfgE';
+  const SUPPORT_EMAIL = 'saber.gestao26@gmail.com';
+
+  const FAQ_GROUPS = [
+    { title: 'Conta e cadastro', items: [
+      { q: 'Esqueci minha senha, e agora?', a: 'Na tela de login, toque em "Esqueci minha senha" e siga o link enviado por e-mail.' },
+      { q: 'Como troco meu e-mail ou senha?', a: 'Vá em Configurações > Sua conta. Trocar o e-mail exige confirmar pelo link enviado antes de valer de verdade.' },
+      { q: 'Como excluo minha conta e meus dados?', a: 'Vá em Configurações > Excluir conta. Você precisa digitar "EXCLUIR" pra confirmar — depois disso, a conta e todos os dados ligados a ela (diário, metas, treinos, avaliações, medições) são apagados de forma permanente e imediata. Não temos como recuperar depois de confirmado.' },
+    ]},
+    { title: 'Diário e metas', items: [
+      { q: 'Como defino minhas metas de calorias e água?', a: 'Vá em Diário do Dia > "Metas diárias" (aparece quando ainda não tiver meta definida), ou use a calculadora automática baseada em peso, altura, idade e objetivo.' },
+      { q: 'A meta de água/proteína não aparece no calendário. Por quê?', a: 'Só aparece se você tiver definido essa meta específica em "Metas diárias". Sem meta cadastrada, não tem o que comparar.' },
+      { q: 'Como funciona o cálculo da lista de compras?', a: 'Somamos os ingredientes das receitas escolhidas, ajustando pela quantidade de porções. Quando um ingrediente aparece "já cozido" na receita, convertemos pra uma estimativa de quanto comprar cru (arroz e feijão precisam de menos cru do que o peso cozido; carne e frango precisam de mais).' },
+    ]},
+    { title: 'Treinos', items: [
+      { q: 'Fiz a avaliação, mas meu treino não apareceu na hora.', a: 'Se você marcou alguma limitação física (coluna, joelho, ombro, etc.), o treino passa por revisão manual antes de ser liberado — pode levar um tempo até aparecer.' },
+      { q: 'Posso editar um treino que a avaliação gerou pra mim?', a: 'Sim — abra o treino, toque em "Gerenciar exercícios / editar treino". Dá pra adicionar, editar, remover exercícios e até renomear o treino.' },
+      { q: 'O som do cronômetro de descanso não toca quando saio do app.', a: 'Isso é uma limitação do próprio celular (economia de bateria), não só do Saber — nenhum site consegue continuar contando som em segundo plano depois que a tela apaga ou o app é fechado de verdade. Ative as notificações push (Configurações > 🔔 Ativar notificações) pra ainda receber um aviso mesmo com o app fechado.' },
+      { q: 'Como funciona a avaliação com limitação física?', a: 'Excluímos os exercícios mais arriscados pra aquela área e reduzimos a quantidade de exercícios ali, como precaução extra. Isso não substitui uma avaliação médica ou fisioterapêutica — é só uma camada de segurança dentro do que um aplicativo consegue oferecer.' },
+    ]},
+    { title: 'Balança e notificações', items: [
+      { q: 'Como conecto minha balança?', a: 'Hoje só funciona com balanças Withings. Vá em Configurações > Balança (Withings) > Conectar.' },
+      { q: 'Ativei as notificações e mesmo assim não chegou nada.', a: 'Confirme que o Saber foi aberto pelo ícone da tela de início (não pelo Safari/Chrome direto), e que você testou o som em Configurações antes.' },
+    ]},
+    { title: 'Para profissionais', items: [
+      { q: 'Como vinculo um cliente?', a: 'Compartilhe seu código de profissional (Configurações > Seu código) — a pessoa digita esse código do lado dela pra se vincular.' },
+      { q: 'Como vejo o relatório semanal de um cliente?', a: 'Configurações > Meus clientes > toque em "📊 Relatório" ao lado do nome dele.' },
+    ]},
+  ];
 
   function urlBase64ToUint8Array(base64String){
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -1023,6 +1066,25 @@
 
     html += `
       <div class="fr-settings-section">
+        <h4>Central de Ajuda</h4>
+        <p class="fr-hint" style="margin-bottom:10px;">Respostas rápidas pras dúvidas mais comuns. Não achou a sua? Fala com a gente por e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a> <i>(em breve, também por WhatsApp)</i>.</p>
+        <div id="fr-faq-area">${FAQ_GROUPS.map(group => `
+          <div class="fr-faq-group-title">${esc(group.title)}</div>
+          ${group.items.map((item, idx) => `
+            <details class="fr-faq-item">
+              <summary>${esc(item.q)}</summary>
+              <div class="fr-faq-body">${esc(item.a)}</div>
+            </details>`).join('')}
+        `).join('')}</div>
+      </div>
+      <div class="fr-settings-section">
+        <h4>Reportar um problema</h4>
+        <p class="fr-hint" style="margin-bottom:10px;">Encontrou algo que não funcionou como devia? Conta pra gente aqui embaixo — a equipe recebe e revisa. Pra dúvidas urgentes, prefira o e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>.</p>
+        <div class="fr-field"><label for="fr-report-msg">O que aconteceu?</label><textarea id="fr-report-msg" rows="4" placeholder="Descreva o problema com o máximo de detalhes possível (o que você estava fazendo, o que esperava que acontecesse, e o que aconteceu de fato)."></textarea></div>
+        <button class="fr-btn-primary" id="fr-report-send" style="width:100%;">Enviar</button>
+        <div id="fr-report-msg-area"></div>
+      </div>
+      <div class="fr-settings-section">
         <button class="fr-btn-danger" id="fr-settings-logout" style="width:100%;">Sair da conta</button>
       </div>
       <div class="fr-settings-section">
@@ -1133,6 +1195,32 @@
       document.getElementById('fr-acc-pass').value = '';
       document.getElementById('fr-acc-pass2').value = '';
       msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Senha atualizada!</p>`;
+    });
+
+    container.querySelector('#fr-report-send').addEventListener('click', async function(){
+      const btn = this;
+      const msgInput = container.querySelector('#fr-report-msg');
+      const msgArea = container.querySelector('#fr-report-msg-area');
+      const message = msgInput.value.trim();
+      if(!message){
+        msgArea.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Escreva o que aconteceu antes de enviar.</p>`;
+        msgInput.focus();
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      const { error } = await sb.from('problem_reports').insert({
+        submitted_by: currentUser.id,
+        message,
+        page_context: currentView || null
+      });
+      btn.disabled = false; btn.textContent = 'Enviar';
+      if(error){
+        msgArea.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível enviar agora. Tente novamente ou escreva pra ${esc(SUPPORT_EMAIL)}.</p>`;
+        return;
+      }
+      msgInput.value = '';
+      msgArea.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Recebemos seu relato, obrigada! A equipe vai revisar.</p>`;
+      notifyAdminsPendingReview('problem');
     });
 
     container.querySelector('#fr-report-day').addEventListener('change', async function(){
