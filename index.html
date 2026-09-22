@@ -157,21 +157,22 @@
     margin:14px 0 8px;
   }
   .fr-faq-group-title:first-child{ margin-top:0; }
-  .fr-settings-cat{
-    background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:10px; overflow:hidden;
+  .fr-settings-navrow{
+    width:100%; background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:10px;
+    padding:16px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px;
+    text-align:left; font-family:inherit; color:inherit;
   }
-  .fr-settings-cat > summary{
-    padding:16px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:10px;
-  }
-  .fr-settings-cat > summary::-webkit-details-marker{ display:none; }
+  .fr-settings-navrow:hover{ background:var(--paper-deep); }
   .fr-settings-cat-label{ font-family:'Fraunces',serif; font-weight:700; font-size:16px; }
   .fr-settings-cat-sub{ display:block; font-family:'Inter',sans-serif; font-weight:400; font-size:12px; color:var(--ink-soft); margin-top:2px; }
-  .fr-settings-cat-arrow{ color:var(--ink-soft); font-size:20px; transform:rotate(90deg); transition:transform .15s; flex-shrink:0; }
-  .fr-settings-cat[open] .fr-settings-cat-arrow{ transform:rotate(270deg); }
-  .fr-settings-cat-body{ padding:0 16px 18px; border-top:1px solid var(--border); padding-top:16px; margin-top:-2px; }
-  .fr-settings-cat-body .fr-settings-section{ margin-bottom:20px; }
-  .fr-settings-cat-body .fr-settings-section h4{ border-top:none; padding-top:0; }
+  .fr-settings-navrow-arrow{ color:var(--ink-soft); font-size:20px; flex-shrink:0; }
   .fr-settings-menu{ margin-bottom:22px; }
+  .fr-settings-back{
+    background:none; border:none; color:var(--green-deep); font-family:'Inter',sans-serif; font-weight:600;
+    font-size:13.5px; cursor:pointer; padding:0; margin-bottom:16px; display:inline-flex; align-items:center; gap:4px;
+  }
+  .fr-settings-back:hover{ text-decoration:underline; }
+  .fr-settings-subtitle{ font-family:'Fraunces',serif; font-size:19px; margin:0 0 16px; }
   .fr-settings-section{ margin-bottom:22px; }
   .fr-settings-section:last-child{ margin-bottom:0; }
   .fr-settings-section h4{
@@ -774,6 +775,7 @@
   let activeCat = 'todas';
   let searchTerm = '';
   let currentView = 'diary';
+  let settingsSubView = null; // null = menu principal; ou 'account' | 'notifications' | 'subscription' | 'help'
 
   /* ---------- Tema (claro/escuro/automático) ---------- */
   function getThemePref(){
@@ -977,9 +979,22 @@
     }).sort((a,b)=> a.email.localeCompare(b.email,'pt-BR'));
   }
 
+  function settingsNavRow(key, label, sub){
+    return `<button type="button" class="fr-settings-navrow" data-key="${key}">
+        <span class="fr-settings-cat-label">${esc(label)}<span class="fr-settings-cat-sub">${esc(sub)}</span></span>
+        <span class="fr-settings-navrow-arrow">›</span>
+      </button>`;
+  }
+
   function renderSettingsView(){
     const container = document.getElementById('fr-settings-content');
     const isPro = currentProfile && currentProfile.is_professional;
+
+    if(settingsSubView){
+      renderSettingsSubView(container);
+      return;
+    }
+
     const themePref = getThemePref();
     let html = '';
 
@@ -995,106 +1010,10 @@
       </div>`;
 
     html += `<div class="fr-settings-menu">`;
-
-    // ---- Dados da conta ----
-    html += `
-      <details class="fr-settings-cat">
-        <summary>
-          <span class="fr-settings-cat-label">Dados da conta<span class="fr-settings-cat-sub">E-mail, senha e exclusão de conta</span></span>
-          <span class="fr-settings-cat-arrow">›</span>
-        </summary>
-        <div class="fr-settings-cat-body">
-          <div class="fr-settings-section">
-            <h4>E-mail e senha</h4>
-            <div class="fr-field"><label for="fr-acc-email">E-mail atual</label><input type="email" id="fr-acc-email" value="${esc(currentUser.email)}"></div>
-            <button class="fr-btn-ghost" id="fr-acc-email-save" style="width:100%;margin-bottom:6px;">Salvar novo e-mail</button>
-            <div id="fr-acc-email-msg"></div>
-            <div class="fr-field" style="margin-top:14px;"><label for="fr-acc-pass">Nova senha</label><input type="password" id="fr-acc-pass" minlength="6" placeholder="Mínimo 6 caracteres"></div>
-            <div class="fr-field"><label for="fr-acc-pass2">Confirmar nova senha</label><input type="password" id="fr-acc-pass2" minlength="6"></div>
-            <button class="fr-btn-ghost" id="fr-acc-pass-save" style="width:100%;">Salvar nova senha</button>
-            <div id="fr-acc-pass-msg"></div>
-          </div>
-          <div class="fr-settings-section">
-            <h4>Excluir conta</h4>
-            <p class="fr-hint" style="margin-bottom:10px;">Isso apaga sua conta e todos os seus dados (diário, metas, treinos, avaliações, medições) de forma permanente. Não pode ser desfeito.</p>
-            <button class="fr-btn-danger" id="fr-delete-account-btn" style="width:100%;">Excluir minha conta e todos os meus dados</button>
-            <div id="fr-delete-account-area"></div>
-          </div>
-        </div>
-      </details>`;
-
-    // ---- Notificações ----
-    html += `
-      <details class="fr-settings-cat">
-        <summary>
-          <span class="fr-settings-cat-label">Notificações<span class="fr-settings-cat-sub">Sons e avisos push</span></span>
-          <span class="fr-settings-cat-arrow">›</span>
-        </summary>
-        <div class="fr-settings-cat-body">
-          <div class="fr-settings-section">
-            <h4>Sons de notificação</h4>
-            <label class="fr-ex-check" style="margin-bottom:12px;"><input type="checkbox" id="fr-sound-enabled" ${getSoundEnabled() ? 'checked' : ''}> Tocar som quando o descanso terminar</label>
-            <p class="fr-hint" style="margin-bottom:8px;">Escolha o som que toca quando o descanso termina.</p>
-            <select id="fr-sound-pref" style="margin-bottom:10px;">
-              <option value="classico" ${getSoundPref()==='classico'?'selected':''}>Clássico (3 beeps)</option>
-              <option value="suave" ${getSoundPref()==='suave'?'selected':''}>Suave (2 tons)</option>
-              <option value="urgente" ${getSoundPref()==='urgente'?'selected':''}>Urgente (4 beeps rápidos)</option>
-              <option value="sino" ${getSoundPref()==='sino'?'selected':''}>Sino</option>
-            </select>
-            <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;margin-bottom:12px;">🔊 Testar som</button>
-            <button class="fr-btn-ghost" id="fr-enable-notifications" style="width:100%;">🔔 ${('Notification' in window && Notification.permission === 'granted') ? 'Notificações ativadas' : 'Ativar notificações'}</button>
-            <p class="fr-hint" style="margin-top:10px;">Se o som e a notificação não chegarem durante um treino de verdade, mesmo funcionando aqui no teste, é porque a tela apagou ou você trocou de aplicativo durante o descanso — isso pausa qualquer site (não só o Saber) por economia de bateria do próprio celular. Deixando a tela ligada e o Saber em primeiro plano durante o descanso, funciona normalmente — e agora, se você voltar um pouco atrasada, o cronômetro se corrige sozinho assim que reabrir o app.</p>
-          </div>
-        </div>
-      </details>`;
-
-    // ---- Assinatura ----
-    html += `
-      <details class="fr-settings-cat">
-        <summary>
-          <span class="fr-settings-cat-label">Assinatura<span class="fr-settings-cat-sub">Pagamento e plano</span></span>
-          <span class="fr-settings-cat-arrow">›</span>
-        </summary>
-        <div class="fr-settings-cat-body">
-          <div class="fr-settings-section">
-            <h4>Sua assinatura</h4>
-            <p class="fr-hint" style="margin-bottom:14px;">Essa área ainda está em construção — assim que o sistema de pagamento estiver pronto, você vai poder assinar e gerenciar sua assinatura por aqui.</p>
-            <button class="fr-btn-ghost" style="width:100%;margin-bottom:8px;" disabled>Assinar o Saber</button>
-            <button class="fr-btn-ghost" style="width:100%;" disabled>Alterar assinatura</button>
-          </div>
-        </div>
-      </details>`;
-
-    // ---- Central de ajudas ----
-    html += `
-      <details class="fr-settings-cat">
-        <summary>
-          <span class="fr-settings-cat-label">Central de ajudas<span class="fr-settings-cat-sub">Perguntas frequentes e suporte</span></span>
-          <span class="fr-settings-cat-arrow">›</span>
-        </summary>
-        <div class="fr-settings-cat-body">
-          <div class="fr-settings-section">
-            <h4>Perguntas frequentes</h4>
-            <p class="fr-hint" style="margin-bottom:10px;">Não achou sua dúvida aqui? Fala com a gente por e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a> <i>(em breve, também por WhatsApp)</i>.</p>
-            <div id="fr-faq-area">${FAQ_GROUPS.map(group => `
-              <div class="fr-faq-group-title">${esc(group.title)}</div>
-              ${group.items.map((item, idx) => `
-                <details class="fr-faq-item">
-                  <summary>${esc(item.q)}</summary>
-                  <div class="fr-faq-body">${esc(item.a)}</div>
-                </details>`).join('')}
-            `).join('')}</div>
-          </div>
-          <div class="fr-settings-section">
-            <h4>Reportar um problema</h4>
-            <p class="fr-hint" style="margin-bottom:10px;">Encontrou algo que não funcionou como devia? Conta pra gente aqui embaixo — a equipe recebe e revisa. Pra dúvidas urgentes, prefira o e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>.</p>
-            <div class="fr-field"><label for="fr-report-msg">O que aconteceu?</label><textarea id="fr-report-msg" rows="4" placeholder="Descreva o problema com o máximo de detalhes possível (o que você estava fazendo, o que esperava que acontecesse, e o que aconteceu de fato)."></textarea></div>
-            <button class="fr-btn-primary" id="fr-report-send" style="width:100%;">Enviar</button>
-            <div id="fr-report-msg-area"></div>
-          </div>
-        </div>
-      </details>`;
-
+    html += settingsNavRow('account', 'Dados da conta', 'E-mail, senha e exclusão de conta');
+    html += settingsNavRow('notifications', 'Notificações', 'Sons e avisos push');
+    html += settingsNavRow('subscription', 'Assinatura', 'Pagamento e plano');
+    html += settingsNavRow('help', 'Central de ajudas', 'Perguntas frequentes e suporte');
     html += `</div>`;
 
     html += `
@@ -1166,132 +1085,15 @@
       setThemePref(this.value);
     });
 
-    container.querySelector('#fr-sound-enabled').addEventListener('change', function(){
-      setSoundEnabled(this.checked);
-      showToast(this.checked ? 'Som de notificação ativado.' : 'Som de notificação desativado.', 'ok');
-    });
-
-    container.querySelector('#fr-sound-pref').addEventListener('change', function(){
-      setSoundPref(this.value);
-      unlockAudio();
-      playTimerEndSound(true);
-    });
-
-    container.querySelector('#fr-test-sound').addEventListener('click', function(){
-      unlockAudio();
-      playTimerEndSound(true);
-      showToast('Se você ouviu os beeps, o som funciona nesse aparelho.', 'ok');
-    });
-
-    container.querySelector('#fr-enable-notifications').addEventListener('click', function(){
-      subscribeToPush().then(()=>{ if(currentView==='settings') renderSettingsView(); });
+    container.querySelectorAll('.fr-settings-navrow').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        settingsSubView = this.getAttribute('data-key');
+        renderSettingsView();
+      });
     });
 
     container.querySelector('#fr-settings-logout').addEventListener('click', async function(){
       await sb.auth.signOut();
-    });
-
-    container.querySelector('#fr-delete-account-btn').addEventListener('click', function(){
-      const area = container.querySelector('#fr-delete-account-area');
-      area.innerHTML = `
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-          <p class="fr-hint" style="color:var(--rust);margin-bottom:8px;">Pra confirmar, digite <b>EXCLUIR</b> no campo abaixo:</p>
-          <input type="text" id="fr-delete-confirm-input" style="margin-bottom:8px;">
-          <button class="fr-btn-ghost" id="fr-delete-cancel" style="width:100%;margin-bottom:6px;">Cancelar</button>
-          <button class="fr-btn-danger" id="fr-delete-confirm" style="width:100%;">Excluir permanentemente</button>
-        </div>`;
-      area.querySelector('#fr-delete-cancel').addEventListener('click', ()=>{ area.innerHTML = ''; });
-      area.querySelector('#fr-delete-confirm').addEventListener('click', async function(){
-        const typed = document.getElementById('fr-delete-confirm-input').value.trim().toUpperCase();
-        if(typed !== 'EXCLUIR'){ showToast('Digite EXCLUIR, exatamente assim, pra confirmar.', 'err'); return; }
-        const btn = this; btn.disabled = true; btn.textContent = 'Excluindo...';
-        try{
-          const { data: sessionData } = await sb.auth.getSession();
-          const token = sessionData?.session?.access_token;
-          const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const result = await res.json();
-          if(!res.ok || result.error){
-            showToast('Não foi possível excluir a conta agora. Tente novamente ou entre em contato pelo suporte.', 'err');
-            btn.disabled = false; btn.textContent = 'Excluir permanentemente';
-            return;
-          }
-          await sb.auth.signOut();
-          window.location.reload();
-        }catch(err){
-          console.error(err);
-          showToast('Não foi possível excluir a conta agora.', 'err');
-          btn.disabled = false; btn.textContent = 'Excluir permanentemente';
-        }
-      });
-    });
-
-    container.querySelector('#fr-acc-email-save').addEventListener('click', async function(){
-      const btn = this;
-      const newEmail = document.getElementById('fr-acc-email').value.trim();
-      const msgEl = container.querySelector('#fr-acc-email-msg');
-      if(!newEmail || newEmail === currentUser.email){ return; }
-      btn.disabled = true; btn.textContent = 'Salvando...';
-      const { error } = await sb.auth.updateUser({ email: newEmail });
-      btn.disabled = false; btn.textContent = 'Salvar novo e-mail';
-      if(error){
-        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(error.message)}</p>`;
-        return;
-      }
-      msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Enviamos um link de confirmação pro e-mail novo (e, às vezes, pro antigo também). Só troca depois de confirmar.</p>`;
-    });
-
-    container.querySelector('#fr-acc-pass-save').addEventListener('click', async function(){
-      const btn = this;
-      const pass1 = document.getElementById('fr-acc-pass').value;
-      const pass2 = document.getElementById('fr-acc-pass2').value;
-      const msgEl = container.querySelector('#fr-acc-pass-msg');
-      if(!pass1 || pass1.length < 6){
-        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">A senha precisa ter pelo menos 6 caracteres.</p>`;
-        return;
-      }
-      if(pass1 !== pass2){
-        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">As duas senhas não são iguais.</p>`;
-        return;
-      }
-      btn.disabled = true; btn.textContent = 'Salvando...';
-      const { error } = await sb.auth.updateUser({ password: pass1 });
-      btn.disabled = false; btn.textContent = 'Salvar nova senha';
-      if(error){
-        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(error.message)}</p>`;
-        return;
-      }
-      document.getElementById('fr-acc-pass').value = '';
-      document.getElementById('fr-acc-pass2').value = '';
-      msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Senha atualizada!</p>`;
-    });
-
-    container.querySelector('#fr-report-send').addEventListener('click', async function(){
-      const btn = this;
-      const msgInput = container.querySelector('#fr-report-msg');
-      const msgArea = container.querySelector('#fr-report-msg-area');
-      const message = msgInput.value.trim();
-      if(!message){
-        msgArea.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Escreva o que aconteceu antes de enviar.</p>`;
-        msgInput.focus();
-        return;
-      }
-      btn.disabled = true; btn.textContent = 'Enviando...';
-      const { error } = await sb.from('problem_reports').insert({
-        submitted_by: currentUser.id,
-        message,
-        page_context: currentView || null
-      });
-      btn.disabled = false; btn.textContent = 'Enviar';
-      if(error){
-        msgArea.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível enviar agora. Tente novamente ou escreva pra ${esc(SUPPORT_EMAIL)}.</p>`;
-        return;
-      }
-      msgInput.value = '';
-      msgArea.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Recebemos seu relato, obrigada! A equipe vai revisar.</p>`;
-      notifyAdminsPendingReview('problem');
     });
 
     container.querySelector('#fr-report-day').addEventListener('change', async function(){
@@ -1358,6 +1160,218 @@
         container.querySelector('#fr-promo-email').value = '';
         showToast(`Código gerado: ${code}`, 'ok');
         renderPromoCodesList(container);
+      });
+    }
+  }
+
+  function renderSettingsSubView(container){
+    const key = settingsSubView;
+    let title = '', body = '';
+
+    if(key === 'account'){
+      title = 'Dados da conta';
+      body = `
+        <div class="fr-settings-section">
+          <h4>E-mail e senha</h4>
+          <div class="fr-field"><label for="fr-acc-email">E-mail atual</label><input type="email" id="fr-acc-email" value="${esc(currentUser.email)}"></div>
+          <button class="fr-btn-ghost" id="fr-acc-email-save" style="width:100%;margin-bottom:6px;">Salvar novo e-mail</button>
+          <div id="fr-acc-email-msg"></div>
+          <div class="fr-field" style="margin-top:14px;"><label for="fr-acc-pass">Nova senha</label><input type="password" id="fr-acc-pass" minlength="6" placeholder="Mínimo 6 caracteres"></div>
+          <div class="fr-field"><label for="fr-acc-pass2">Confirmar nova senha</label><input type="password" id="fr-acc-pass2" minlength="6"></div>
+          <button class="fr-btn-ghost" id="fr-acc-pass-save" style="width:100%;">Salvar nova senha</button>
+          <div id="fr-acc-pass-msg"></div>
+        </div>
+        <div class="fr-settings-section">
+          <h4>Excluir conta</h4>
+          <p class="fr-hint" style="margin-bottom:10px;">Isso apaga sua conta e todos os seus dados (diário, metas, treinos, avaliações, medições) de forma permanente. Não pode ser desfeito.</p>
+          <button class="fr-btn-danger" id="fr-delete-account-btn" style="width:100%;">Excluir minha conta e todos os meus dados</button>
+          <div id="fr-delete-account-area"></div>
+        </div>`;
+    } else if(key === 'notifications'){
+      title = 'Notificações';
+      body = `
+        <div class="fr-settings-section">
+          <h4>Sons de notificação</h4>
+          <label class="fr-ex-check" style="margin-bottom:12px;"><input type="checkbox" id="fr-sound-enabled" ${getSoundEnabled() ? 'checked' : ''}> Tocar som quando o descanso terminar</label>
+          <p class="fr-hint" style="margin-bottom:8px;">Escolha o som que toca quando o descanso termina.</p>
+          <select id="fr-sound-pref" style="margin-bottom:10px;">
+            <option value="classico" ${getSoundPref()==='classico'?'selected':''}>Clássico (3 beeps)</option>
+            <option value="suave" ${getSoundPref()==='suave'?'selected':''}>Suave (2 tons)</option>
+            <option value="urgente" ${getSoundPref()==='urgente'?'selected':''}>Urgente (4 beeps rápidos)</option>
+            <option value="sino" ${getSoundPref()==='sino'?'selected':''}>Sino</option>
+          </select>
+          <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;margin-bottom:12px;">🔊 Testar som</button>
+          <button class="fr-btn-ghost" id="fr-enable-notifications" style="width:100%;">🔔 ${('Notification' in window && Notification.permission === 'granted') ? 'Notificações ativadas' : 'Ativar notificações'}</button>
+          <p class="fr-hint" style="margin-top:10px;">Se o som e a notificação não chegarem durante um treino de verdade, mesmo funcionando aqui no teste, é porque a tela apagou ou você trocou de aplicativo durante o descanso — isso pausa qualquer site (não só o Saber) por economia de bateria do próprio celular. Deixando a tela ligada e o Saber em primeiro plano durante o descanso, funciona normalmente — e agora, se você voltar um pouco atrasada, o cronômetro se corrige sozinho assim que reabrir o app.</p>
+        </div>`;
+    } else if(key === 'subscription'){
+      title = 'Assinatura';
+      body = `
+        <div class="fr-settings-section">
+          <h4>Sua assinatura</h4>
+          <p class="fr-hint" style="margin-bottom:14px;">Essa área ainda está em construção — assim que o sistema de pagamento estiver pronto, você vai poder assinar e gerenciar sua assinatura por aqui.</p>
+          <button class="fr-btn-ghost" style="width:100%;margin-bottom:8px;" disabled>Assinar o Saber</button>
+          <button class="fr-btn-ghost" style="width:100%;" disabled>Alterar assinatura</button>
+        </div>`;
+    } else if(key === 'help'){
+      title = 'Central de ajudas';
+      body = `
+        <div class="fr-settings-section">
+          <h4>Perguntas frequentes</h4>
+          <p class="fr-hint" style="margin-bottom:10px;">Não achou sua dúvida aqui? Fala com a gente por e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a> <i>(em breve, também por WhatsApp)</i>.</p>
+          <div id="fr-faq-area">${FAQ_GROUPS.map(group => `
+            <div class="fr-faq-group-title">${esc(group.title)}</div>
+            ${group.items.map((item, idx) => `
+              <details class="fr-faq-item">
+                <summary>${esc(item.q)}</summary>
+                <div class="fr-faq-body">${esc(item.a)}</div>
+              </details>`).join('')}
+          `).join('')}</div>
+        </div>
+        <div class="fr-settings-section">
+          <h4>Reportar um problema</h4>
+          <p class="fr-hint" style="margin-bottom:10px;">Encontrou algo que não funcionou como devia? Conta pra gente aqui embaixo — a equipe recebe e revisa. Pra dúvidas urgentes, prefira o e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>.</p>
+          <div class="fr-field"><label for="fr-report-msg">O que aconteceu?</label><textarea id="fr-report-msg" rows="4" placeholder="Descreva o problema com o máximo de detalhes possível (o que você estava fazendo, o que esperava que acontecesse, e o que aconteceu de fato)."></textarea></div>
+          <button class="fr-btn-primary" id="fr-report-send" style="width:100%;">Enviar</button>
+          <div id="fr-report-msg-area"></div>
+        </div>`;
+    }
+
+    container.innerHTML = `
+      <div class="fr-settings-wrap">
+        <button type="button" class="fr-settings-back" id="fr-settings-back">‹ Configurações</button>
+        <h3 class="fr-settings-subtitle">${esc(title)}</h3>
+        ${body}
+      </div>`;
+
+    container.querySelector('#fr-settings-back').addEventListener('click', function(){
+      settingsSubView = null;
+      renderSettingsView();
+    });
+
+    if(key === 'account'){
+      container.querySelector('#fr-delete-account-btn').addEventListener('click', function(){
+        const area = container.querySelector('#fr-delete-account-area');
+        area.innerHTML = `
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            <p class="fr-hint" style="color:var(--rust);margin-bottom:8px;">Pra confirmar, digite <b>EXCLUIR</b> no campo abaixo:</p>
+            <input type="text" id="fr-delete-confirm-input" style="margin-bottom:8px;">
+            <button class="fr-btn-ghost" id="fr-delete-cancel" style="width:100%;margin-bottom:6px;">Cancelar</button>
+            <button class="fr-btn-danger" id="fr-delete-confirm" style="width:100%;">Excluir permanentemente</button>
+          </div>`;
+        area.querySelector('#fr-delete-cancel').addEventListener('click', ()=>{ area.innerHTML = ''; });
+        area.querySelector('#fr-delete-confirm').addEventListener('click', async function(){
+          const typed = document.getElementById('fr-delete-confirm-input').value.trim().toUpperCase();
+          if(typed !== 'EXCLUIR'){ showToast('Digite EXCLUIR, exatamente assim, pra confirmar.', 'err'); return; }
+          const btn = this; btn.disabled = true; btn.textContent = 'Excluindo...';
+          try{
+            const { data: sessionData } = await sb.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await res.json();
+            if(!res.ok || result.error){
+              showToast('Não foi possível excluir a conta agora. Tente novamente ou entre em contato pelo suporte.', 'err');
+              btn.disabled = false; btn.textContent = 'Excluir permanentemente';
+              return;
+            }
+            await sb.auth.signOut();
+            window.location.reload();
+          }catch(err){
+            console.error(err);
+            showToast('Não foi possível excluir a conta agora.', 'err');
+            btn.disabled = false; btn.textContent = 'Excluir permanentemente';
+          }
+        });
+      });
+
+      container.querySelector('#fr-acc-email-save').addEventListener('click', async function(){
+        const btn = this;
+        const newEmail = document.getElementById('fr-acc-email').value.trim();
+        const msgEl = container.querySelector('#fr-acc-email-msg');
+        if(!newEmail || newEmail === currentUser.email){ return; }
+        btn.disabled = true; btn.textContent = 'Salvando...';
+        const { error } = await sb.auth.updateUser({ email: newEmail });
+        btn.disabled = false; btn.textContent = 'Salvar novo e-mail';
+        if(error){
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(error.message)}</p>`;
+          return;
+        }
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Enviamos um link de confirmação pro e-mail novo (e, às vezes, pro antigo também). Só troca depois de confirmar.</p>`;
+      });
+
+      container.querySelector('#fr-acc-pass-save').addEventListener('click', async function(){
+        const btn = this;
+        const pass1 = document.getElementById('fr-acc-pass').value;
+        const pass2 = document.getElementById('fr-acc-pass2').value;
+        const msgEl = container.querySelector('#fr-acc-pass-msg');
+        if(!pass1 || pass1.length < 6){
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">A senha precisa ter pelo menos 6 caracteres.</p>`;
+          return;
+        }
+        if(pass1 !== pass2){
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">As duas senhas não são iguais.</p>`;
+          return;
+        }
+        btn.disabled = true; btn.textContent = 'Salvando...';
+        const { error } = await sb.auth.updateUser({ password: pass1 });
+        btn.disabled = false; btn.textContent = 'Salvar nova senha';
+        if(error){
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">${esc(error.message)}</p>`;
+          return;
+        }
+        document.getElementById('fr-acc-pass').value = '';
+        document.getElementById('fr-acc-pass2').value = '';
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Senha atualizada!</p>`;
+      });
+    } else if(key === 'notifications'){
+      container.querySelector('#fr-sound-enabled').addEventListener('change', function(){
+        setSoundEnabled(this.checked);
+        showToast(this.checked ? 'Som de notificação ativado.' : 'Som de notificação desativado.', 'ok');
+      });
+
+      container.querySelector('#fr-sound-pref').addEventListener('change', function(){
+        setSoundPref(this.value);
+        unlockAudio();
+        playTimerEndSound(true);
+      });
+
+      container.querySelector('#fr-test-sound').addEventListener('click', function(){
+        unlockAudio();
+        playTimerEndSound(true);
+        showToast('Se você ouviu os beeps, o som funciona nesse aparelho.', 'ok');
+      });
+
+      container.querySelector('#fr-enable-notifications').addEventListener('click', function(){
+        subscribeToPush().then(()=>{ if(currentView==='settings' && settingsSubView==='notifications') renderSettingsView(); });
+      });
+    } else if(key === 'help'){
+      container.querySelector('#fr-report-send').addEventListener('click', async function(){
+        const btn = this;
+        const msgInput = container.querySelector('#fr-report-msg');
+        const msgArea = container.querySelector('#fr-report-msg-area');
+        const message = msgInput.value.trim();
+        if(!message){
+          msgArea.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Escreva o que aconteceu antes de enviar.</p>`;
+          msgInput.focus();
+          return;
+        }
+        btn.disabled = true; btn.textContent = 'Enviando...';
+        const { error } = await sb.from('problem_reports').insert({
+          submitted_by: currentUser.id,
+          message,
+          page_context: currentView || null
+        });
+        btn.disabled = false; btn.textContent = 'Enviar';
+        if(error){
+          msgArea.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível enviar agora. Tente novamente ou escreva pra ${esc(SUPPORT_EMAIL)}.</p>`;
+          return;
+        }
+        msgInput.value = '';
+        msgArea.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Recebemos seu relato, obrigada! A equipe vai revisar.</p>`;
+        notifyAdminsPendingReview('problem');
       });
     }
   }
@@ -1771,6 +1785,7 @@
     }
   }
   function switchView(view){
+    if(view === 'settings' && currentView !== 'settings') settingsSubView = null;
     currentView = view;
     document.getElementById('fr-view-recipes').style.display = view==='recipes' ? '' : 'none';
     document.getElementById('fr-view-diary').style.display = view==='diary' ? '' : 'none';
