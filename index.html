@@ -33,7 +33,7 @@
     --paper: #E7DFC7;
     --paper-deep: #DCD1AE;
     --card: #FFFCF3;
-    --surface: var(--surface);
+    --surface: #FFFEFA;
     --ink: #262B1E;
     --ink-soft: #6B6A57;
     --green: #3F6B4A;
@@ -46,9 +46,9 @@
     --border: rgba(38,43,30,0.14);
     --shadow: 0 3px 10px rgba(38,43,30,0.10);
     --radius: 10px;
-    --err-bg: var(--err-bg);
-    --ok-bg: var(--ok-bg);
-    --note-bg: var(--note-bg);
+    --err-bg: #FBE7DD;
+    --ok-bg: #E3EFE4;
+    --note-bg: #FBF1DC;
   }
   html[data-theme="dark"]{
     --paper: #1B1E15;
@@ -662,6 +662,20 @@
   const VAPID_PUBLIC_KEY = 'BKXKLuS4ekfLnqNGmM7BHPK1p7hcJRvuBxybiFEVRTLlHEPJgYpZzip5IeQDtGxtUCE5Oy-whckZiYd4LXIlfgE';
   const SUPPORT_EMAIL = 'saber.gestao26@gmail.com';
 
+  // Planos da assinatura. As MESMAS chaves e preços existem também no
+  // servidor (Edge Function mp-create-preference) — o preço real e
+  // validado é sempre o do servidor; isso aqui é só pra exibir a tela.
+  // Se mudar um preço, muda nos dois lugares.
+  const SUBSCRIPTION_PLANS = [
+    { key: '1m',  label: '1 mês',    months: 1,  price: 31.90 },
+    { key: '3m',  label: '3 meses',  months: 3,  price: 76.56,  discountLabel: '20% de desconto' },
+    { key: '6m',  label: '6 meses',  months: 6,  price: 143.55, discountLabel: '25% de desconto' },
+    { key: '12m', label: '12 meses', months: 12, price: 267.96, discountLabel: '30% de desconto' },
+  ];
+  function formatBRL(v){
+    return 'R$ ' + v.toFixed(2).replace('.', ',');
+  }
+
   const FAQ_GROUPS = [
     { title: 'Conta e cadastro', items: [
       { q: 'Esqueci minha senha, e agora?', a: 'Na tela de login, toque em "Esqueci minha senha" e siga o link enviado por e-mail.' },
@@ -1127,9 +1141,17 @@
       body = `
         <div class="fr-settings-section">
           <h4>Sua assinatura</h4>
-          <p class="fr-hint" style="margin-bottom:14px;">Essa área ainda está em construção — assim que o sistema de pagamento estiver pronto, você vai poder assinar e gerenciar sua assinatura por aqui.</p>
-          <button class="fr-btn-ghost" style="width:100%;margin-bottom:8px;" disabled>Assinar o Saber</button>
-          <button class="fr-btn-ghost" style="width:100%;" disabled>Alterar assinatura</button>
+          <div id="fr-sub-status"><div class="fr-loading">Carregando...</div></div>
+        </div>
+        <div class="fr-settings-section">
+          <h4>Planos</h4>
+          <div id="fr-sub-plans">${SUBSCRIPTION_PLANS.map(p => `
+            <button type="button" class="fr-btn-ghost fr-sub-plan-btn" data-plan="${p.key}" style="width:100%;margin-bottom:8px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+              <span>${esc(p.label)}${p.discountLabel ? `<br><span style="color:var(--green-deep);font-weight:600;font-size:12px;">${esc(p.discountLabel)}</span>` : ''}</span>
+              <b>${formatBRL(p.price)}</b>
+            </button>`).join('')}</div>
+          <p class="fr-hint" style="margin-top:6px;">Pagamento via Pix, débito ou crédito à vista, processado pelo Mercado Pago. Você vai ser redirecionada pra finalizar o pagamento com segurança.</p>
+          <div id="fr-sub-msg"></div>
         </div>`;
     } else if(key === 'help'){
       title = 'Central de ajudas';
@@ -1305,6 +1327,11 @@
         document.getElementById('fr-acc-pass').value = '';
         document.getElementById('fr-acc-pass2').value = '';
         msgEl.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);margin-top:6px;">Senha atualizada!</p>`;
+      });
+    } else if(key === 'subscription'){
+      renderSubscriptionArea(container);
+      container.querySelectorAll('.fr-sub-plan-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){ startSubscriptionCheckout(container, this.getAttribute('data-plan'), this); });
       });
     } else if(key === 'notifications'){
       container.querySelector('#fr-sound-enabled').addEventListener('change', function(){
@@ -1630,6 +1657,56 @@
     `;
   }
 
+  async function renderSubscriptionArea(container){
+    const el = container.querySelector('#fr-sub-status');
+    if(!el) return;
+    const { data: sub } = await sb.from('subscriptions').select('*').eq('user_id', currentUser.id).maybeSingle();
+    const active = sub && sub.expires_at && new Date(sub.expires_at) > new Date();
+    if(active){
+      const planInfo = SUBSCRIPTION_PLANS.find(p=>p.key===sub.plan);
+      el.innerHTML = `
+        <div class="fr-linked-card">
+          <div>
+            <div class="fr-linked-name">Assinatura ativa${planInfo ? ' — ' + esc(planInfo.label) : ''}</div>
+            <div class="fr-linked-role">Válida até ${esc(formatDateLabel(sub.expires_at.slice(0,10)))}</div>
+          </div>
+        </div>`;
+    } else {
+      el.innerHTML = `<p class="fr-hint">Nenhuma assinatura ativa no momento. Escolha um plano abaixo pra assinar.</p>`;
+    }
+  }
+
+  async function startSubscriptionCheckout(container, planKey, btn){
+    const msgEl = container.querySelector('#fr-sub-msg');
+    const originalLabel = btn.innerHTML;
+    container.querySelectorAll('.fr-sub-plan-btn').forEach(b=>{ b.disabled = true; });
+    btn.innerHTML = 'Preparando pagamento...';
+    msgEl.innerHTML = '';
+    try{
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const returnUrlBase = window.location.origin + window.location.pathname;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/mp-create-preference`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planKey, return_url_base: returnUrlBase })
+      });
+      const result = await res.json();
+      if(!res.ok || result.error || !result.init_point){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível iniciar o pagamento agora. Tente novamente em instantes.</p>`;
+        container.querySelectorAll('.fr-sub-plan-btn').forEach(b=>{ b.disabled = false; });
+        btn.innerHTML = originalLabel;
+        return;
+      }
+      window.location.href = result.init_point;
+    }catch(err){
+      console.error(err);
+      msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível iniciar o pagamento agora.</p>`;
+      container.querySelectorAll('.fr-sub-plan-btn').forEach(b=>{ b.disabled = false; });
+      btn.innerHTML = originalLabel;
+    }
+  }
+
   function renderLinkedArea(overlay){
     const el = overlay.querySelector('#fr-linked-area');
     if(linkedProfessional){
@@ -1786,6 +1863,25 @@
     window.history.replaceState({}, document.title, cleanUrl);
   }
 
+  function handleSubscriptionReturn(){
+    const params = new URLSearchParams(window.location.search);
+    if(params.has('mp_status')){
+      const status = params.get('mp_status');
+      if(status === 'success'){
+        showToast('Pagamento recebido! Assim que o Mercado Pago confirmar, sua assinatura é atualizada automaticamente.', 'ok');
+      } else if(status === 'pending'){
+        showToast('Pagamento em análise. Assim que for aprovado, sua assinatura é atualizada automaticamente.', 'ok');
+      } else {
+        showToast('O pagamento não foi concluído. Você pode tentar de novo em Configurações > Assinatura.', 'err');
+      }
+      switchView('settings');
+      settingsSubView = 'subscription';
+      renderSettingsView();
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }
+
   async function boot(){
     await ensureProfile();
     authScreen.style.display = 'none';
@@ -1802,6 +1898,7 @@
     loadMyClients();
     loadWorkouts();
     handleWithingsReturn();
+    handleSubscriptionReturn();
     if(currentView==='diary') renderDiary();
     if(!currentProfile.onboarding_done){
       try{
