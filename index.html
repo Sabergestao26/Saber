@@ -598,6 +598,18 @@
           <option value="personal">Personal trainer</option>
         </select>
       </div>
+      <div class="fr-field" id="auth-terms-field" style="display:none;">
+        <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;font-size:13px;line-height:1.45;cursor:pointer;">
+          <input type="checkbox" id="auth-terms-checkbox" style="margin-top:2px;flex-shrink:0;">
+          <span>Li e concordo com os <a href="termos-de-uso.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="politica-de-privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a> do Saber.</span>
+        </label>
+      </div>
+      <div class="fr-field" id="auth-prof-terms-field" style="display:none;">
+        <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;font-size:13px;line-height:1.45;cursor:pointer;">
+          <input type="checkbox" id="auth-prof-terms-checkbox" style="margin-top:2px;flex-shrink:0;">
+          <span>Também li e concordo com os <a href="termos-uso-profissionais.html" target="_blank" rel="noopener">Termos de Uso para Profissionais</a>, incluindo a declaração de que possuo registro profissional ativo (CRN/CREF).</span>
+        </label>
+      </div>
       <button type="submit" class="fr-btn-primary" id="auth-submit" style="width:100%">Entrar</button>
     </form>
     <button type="button" id="auth-forgot-link" style="background:none;border:none;color:var(--ink-soft);font-size:12.5px;text-decoration:underline;margin-top:12px;cursor:pointer;width:100%;">Esqueci minha senha</button>
@@ -661,6 +673,13 @@
   const SUPABASE_URL = 'https://dzkugfwflxdhvktyqkwx.supabase.co';
   const VAPID_PUBLIC_KEY = 'BKXKLuS4ekfLnqNGmM7BHPK1p7hcJRvuBxybiFEVRTLlHEPJgYpZzip5IeQDtGxtUCE5Oy-whckZiYd4LXIlfgE';
   const SUPPORT_EMAIL = 'saber.gestao26@gmail.com';
+  // Versão vigente dos Termos de Uso / Política de Privacidade. Ao mudar
+  // o texto desses documentos de forma relevante, muda esse valor — assim
+  // dá pra saber, no futuro, quem aceitou qual versão.
+  const TERMS_VERSION = '2026-09-28';
+  // Versão vigente dos Termos de Uso para Profissionais (nutricionistas e
+  // personal trainers). Mesma lógica do TERMS_VERSION acima.
+  const PROF_TERMS_VERSION = '2026-09-28';
 
   // Planos da assinatura. As MESMAS chaves e preços existem também no
   // servidor (Edge Function mp-create-preference) — o preço real e
@@ -963,10 +982,21 @@
     authTabSignup.classList.toggle('active', mode==='signup');
     authSubmit.textContent = mode==='login' ? 'Entrar' : 'Criar conta';
     document.getElementById('auth-role-field').style.display = mode==='signup' ? '' : 'none';
+    document.getElementById('auth-terms-field').style.display = mode==='signup' ? '' : 'none';
+    updateProfTermsVisibility();
     authMessage.hidden = true;
   }
   authTabLogin.addEventListener('click', ()=> setAuthMode('login'));
   authTabSignup.addEventListener('click', ()=> setAuthMode('signup'));
+
+  // O checkbox extra dos Termos para Profissionais só aparece no cadastro
+  // e só quando "Você é..." não está em "Uma pessoa usando pra mim / minha
+  // família" — ou seja, só pra quem escolhe Nutricionista ou Personal trainer.
+  function updateProfTermsVisibility(){
+    const role = document.getElementById('auth-role').value;
+    document.getElementById('auth-prof-terms-field').style.display = (authMode==='signup' && role !== 'cliente') ? '' : 'none';
+  }
+  document.getElementById('auth-role').addEventListener('change', updateProfTermsVisibility);
 
   function showAuthMessage(text, type){
     authMessage.textContent = text;
@@ -992,6 +1022,14 @@
     e.preventDefault();
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
+    if(authMode==='signup' && !document.getElementById('auth-terms-checkbox').checked){
+      showAuthMessage('Pra criar sua conta, você precisa marcar que leu e concorda com os Termos de Uso e a Política de Privacidade.', 'err');
+      return;
+    }
+    if(authMode==='signup' && document.getElementById('auth-role').value !== 'cliente' && !document.getElementById('auth-prof-terms-checkbox').checked){
+      showAuthMessage('Pra se cadastrar como profissional, você também precisa marcar que concorda com os Termos de Uso para Profissionais.', 'err');
+      return;
+    }
     authSubmit.disabled = true;
     authSubmit.textContent = authMode==='login' ? 'Entrando...' : 'Criando conta...';
     try{
@@ -1005,9 +1043,17 @@
         const { data, error } = await sb.auth.signUp({ email, password });
         if(error){
           showAuthMessage(error.message, 'err');
-        } else if(role !== 'cliente'){
-          // guarda a escolha pra aplicar assim que o perfil existir (agora ou no 1º login)
-          localStorage.setItem('saber_pending_role_' + email.toLowerCase(), role);
+        } else {
+          if(role !== 'cliente'){
+            // guarda a escolha pra aplicar assim que o perfil existir (agora ou no 1º login)
+            localStorage.setItem('saber_pending_role_' + email.toLowerCase(), role);
+            // guarda também o aceite dos Termos para Profissionais, no mesmo padrão
+            localStorage.setItem('saber_pending_prof_terms_' + email.toLowerCase(), PROF_TERMS_VERSION);
+          }
+          // guarda o aceite dos Termos/Política pra registrar no perfil assim
+          // que ele existir (agora, se não precisar confirmar e-mail, ou no
+          // 1º login, se precisar) — mesmo padrão do cargo acima.
+          localStorage.setItem('saber_pending_terms_' + email.toLowerCase(), TERMS_VERSION);
         }
         if(!error && !data.session){
           setAuthMode('login');
@@ -1169,6 +1215,11 @@
           `).join('')}</div>
         </div>
         <div class="fr-settings-section">
+          <h4>Termos e privacidade</h4>
+          <p class="fr-hint" style="margin-bottom:10px;">Consulte a qualquer momento os documentos que você aceitou ao criar sua conta:</p>
+          <p style="margin:0 0 10px;"><a href="termos-de-uso.html" target="_blank" rel="noopener">Termos de Uso</a> &nbsp;·&nbsp; <a href="politica-de-privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>${currentProfile && currentProfile.is_professional ? ' &nbsp;·&nbsp; <a href="termos-uso-profissionais.html" target="_blank" rel="noopener">Termos de Uso para Profissionais</a>' : ''}</p>
+        </div>
+        <div class="fr-settings-section">
           <h4>Reportar um problema</h4>
           <p class="fr-hint" style="margin-bottom:10px;">Encontrou algo que não funcionou como devia? Conta pra gente aqui embaixo — a equipe recebe e revisa. Pra dúvidas urgentes, prefira o e-mail: <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>.</p>
           <div class="fr-field"><label for="fr-report-msg">O que aconteceu?</label><textarea id="fr-report-msg" rows="4" placeholder="Descreva o problema com o máximo de detalhes possível (o que você estava fazendo, o que esperava que acontecesse, e o que aconteceu de fato)."></textarea></div>
@@ -1194,6 +1245,10 @@
           <div id="fr-withings-area"><div class="fr-loading">Carregando...</div></div>
         </div>
         ${isPro ? `
+        <div class="fr-settings-section">
+          <h4>Verificação profissional</h4>
+          <div id="fr-prof-verif-area"><div class="fr-loading">Carregando...</div></div>
+        </div>
         <div class="fr-settings-section">
           <h4>Seu código de profissional</h4>
           <div class="fr-code-box">
@@ -1403,6 +1458,7 @@
       });
 
       if(isPro){
+        renderProfVerifArea(container);
         renderClientsList(container);
         container.querySelector('#fr-notify-client-reports').addEventListener('change', async function(){
           const val = this.checked;
@@ -1477,6 +1533,219 @@
       </div>`).join('');
   }
 
+  const PROF_VERIF_MAX_MB = 8;
+
+  async function renderProfVerifArea(overlay){
+    const el = overlay.querySelector('#fr-prof-verif-area');
+    const { data: verif, error } = await sb.from('professional_verifications').select('*').eq('user_id', currentUser.id).maybeSingle();
+    if(error){ el.innerHTML = `<p class="fr-hint">Não foi possível carregar.</p>`; return; }
+
+    const status = verif ? verif.status : 'none';
+
+    function uploadFormHtml(intro){
+      return `
+        <p class="fr-hint" style="margin-bottom:10px;">${intro}</p>
+        <div class="fr-field"><label for="fr-verif-reg">Número de registro (CRN ou CREF)</label><input type="text" id="fr-verif-reg" placeholder="Ex.: CRN-1 12345" value="${esc((verif && verif.registration_number) || '')}"></div>
+        <div class="fr-field"><label for="fr-verif-file">Foto do documento (carteira ou comprovante do conselho)</label><input type="file" id="fr-verif-file" accept="image/*" capture="environment"></div>
+        <p class="fr-hint" style="margin-bottom:10px;">Tire uma foto nítida, com todos os dados legíveis: nome, número de registro e situação. Arquivo até ${PROF_VERIF_MAX_MB}MB.</p>
+        <button class="fr-btn-primary" id="fr-verif-submit" style="width:100%;">Enviar pra revisão</button>
+        <div id="fr-verif-msg"></div>`;
+    }
+
+    if(status === 'approved'){
+      el.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);">✅ Documento aprovado. Você já pode vincular clientes e passar treino ou dieta pra eles.</p>`;
+      return;
+    }
+    if(status === 'pending'){
+      el.innerHTML = `<p class="fr-hint">📄 Documento enviado, em revisão. Assim que for analisado, você recebe um aviso aqui. Enquanto isso, vincular clientes e atribuir treino/dieta fica bloqueado.</p>`;
+      return;
+    }
+    if(status === 'rejected'){
+      el.innerHTML = `
+        <p class="fr-hint" style="color:var(--rust);margin-bottom:10px;">Seu documento não foi aprovado${verif && verif.rejection_reason ? ': ' + esc(verif.rejection_reason) : '.'} Envie novamente, com uma foto mais nítida ou o documento correto.</p>
+        ${uploadFormHtml('Reenvie o documento pra revisão.')}`;
+    } else {
+      el.innerHTML = uploadFormHtml('Antes de vincular clientes ou passar treino/dieta pra alguém, envie a foto do seu documento de registro profissional pra revisão.');
+    }
+
+    const submitBtn = el.querySelector('#fr-verif-submit');
+    submitBtn.addEventListener('click', async function(){
+      const msgEl = el.querySelector('#fr-verif-msg');
+      const regInput = el.querySelector('#fr-verif-reg');
+      const fileInput = el.querySelector('#fr-verif-file');
+      const registrationNumber = regInput.value.trim();
+      const file = fileInput.files[0];
+      msgEl.innerHTML = '';
+      if(!registrationNumber){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Digite o número de registro.</p>`;
+        regInput.focus();
+        return;
+      }
+      if(!file){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Selecione a foto do documento.</p>`;
+        return;
+      }
+      if(file.size > PROF_VERIF_MAX_MB * 1024 * 1024){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Esse arquivo passa de ${PROF_VERIF_MAX_MB}MB. Envie uma foto menor.</p>`;
+        return;
+      }
+      submitBtn.disabled = true; submitBtn.textContent = 'Enviando...';
+      try{
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+        const path = `${currentUser.id}/documento.${ext}`;
+        const { error: upErr } = await sb.storage.from('professional-docs').upload(path, file, { upsert: true, contentType: file.type || undefined });
+        if(upErr) throw upErr;
+
+        const nowIso = new Date().toISOString();
+        if(!verif){
+          const { error: insErr } = await sb.from('professional_verifications').insert({
+            user_id: currentUser.id, status: 'pending', registration_number: registrationNumber,
+            doc_path: path, submitted_at: nowIso, updated_at: nowIso
+          });
+          if(insErr) throw insErr;
+        } else {
+          const { error: updErr } = await sb.from('professional_verifications').update({
+            status: 'pending', registration_number: registrationNumber, doc_path: path,
+            submitted_at: nowIso, updated_at: nowIso, reviewed_at: null, rejection_reason: null
+          }).eq('user_id', currentUser.id);
+          if(updErr) throw updErr;
+        }
+        showToast('Documento enviado pra revisão.', 'ok');
+        renderProfVerifArea(overlay);
+      }catch(err){
+        console.error(err);
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível enviar agora. Tente novamente.</p>`;
+        submitBtn.disabled = false; submitBtn.textContent = 'Enviar pra revisão';
+      }
+    });
+  }
+
+  /* ---------- Chat profissional-cliente ---------- */
+  async function openChatModal(professionalId, clientId, otherLabel){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">💬 ${esc(otherLabel)}</h3>
+      <div id="fr-chat-messages" style="max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;"><div class="fr-loading">Carregando...</div></div>
+      <form id="fr-chat-form" style="display:flex;gap:8px;">
+        <input type="text" id="fr-chat-input" placeholder="Escreva uma mensagem..." style="flex:1;" autocomplete="off" maxlength="2000">
+        <button type="submit" class="fr-btn-primary" style="width:auto;padding:0 18px;">Enviar</button>
+      </form>
+      <div id="fr-chat-msg"></div>
+    `);
+    const msgsEl = overlay.querySelector('#fr-chat-messages');
+
+    async function loadMessages(){
+      const { data, error } = await sb.from('professional_messages').select('*')
+        .eq('professional_id', professionalId).eq('client_id', clientId)
+        .order('created_at', { ascending: true }).limit(300);
+      if(!document.getElementById('fr-chat-messages')) return; // modal já foi fechado
+      if(error){ msgsEl.innerHTML = `<p class="fr-hint">Não foi possível carregar as mensagens.</p>`; return; }
+      const wasNearBottom = (msgsEl.scrollTop + msgsEl.clientHeight) >= (msgsEl.scrollHeight - 40);
+      const list = data || [];
+      msgsEl.innerHTML = list.length ? list.map(m=>{
+        const mine = m.sender_id === currentUser.id;
+        const when = new Date(m.created_at).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+        return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:78%;background:${mine?'var(--green-deep)':'var(--card)'};color:${mine?'#fff':'var(--ink)'};border:${mine?'none':'1px solid var(--border)'};padding:8px 12px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word;">${esc(m.body)}<div style="font-size:10.5px;opacity:0.75;margin-top:3px;">${when}</div></div>`;
+      }).join('') : `<p class="fr-hint">Nenhuma mensagem ainda. Diga oi!</p>`;
+      if(wasNearBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+
+    await loadMessages();
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+    activeChatPollTimer = setInterval(loadMessages, 4000);
+
+    overlay.querySelector('#fr-chat-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const input = overlay.querySelector('#fr-chat-input');
+      const body = input.value.trim();
+      if(!body) return;
+      const msgArea = overlay.querySelector('#fr-chat-msg');
+      input.disabled = true;
+      const { error } = await sb.from('professional_messages').insert({
+        professional_id: professionalId, client_id: clientId, sender_id: currentUser.id, body
+      });
+      input.disabled = false;
+      if(error){
+        msgArea.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível enviar. Tente novamente.</p>`;
+        return;
+      }
+      input.value = '';
+      msgArea.innerHTML = '';
+      await loadMessages();
+      input.focus();
+    });
+  }
+
+  /* ---------- Avaliar / reclamar de um profissional ---------- */
+  async function openProfessionalFeedbackModal(professionalId, kind){
+    const isRate = kind === 'avaliacao';
+    let existing = null;
+    if(isRate){
+      const { data } = await sb.from('professional_feedback').select('*')
+        .eq('professional_id', professionalId).eq('client_id', currentUser.id).eq('kind', 'avaliacao').maybeSingle();
+      existing = data;
+    }
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">${isRate ? '⭐ Avaliar profissional' : '⚠️ Abrir reclamação'}</h3>
+      ${isRate ? `
+        <div class="fr-field">
+          <label>Nota</label>
+          <div id="fr-fb-stars" style="display:flex;gap:6px;font-size:30px;line-height:1;">
+            ${[1,2,3,4,5].map(n=>`<span data-star="${n}" style="cursor:pointer;">${(existing && existing.rating>=n) ? '★' : '☆'}</span>`).join('')}
+          </div>
+        </div>` : ''}
+      <div class="fr-field"><label for="fr-fb-msg">${isRate ? 'Comentário (opcional)' : 'Descreva o que aconteceu'}</label><textarea id="fr-fb-msg" rows="4" ${isRate?'':'required'}>${esc((existing && existing.message) || '')}</textarea></div>
+      ${!isRate ? `<p class="fr-hint" style="margin-bottom:10px;">Sua reclamação vai pra revisão da equipe do Saber — o profissional não vê quem enviou.</p>` : ''}
+      <button class="fr-btn-primary" id="fr-fb-submit" style="width:100%;">${isRate ? 'Salvar avaliação' : 'Enviar reclamação'}</button>
+      <div id="fr-fb-result-msg"></div>
+    `);
+    let selectedRating = existing ? existing.rating : 0;
+    if(isRate){
+      const starsEl = overlay.querySelector('#fr-fb-stars');
+      function paintStars(){
+        starsEl.querySelectorAll('[data-star]').forEach(s=>{
+          s.textContent = (parseInt(s.getAttribute('data-star'),10) <= selectedRating) ? '★' : '☆';
+        });
+      }
+      starsEl.querySelectorAll('[data-star]').forEach(s=>{
+        s.addEventListener('click', ()=>{ selectedRating = parseInt(s.getAttribute('data-star'),10); paintStars(); });
+      });
+    }
+    overlay.querySelector('#fr-fb-submit').addEventListener('click', async function(){
+      const btn = this;
+      const resultEl = overlay.querySelector('#fr-fb-result-msg');
+      const message = overlay.querySelector('#fr-fb-msg').value.trim();
+      if(isRate && selectedRating === 0){
+        resultEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Escolha uma nota de 1 a 5.</p>`;
+        return;
+      }
+      if(!isRate && !message){
+        resultEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Descreva o que aconteceu.</p>`;
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      try{
+        if(isRate){
+          if(existing){
+            const { error } = await sb.from('professional_feedback').update({ rating: selectedRating, message: message || null }).eq('id', existing.id);
+            if(error) throw error;
+          } else {
+            const { error } = await sb.from('professional_feedback').insert({ professional_id: professionalId, client_id: currentUser.id, kind: 'avaliacao', rating: selectedRating, message: message || null });
+            if(error) throw error;
+          }
+        } else {
+          const { error } = await sb.from('professional_feedback').insert({ professional_id: professionalId, client_id: currentUser.id, kind: 'reclamacao', message });
+          if(error) throw error;
+        }
+        showToast(isRate ? 'Avaliação salva. Obrigado!' : 'Reclamação enviada. Nossa equipe vai revisar.', 'ok');
+        closeOverlay();
+      }catch(err){
+        console.error(err);
+        resultEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível enviar agora. Tente novamente.</p>`;
+        btn.disabled = false; btn.textContent = isRate ? 'Salvar avaliação' : 'Enviar reclamação';
+      }
+    });
+  }
+
   function renderClientsList(overlay){
     const el = overlay.querySelector('#fr-clients-list');
     if(myClients.length===0){
@@ -1487,11 +1756,19 @@
       myClients.map(c=>`
         <div class="fr-client-row" data-client="${c.client_id}" style="cursor:default;">
           <span class="fr-client-name">${esc(c.email)}</span>
-          <span style="display:flex;gap:6px;">
+          <span style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button type="button" class="fr-chip" data-chat="${c.client_id}">💬 Chat</button>
             <button type="button" class="fr-chip fr-chip-video" data-report="${c.client_id}">📊 Relatório</button>
             <button type="button" class="fr-chip fr-chip-upload" data-recipes="${c.client_id}">Receitas ›</button>
           </span>
         </div>`).join('');
+    el.querySelectorAll('[data-chat]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const clientId = btn.getAttribute('data-chat');
+        const client = myClients.find(c=>c.client_id===clientId);
+        openChatModal(currentUser.id, clientId, client.email);
+      });
+    });
     el.querySelectorAll('[data-recipes]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const clientId = btn.getAttribute('data-recipes');
@@ -1717,6 +1994,11 @@
             <div class="fr-linked-role">${esc(linkedProfessional.professional_label || 'Profissional')}</div>
           </div>
           <button class="fr-btn-ghost" id="fr-unlink-btn">Desvincular</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+          <button type="button" class="fr-chip" id="fr-linked-chat-btn">💬 Chat</button>
+          <button type="button" class="fr-chip" id="fr-linked-rate-btn">⭐ Avaliar</button>
+          <button type="button" class="fr-chip" id="fr-linked-complain-btn">⚠️ Reclamação</button>
         </div>`;
       el.querySelector('#fr-unlink-btn').addEventListener('click', async function(){
         const btn = this; btn.disabled = true; btn.textContent = 'Desvinculando...';
@@ -1725,6 +2007,15 @@
         linkedProfessional = null;
         showToast('Desvinculado.', 'ok');
         renderLinkedArea(overlay);
+      });
+      el.querySelector('#fr-linked-chat-btn').addEventListener('click', ()=>{
+        openChatModal(linkedProfessional.id, currentUser.id, linkedProfessional.email || 'Profissional');
+      });
+      el.querySelector('#fr-linked-rate-btn').addEventListener('click', ()=>{
+        openProfessionalFeedbackModal(linkedProfessional.id, 'avaliacao');
+      });
+      el.querySelector('#fr-linked-complain-btn').addEventListener('click', ()=>{
+        openProfessionalFeedbackModal(linkedProfessional.id, 'reclamacao');
       });
     } else {
       el.innerHTML = `
@@ -1746,7 +2037,7 @@
         }
         const { error: linkErr } = await sb.from('professional_clients').insert({ professional_id: prof.id, client_id: currentUser.id });
         if(linkErr){
-          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:8px;">Não foi possível vincular agora. Tente novamente.</p>`;
+          msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:8px;">Não foi possível vincular agora. Isso pode acontecer se esse profissional ainda não teve o documento de registro aprovado — peça pra ele verificar em Configurações &gt; Verificação profissional.</p>`;
           btn.disabled = false; btn.textContent = 'Vincular';
           return;
         }
@@ -1839,6 +2130,26 @@
       }
       localStorage.removeItem(pendingKey);
     }
+
+    const pendingTermsKey = 'saber_pending_terms_' + currentUser.email.toLowerCase();
+    const pendingTermsVersion = localStorage.getItem(pendingTermsKey);
+    if(pendingTermsVersion && !currentProfile.terms_accepted_at){
+      const { data: updatedTerms, error: termsErr } = await sb.from('profiles')
+        .update({ terms_accepted_at: new Date().toISOString(), terms_version: pendingTermsVersion })
+        .eq('id', currentUser.id).select().single();
+      if(!termsErr && updatedTerms){ currentProfile = updatedTerms; }
+    }
+    if(pendingTermsVersion) localStorage.removeItem(pendingTermsKey);
+
+    const pendingProfTermsKey = 'saber_pending_prof_terms_' + currentUser.email.toLowerCase();
+    const pendingProfTermsVersion = localStorage.getItem(pendingProfTermsKey);
+    if(pendingProfTermsVersion && !currentProfile.prof_terms_accepted_at){
+      const { data: updatedProfTerms, error: profTermsErr } = await sb.from('profiles')
+        .update({ prof_terms_accepted_at: new Date().toISOString(), prof_terms_version: pendingProfTermsVersion })
+        .eq('id', currentUser.id).select().single();
+      if(!profTermsErr && updatedProfTerms){ currentProfile = updatedProfTerms; }
+    }
+    if(pendingProfTermsVersion) localStorage.removeItem(pendingProfTermsKey);
   }
 
   function renderUserBar(){
@@ -3490,10 +3801,12 @@
     return overlay;
   }
   function escListener(e){ if(e.key==='Escape') closeOverlay(); }
+  let activeChatPollTimer = null;
   function closeOverlay(){
     const existing = document.getElementById('fr-overlay');
     if(existing) existing.remove();
     document.removeEventListener('keydown', escListener);
+    if(activeChatPollTimer){ clearInterval(activeChatPollTimer); activeChatPollTimer = null; }
   }
 
   const UNIT_OPTIONS = ['g','kg','ml','l','unidade','xícara','colher de sopa','colher de chá','dente','pitada','a gosto'];

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+  (function(){
+    try{
+      var pref = localStorage.getItem('saber_theme') || 'auto';
+      var isDark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if(isDark) document.documentElement.setAttribute('data-theme', 'dark');
+    }catch(e){}
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Política de Privacidade — Saber</title>
+<meta name="theme-color" content="#2E4F37">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #E7DFC7; --card: #FFFCF3; --ink: #262B1E; --ink-soft: #6B6A57;
+    --green-deep: #2E4F37; --mustard: #BF8A2E; --rust: #A8481F;
+    --border: rgba(38,43,30,0.14); --note-bg: #FBF1DC;
+  }
+  html[data-theme="dark"]{
+    --paper: #1B1E15; --card: #23271C; --ink: #EDE6D3; --ink-soft: #A8A38C;
+    --green-deep: #4A7C58; --mustard: #D9A64C; --rust: #DE7B4A;
+    --border: rgba(237,230,211,0.16); --note-bg: #3A311A;
+  }
+  @media (prefers-color-scheme: dark){
+    html:not([data-theme="light"]):not([data-theme="dark"]){
+      --paper: #1B1E15; --card: #23271C; --ink: #EDE6D3; --ink-soft: #A8A38C;
+      --green-deep: #4A7C58; --mustard: #D9A64C; --rust: #DE7B4A;
+      --border: rgba(237,230,211,0.16); --note-bg: #3A311A;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',sans-serif; background:var(--paper); color:var(--ink);
+    min-height:100vh; line-height:1.6;
+  }
+  .wrap{ max-width:680px; margin:0 auto; padding:32px 20px 80px; }
+  a.back{ color:var(--green-deep); text-decoration:none; font-weight:600; font-size:14px; }
+  h1{ font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:30px; margin:20px 0 4px; color:var(--ink); }
+  .updated{ color:var(--ink-soft); font-size:13px; margin-bottom:20px; }
+  .note{ background:var(--note-bg); border-radius:10px; padding:12px 16px; font-size:13px; color:var(--ink-soft); margin-bottom:28px; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:28px 26px; }
+  h2{ font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:19px; color:var(--green-deep); margin:28px 0 10px; }
+  h2:first-child{ margin-top:0; }
+  p{ margin:0 0 14px; font-size:15px; }
+  ul{ margin:0 0 14px; padding-left:20px; }
+  li{ margin-bottom:8px; font-size:15px; }
+  strong{ color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">‹ Voltar pro Saber</a>
+  <h1>Política de Privacidade — Saber<span style="color:var(--mustard)">.</span></h1>
+  <div class="updated">Última atualização: 28 de setembro de 2026</div>
+
+  <div class="note">Este documento foi redigido com apoio de IA e ainda não passou por revisão jurídica formal. Recomenda-se acompanhamento de um(a) advogado(a) à medida que o Saber cresce.</div>
+
+  <div class="card">
+    <p>Esta Política de Privacidade descreve como o Saber ("nós", "aplicativo", "plataforma") coleta, usa, armazena e protege os dados pessoais das pessoas que utilizam o serviço ("você", "usuário", "titular"), em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD).</p>
+
+    <h2>1. Quem é o responsável pelos seus dados (controlador)</h2>
+    <p>O Saber é operado por <strong>Yara Victoria Alves Ferreira</strong>, inscrita no CNPJ nº <strong>69.345.921/0001-92</strong>, com atuação 100% digital, sediada em <strong>Alto Paraíso de Goiás – GO</strong>. Para qualquer dúvida sobre esta política ou sobre seus dados, você pode entrar em contato pelo e-mail <a href="mailto:saber.gestao26@gmail.com">saber.gestao26@gmail.com</a>.</p>
+
+    <h2>2. Quais dados coletamos</h2>
+    <p>Coletamos os seguintes tipos de dados, sempre relacionados ao uso do aplicativo:</p>
+    <ul>
+      <li><strong>Dados de cadastro:</strong> nome, e-mail e senha (armazenada de forma criptografada).</li>
+      <li><strong>Dados de saúde e desempenho físico</strong> (dados sensíveis, nos termos do art. 5º, II da LGPD): sexo, idade, altura, peso, nível de atividade física, objetivo (emagrecer, ganhar massa, etc.), registros de refeições e água, metas nutricionais, avaliações de treino, limitações físicas informadas por você, treinos realizados, cargas e repetições registradas, e medições de composição corporal (peso, gordura corporal, massa muscular) quando você opta por conectar uma balança compatível (ex.: Withings).</li>
+      <li><strong>Dados de profissionais vinculados:</strong> se você é nutricionista ou personal trainer cadastrado como profissional, coletamos também o código de vínculo com seus clientes e as receitas/treinos que você atribui a eles. Antes de poder vincular clientes ou atribuir treino/dieta, coletamos ainda uma foto do seu documento de registro profissional (carteira ou comprovante do CRN/CREF) e o número de registro, usados exclusivamente para verificar sua habilitação a atuar como profissional na plataforma. Essa foto fica guardada de forma privada (não é um link público), acessível só por você e pela equipe responsável pela revisão, e é excluída se você excluir sua conta.</li>
+      <li><strong>Mensagens de chat:</strong> se você usa o chat entre cliente e profissional dentro do aplicativo, as mensagens trocadas ficam armazenadas — visíveis pra você, pro outro lado da conversa, e pela equipe responsável do Saber, exclusivamente quando necessário pra investigar uma reclamação ou garantir a segurança da plataforma.</li>
+      <li><strong>Avaliações e reclamações sobre profissionais:</strong> se você avalia (nota e comentário) ou abre uma reclamação sobre um profissional vinculado, esse conteúdo é usado pela equipe do Saber pra acompanhar a qualidade do atendimento prestado. O profissional avaliado não tem acesso a quem enviou cada avaliação ou reclamação.</li>
+      <li><strong>Dados de pagamento:</strong> quando você assina um plano pago, os dados de pagamento (cartão, Pix) são processados diretamente pelo Mercado Pago — o Saber não armazena números de cartão.</li>
+      <li><strong>Dados técnicos:</strong> informações do dispositivo e navegador, e um identificador técnico usado para enviar notificações push, quando você ativa essa opção.</li>
+    </ul>
+
+    <h2>3. Para que usamos seus dados</h2>
+    <p>Usamos os dados coletados para:</p>
+    <ul>
+      <li>Calcular suas metas de calorias, macronutrientes e água.</li>
+      <li>Gerar e ajustar planos de treino com base nas suas respostas na avaliação.</li>
+      <li>Mostrar seu histórico e progresso (diário alimentar, calendário, relatório semanal).</li>
+      <li>Permitir que um profissional vinculado acompanhe seus dados, caso você opte por vincular sua conta a ele.</li>
+      <li>Enviar notificações (ex.: fim do descanso entre séries), quando ativadas por você.</li>
+      <li>Processar sua assinatura, quando aplicável.</li>
+      <li>Melhorar e corrigir o funcionamento do aplicativo.</li>
+    </ul>
+
+    <h2>4. Base legal para o tratamento</h2>
+    <p>Tratamos seus dados com base no seu consentimento (art. 7º, I e art. 11, I da LGPD, para dados sensíveis de saúde), que você fornece ao criar sua conta e preencher as informações do aplicativo, e na necessidade de execução do serviço que você contratou ao usar o Saber (art. 7º, V).</p>
+
+    <h2>5. Com quem compartilhamos seus dados</h2>
+    <p>Não vendemos seus dados. Compartilhamos informações apenas com:</p>
+    <ul>
+      <li><strong>Supabase</strong> (nosso provedor de banco de dados e autenticação), responsável por armazenar os dados com segurança.</li>
+      <li><strong>Withings</strong>, exclusivamente se você optar por conectar sua balança — nesse caso, o Saber recebe as medições diretamente da Withings, mediante sua autorização.</li>
+      <li>O <strong>profissional</strong> (nutricionista/personal trainer) ao qual você vincular sua conta, apenas os dados necessários pra ele acompanhar seu progresso (metas, diário, treinos).</li>
+      <li><strong>Mercado Pago</strong>, processador de pagamentos, quando você realiza uma assinatura — ele recebe os dados necessários pra processar o pagamento (nome, e-mail, dados do cartão ou Pix), que o Saber não armazena.</li>
+      <li>Autoridades públicas, apenas quando exigido por lei.</li>
+    </ul>
+
+    <h2>6. Por quanto tempo guardamos seus dados</h2>
+    <p>Guardamos seus dados enquanto sua conta estiver ativa. Se você excluir sua conta (pelo próprio aplicativo, em Configurações &gt; Dados da conta &gt; Excluir conta), seus dados pessoais são apagados de forma imediata e permanente, exceto quando a lei exigir retenção por período maior — por exemplo, dados fiscais de pagamentos, que o Mercado Pago mantém segundo as próprias obrigações legais dele como processador.</p>
+
+    <h2>7. Como protegemos seus dados</h2>
+    <p>Adotamos medidas técnicas de segurança, incluindo controle de acesso por linha (Row Level Security) no banco de dados — o que impede que uma pessoa acesse dados de outra sem permissão —, senhas armazenadas de forma criptografada, e conexão criptografada (HTTPS) entre o aplicativo e nossos servidores.</p>
+
+    <h2>8. Seus direitos como titular dos dados</h2>
+    <p>Nos termos do art. 18 da LGPD, você pode, a qualquer momento:</p>
+    <ul>
+      <li>Confirmar se tratamos seus dados e acessá-los.</li>
+      <li>Corrigir dados incompletos, inexatos ou desatualizados.</li>
+      <li>Solicitar a exclusão dos seus dados.</li>
+      <li>Solicitar a portabilidade dos seus dados a outro fornecedor.</li>
+      <li>Revogar seu consentimento a qualquer momento.</li>
+    </ul>
+    <p>Para exercer qualquer um desses direitos, entre em contato pelo e-mail <a href="mailto:saber.gestao26@gmail.com">saber.gestao26@gmail.com</a>.</p>
+
+    <h2>9. Crianças e adolescentes</h2>
+    <p>O Saber não é direcionado a menores de 18 anos. Não coletamos intencionalmente dados de crianças ou adolescentes sem o consentimento específico e em destaque de um dos pais ou responsável legal.</p>
+
+    <h2>10. Alterações nesta política</h2>
+    <p>Podemos atualizar esta Política de Privacidade periodicamente. Alterações relevantes serão comunicadas dentro do próprio aplicativo.</p>
+
+    <h2>11. Contato</h2>
+    <p>Dúvidas sobre esta política ou sobre seus dados podem ser enviadas para <a href="mailto:saber.gestao26@gmail.com">saber.gestao26@gmail.com</a>.</p>
+  </div>
+</div>
+</body>
+</html>

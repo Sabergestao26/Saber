@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+  (function(){
+    try{
+      var pref = localStorage.getItem('saber_theme') || 'auto';
+      var isDark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if(isDark) document.documentElement.setAttribute('data-theme', 'dark');
+    }catch(e){}
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Termos de Uso — Saber</title>
+<meta name="theme-color" content="#2E4F37">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #E7DFC7; --card: #FFFCF3; --ink: #262B1E; --ink-soft: #6B6A57;
+    --green-deep: #2E4F37; --mustard: #BF8A2E; --rust: #A8481F;
+    --border: rgba(38,43,30,0.14); --note-bg: #FBF1DC;
+  }
+  html[data-theme="dark"]{
+    --paper: #1B1E15; --card: #23271C; --ink: #EDE6D3; --ink-soft: #A8A38C;
+    --green-deep: #4A7C58; --mustard: #D9A64C; --rust: #DE7B4A;
+    --border: rgba(237,230,211,0.16); --note-bg: #3A311A;
+  }
+  @media (prefers-color-scheme: dark){
+    html:not([data-theme="light"]):not([data-theme="dark"]){
+      --paper: #1B1E15; --card: #23271C; --ink: #EDE6D3; --ink-soft: #A8A38C;
+      --green-deep: #4A7C58; --mustard: #D9A64C; --rust: #DE7B4A;
+      --border: rgba(237,230,211,0.16); --note-bg: #3A311A;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',sans-serif; background:var(--paper); color:var(--ink);
+    min-height:100vh; line-height:1.6;
+  }
+  .wrap{ max-width:680px; margin:0 auto; padding:32px 20px 80px; }
+  a.back{ color:var(--green-deep); text-decoration:none; font-weight:600; font-size:14px; }
+  h1{ font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:30px; margin:20px 0 4px; color:var(--ink); }
+  .updated{ color:var(--ink-soft); font-size:13px; margin-bottom:20px; }
+  .note{ background:var(--note-bg); border-radius:10px; padding:12px 16px; font-size:13px; color:var(--ink-soft); margin-bottom:28px; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:28px 26px; }
+  h2{ font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:19px; color:var(--green-deep); margin:28px 0 10px; }
+  h2:first-child{ margin-top:0; }
+  p{ margin:0 0 14px; font-size:15px; }
+  ul{ margin:0 0 14px; padding-left:20px; }
+  li{ margin-bottom:8px; font-size:15px; }
+  strong{ color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">‹ Voltar pro Saber</a>
+  <h1>Termos de Uso — Saber<span style="color:var(--mustard)">.</span></h1>
+  <div class="updated">Última atualização: 28 de setembro de 2026</div>
+
+  <div class="note">Este documento foi redigido com apoio de IA e ainda não passou por revisão jurídica formal. Recomenda-se acompanhamento de um(a) advogado(a) à medida que o Saber cresce.</div>
+
+  <div class="card">
+    <p>Estes Termos de Uso regulam o uso do aplicativo Saber, operado por <strong>Yara Victoria Alves Ferreira</strong>, inscrita no CNPJ nº <strong>69.345.921/0001-92</strong>, sob o nome fantasia "Saber". Ao criar uma conta ou usar o Saber, você concorda com estes termos.</p>
+
+    <h2>1. O que é o Saber</h2>
+    <p>O Saber é um aplicativo de diário alimentar, receitas e treinos, que ajuda você a registrar refeições, acompanhar metas nutricionais, montar e acompanhar treinos, e, se desejar, conectar sua conta a um profissional de nutrição ou educação física.</p>
+
+    <h2>2. Aviso importante sobre saúde — leia com atenção</h2>
+    <p>O Saber é uma ferramenta de apoio e organização, e <strong>NÃO substitui</strong> a avaliação, o diagnóstico ou o acompanhamento de um médico, nutricionista ou profissional de educação física habilitado.</p>
+    <ul>
+      <li>As metas de calorias e macronutrientes calculadas pelo aplicativo são estimativas baseadas em fórmulas gerais, e podem não ser adequadas ao seu caso específico.</li>
+      <li>A "Avaliação" de treino gera sugestões com base nas respostas que você fornece. Quando você informa algum problema ou desconforto (limitação física), sua avaliação é encaminhada pra um personal trainer cadastrado no Saber realizar a avaliação, em vez de o treino ser gerado automaticamente. <strong>Esse atendimento é um serviço prestado diretamente pelo profissional, remunerado diretamente por você a ele</strong> — não está incluído na sua assinatura do Saber. O valor, a forma de pagamento e as condições desse atendimento são combinados diretamente entre você e o profissional, fora do aplicativo; o Saber não participa dessa cobrança nem se responsabiliza por ela. Essa avaliação não substitui uma avaliação médica ou fisioterapêutica individualizada.</li>
+      <li>Antes de iniciar qualquer programa de exercícios ou mudança alimentar significativa, procure orientação médica, especialmente se você tiver alguma condição de saúde pré-existente.</li>
+      <li>Se sentir dor, tontura, falta de ar ou qualquer desconforto durante um treino sugerido pelo aplicativo, interrompa a atividade imediatamente e procure ajuda.</li>
+    </ul>
+
+    <h2>3. Cadastro e sua conta</h2>
+    <p>Para usar o Saber, você precisa criar uma conta com e-mail e senha. Você é responsável por manter a confidencialidade da sua senha e por todas as atividades realizadas na sua conta. Você se compromete a fornecer informações verdadeiras no cadastro e na avaliação.</p>
+
+    <h2>4. Contas de profissionais e vínculo com clientes</h2>
+    <p>Nutricionistas e personal trainers podem se cadastrar como profissionais e vincular clientes através de um código pessoal. Ao vincular sua conta a um profissional, você autoriza que ele visualize seus dados de progresso (metas, diário, treinos, relatórios) dentro do aplicativo. Você pode desvincular a qualquer momento nas configurações.</p>
+
+    <h2>5. Assinatura e pagamento</h2>
+    <p>O Saber oferece planos de assinatura paga, com opções de 1, 3, 6 ou 12 meses. Os valores e eventuais descontos de cada plano são exibidos dentro do aplicativo antes da confirmação do pagamento. Os pagamentos são processados pelo Mercado Pago — o Saber não armazena os dados do seu cartão.</p>
+    <p>Você pode escolher entre duas formas de contratar:</p>
+    <ul>
+      <li><strong>Pagamento avulso</strong>, via Pix, débito ou crédito à vista: dá acesso ao período escolhido, sem renovação automática — ao final do período, você pode assinar de novo se quiser continuar.</li>
+      <li><strong>Assinatura recorrente no cartão de crédito:</strong> o valor do plano escolhido é cobrado automaticamente no cartão, a cada 1, 3, 6 ou 12 meses conforme o plano, até que você cancele. Você pode cancelar a qualquer momento em Configurações &gt; Assinatura, e o acesso continua valendo até o fim do período já pago — não há cobrança da parcela seguinte depois do cancelamento.</li>
+    </ul>
+    <p><strong>Direito de arrependimento:</strong> como a contratação acontece à distância, você tem até 7 (sete) dias corridos após o pagamento pra desistir e pedir reembolso integral, conforme o art. 49 do Código de Defesa do Consumidor (Lei nº 8.078/1990) — é só escrever pra <a href="mailto:saber.gestao26@gmail.com">saber.gestao26@gmail.com</a>. Passado esse prazo, não fazemos reembolso proporcional por cancelamento antecipado ou não utilização do período contratado.</p>
+
+    <h2>6. Propriedade intelectual</h2>
+    <p>O catálogo de receitas do Saber reúne receitas de autoria própria e receitas adaptadas de fontes públicas (livros, sites e outras referências culinárias). Em relação a essas últimas, o Saber não reivindica exclusividade sobre a receita em si — você pode encontrar ou reproduzir receitas equivalentes livremente por conta própria, fora do aplicativo.</p>
+    <p>Já o restante do conteúdo do Saber — incluindo a biblioteca de exercícios, textos, marca, design e a forma como o catálogo é organizado dentro do aplicativo — pertence a Yara Victoria Alves Ferreira ou é usado com a devida licença, e não pode ser copiado, redistribuído ou usado comercialmente sem autorização.</p>
+    <p>Os dados que você insere (seu diário alimentar, receitas particulares, cargas de treino) continuam sendo seus — o Saber apenas os armazena para prestar o serviço.</p>
+
+    <h2>7. Condutas não permitidas</h2>
+    <p>Ao usar o Saber, você concorda em não:</p>
+    <ul>
+      <li>Fornecer informações falsas no cadastro ou na avaliação de treino.</li>
+      <li>Tentar acessar dados de outras pessoas sem autorização.</li>
+      <li>Usar o aplicativo para fins comerciais não autorizados, como revenda do conteúdo.</li>
+      <li>Tentar burlar, sobrecarregar ou comprometer a segurança do sistema.</li>
+    </ul>
+
+    <h2>8. Limitação de responsabilidade</h2>
+    <p>O Saber é fornecido "como está". Fazemos o possível para manter a precisão das informações nutricionais (baseadas na Tabela TACO, do NEPA/UNICAMP) e a segurança dos treinos sugeridos, mas não garantimos resultados específicos e não nos responsabilizamos por lesões, problemas de saúde ou danos decorrentes do uso inadequado do aplicativo ou da ausência de acompanhamento profissional presencial quando recomendado.</p>
+
+    <h2>9. Cancelamento e exclusão de conta</h2>
+    <p>Você pode excluir sua conta a qualquer momento, diretamente pelo aplicativo, em Configurações &gt; Dados da conta &gt; Excluir conta. A exclusão é permanente e imediata: assim que confirmada, sua conta e todos os dados ligados a ela (diário, metas, treinos, avaliações, medições) são apagados e não podem ser recuperados.</p>
+    <p>Podemos suspender ou encerrar contas que violem estes termos, mediante aviso prévio quando possível.</p>
+
+    <h2>10. Alterações nestes termos</h2>
+    <p>Podemos atualizar estes Termos de Uso periodicamente. Mudanças relevantes serão comunicadas dentro do aplicativo. O uso continuado do Saber após uma atualização representa sua concordância com os novos termos.</p>
+
+    <h2>11. Legislação aplicável e foro</h2>
+    <p>Estes termos são regidos pelas leis brasileiras. Fica eleito o foro da comarca de <strong>Alto Paraíso de Goiás – GO</strong> para dirimir quaisquer controvérsias, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
+
+    <h2>12. Contato</h2>
+    <p>Dúvidas sobre estes Termos de Uso podem ser enviadas para <a href="mailto:saber.gestao26@gmail.com">saber.gestao26@gmail.com</a>.</p>
+  </div>
+</div>
+</body>
+</html>

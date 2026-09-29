@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+  (function(){
+    try{
+      var pref = localStorage.getItem('saber_theme') || 'auto';
+      var isDark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if(isDark) document.documentElement.setAttribute('data-theme', 'dark');
+    }catch(e){}
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Termos de Uso para Profissionais — Saber</title>
+<meta name="theme-color" content="#2E4F37">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #E7DFC7; --card: #FFFCF3; --ink: #262B1E; --ink-soft: #6B6A57;
+    --green-deep: #2E4F37; --mustard: #BF8A2E; --rust: #A8481F;
+    --border: rgba(38,43,30,0.14); --note-bg: #FBF1DC;
+  }
+  html[data-theme="dark"]{
+    --paper: #1B1E15; --card: #23271C; --ink: #EDE6D3; --ink-soft: #A8A38C;
+    --green-deep: #4A7C58; --mustard: #D9A64C; --rust: #DE7B4A;
+    --border: rgba(237,230,211,0.16); --note-bg: #3A311A;
+  }
+  @media (prefers-color-scheme: dark){
+    html:not([data-theme="light"]):not([data-theme="dark"]){
+      --paper: #1B1E15; --card: #23271C; --ink: #EDE6D3; --ink-soft: #A8A38C;
+      --green-deep: #4A7C58; --mustard: #D9A64C; --rust: #DE7B4A;
+      --border: rgba(237,230,211,0.16); --note-bg: #3A311A;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',sans-serif; background:var(--paper); color:var(--ink);
+    min-height:100vh; line-height:1.6;
+  }
+  .wrap{ max-width:680px; margin:0 auto; padding:32px 20px 80px; }
+  a.back{ color:var(--green-deep); text-decoration:none; font-weight:600; font-size:14px; }
+  h1{ font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:28px; margin:20px 0 4px; color:var(--ink); }
+  .updated{ color:var(--ink-soft); font-size:13px; margin-bottom:20px; }
+  .note{ background:var(--note-bg); border-radius:10px; padding:12px 16px; font-size:13px; color:var(--ink-soft); margin-bottom:28px; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:28px 26px; }
+  h2{ font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:19px; color:var(--green-deep); margin:28px 0 10px; }
+  h2:first-child{ margin-top:0; }
+  p{ margin:0 0 14px; font-size:15px; }
+  ul{ margin:0 0 14px; padding-left:20px; }
+  li{ margin-bottom:8px; font-size:15px; }
+  strong{ color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">‹ Voltar pro Saber</a>
+  <h1>Termos de Uso para Profissionais — Saber<span style="color:var(--mustard)">.</span></h1>
+  <div class="updated">Última atualização: 28 de setembro de 2026</div>
+
+  <div class="note">Este documento foi redigido com apoio de IA e ainda não passou por revisão jurídica formal. Recomenda-se acompanhamento de um(a) advogado(a) à medida que o Saber cresce.</div>
+
+  <div class="card">
+    <p>Este documento complementa os <a href="termos-de-uso.html">Termos de Uso</a> gerais do Saber e se aplica especificamente a quem se cadastra na plataforma como <strong>nutricionista</strong> ou <strong>personal trainer</strong> ("profissional"). Ao selecionar uma dessas opções no cadastro, você concorda também com estas condições adicionais, além dos Termos de Uso gerais e da Política de Privacidade.</p>
+
+    <h2>1. Quem pode se cadastrar como profissional</h2>
+    <p>Só pode se cadastrar como nutricionista ou personal trainer quem tiver <strong>registro ativo no conselho profissional correspondente</strong> — CRN (Conselho Regional de Nutricionistas) para nutricionistas, CREF (Conselho Regional de Educação Física) para personal trainers — e estiver legalmente habilitado a exercer a profissão no Brasil.</p>
+    <p><strong>Declaração e verificação do registro profissional:</strong> ao selecionar essa opção no cadastro, você declara, sob sua exclusiva responsabilidade, que possui esse registro ativo e está regularmente habilitado(a) pelo respectivo conselho. Você pode criar seu perfil de profissional sem enviar nenhum documento. Porém, <strong>antes de vincular qualquer cliente, ou de atribuir treino ou plano alimentar a alguém</strong>, você precisa enviar, dentro do aplicativo, uma foto nítida e legível do seu documento de registro profissional (carteira ou comprovante do CRN/CREF), com todos os dados visíveis, inclusive o número de registro. Esse documento passa por revisão manual da equipe do Saber antes da liberação — enquanto a revisão não for concluída, ou se o documento for recusado, essas duas funcionalidades ficam bloqueadas. Declarações falsas ou o envio de documento inválido, ilegível ou de terceiros podem levar à suspensão imediata do acesso profissional, sem prejuízo de outras medidas cabíveis, inclusive perante o conselho de classe e as autoridades competentes.</p>
+
+    <h2>2. Vínculo com clientes</h2>
+    <p>Ao se cadastrar como profissional, você recebe um código pessoal de vínculo. Uma pessoa usuária do Saber pode inserir esse código pra vincular a conta dela à sua, autorizando você a visualizar os dados de progresso dela dentro do aplicativo (metas, diário alimentar, treinos, relatórios e avaliações). O vínculo pode ser desfeito a qualquer momento, por você ou pelo cliente, diretamente nas configurações.</p>
+
+    <h2>3. Acesso a dados de clientes e confidencialidade</h2>
+    <p>Ao acessar dados de um cliente vinculado — incluindo dados sensíveis de saúde, nos termos da LGPD — você se compromete a:</p>
+    <ul>
+      <li>Usar esses dados exclusivamente para prestar seu atendimento profissional ao cliente vinculado.</li>
+      <li>Manter sigilo sobre os dados, não compartilhando, exportando ou divulgando informações de clientes a terceiros sem autorização expressa deles.</li>
+      <li>Não usar os dados de clientes pra fins comerciais distintos do atendimento (ex.: prospecção, listas de contato, publicidade, revenda).</li>
+      <li>Respeitar eventual solicitação do cliente de desvincular a conta ou de exclusão dos dados que você tiver obtido fora do Saber.</li>
+    </ul>
+
+    <h2>4. Avaliações com limitação física</h2>
+    <p>Quando uma pessoa usuária, ao preencher a "Avaliação" de treino, informa algum problema ou desconforto (limitação física), essa avaliação é encaminhada para um personal trainer cadastrado no Saber realizar a avaliação, em vez de o treino ser gerado automaticamente. Ao se cadastrar como personal trainer, você pode ser chamado a realizar essas avaliações dentro do funcionamento do aplicativo.</p>
+    <p><strong>Esse atendimento é um serviço prestado diretamente por você à pessoa usuária, remunerado diretamente por ela</strong> — não está incluído na assinatura do Saber. O valor cobrado, a forma de pagamento e as condições desse atendimento são combinados diretamente entre você e a pessoa usuária, fora do aplicativo; o Saber não participa dessa cobrança, não define nem intermedeia esse valor, e não se responsabiliza por esse pagamento.</p>
+    <p>A realização dessa avaliação é de sua exclusiva responsabilidade técnica e profissional — o Saber disponibiliza a ferramenta pra viabilizar esse encaminhamento, mas não supervisiona clinicamente nem garante a adequação técnica de cada avaliação realizada.</p>
+
+    <h2>5. Responsabilidade pelas orientações e recomendações</h2>
+    <p>Toda orientação, recomendação, plano de treino, ajuste ou revisão que você fornecer a um cliente através do Saber é de sua <strong>exclusiva responsabilidade profissional, técnica e legal</strong>. O Saber é apenas a ferramenta de comunicação e organização entre você e seus clientes — não participa, não aprova e não se responsabiliza pelo conteúdo técnico dessas orientações.</p>
+
+    <h2>6. Uso da plataforma e condições financeiras</h2>
+    <p>O acesso às funcionalidades do Saber, inclusive as de profissional, segue as mesmas condições de assinatura descritas nos Termos de Uso gerais, salvo quando o Saber conceder acesso gratuito ou condições específicas, a seu exclusivo critério.</p>
+
+    <h2>7. Suspensão e encerramento do acesso profissional</h2>
+    <p>O Saber pode suspender ou encerrar o acesso profissional de uma conta, a qualquer momento e mediante aviso prévio quando possível, em casos como: denúncia fundamentada de má conduta; uso indevido dos dados de clientes; declaração falsa sobre registro profissional; ou violação destes termos ou dos Termos de Uso gerais.</p>
+
+    <h2>8. Relação entre o Saber e o profissional</h2>
+    <p>Este documento não cria vínculo empregatício, societário ou de representação entre você e Yara Victoria Alves Ferreira / o Saber. Você atua como profissional autônomo, responsável por sua própria atuação técnica, fiscal e regulatória perante seu conselho de classe.</p>
+
+    <h2>9. Disposições gerais</h2>
+    <p>Aplicam-se a você, no que couber, os Termos de Uso gerais do Saber. Em caso de conflito entre este documento e os Termos de Uso gerais quanto a questões específicas do uso profissional, prevalece este documento.</p>
+
+    <h2>10. Legislação aplicável e foro</h2>
+    <p>Estes termos são regidos pelas leis brasileiras. Fica eleito o foro da comarca de <strong>Alto Paraíso de Goiás – GO</strong> para dirimir quaisquer controvérsias, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
+
+    <h2>11. Contato</h2>
+    <p>Dúvidas sobre estes Termos de Uso para Profissionais podem ser enviadas para <a href="mailto:saber.gestao26@gmail.com">saber.gestao26@gmail.com</a>.</p>
+  </div>
+</div>
+</body>
+</html>

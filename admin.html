@@ -79,6 +79,17 @@
   </div>
 
   <div class="card">
+    <h4>Avaliações e reclamações sobre profissionais</h4>
+    <div id="prof-feedback-area"><p class="hint">Carregando...</p></div>
+  </div>
+
+  <div class="card">
+    <h4>Documentos de profissionais pendentes</h4>
+    <p class="hint" style="margin-bottom:10px;">Confira se a foto bate com o nome e o número de registro informados. Não existe API oficial dos conselhos pra conferir automaticamente — use os links de consulta abaixo de cada envio pra checar na página oficial do conselho.</p>
+    <div id="prof-docs-area"><p class="hint">Carregando...</p></div>
+  </div>
+
+  <div class="card">
     <h4>Avaliações de treino pendentes</h4>
     <div id="assessments-area"><p class="hint">Carregando...</p></div>
   </div>
@@ -309,6 +320,124 @@
     return plan.filter(day=> day.exercises.length>0);
   }
 
+  /* ---------- Avaliações e reclamações sobre profissionais ---------- */
+  async function renderProfFeedbackArea(){
+    const el = document.getElementById('prof-feedback-area');
+    const { data, error } = await sb.from('professional_feedback').select('*').eq('status', 'pending').order('created_at');
+    if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
+    const list = data || [];
+    if(list.length===0){ el.innerHTML = `<p class="hint">Nada pendente.</p>`; return; }
+    const profIds = list.map(f=>f.professional_id);
+    const { data: profs } = await sb.from('profiles').select('id, email, professional_label').in('id', profIds);
+    const profById = {}; (profs||[]).forEach(p=> profById[p.id]=p);
+    el.innerHTML = list.map(f=>{
+      const prof = profById[f.professional_id] || {};
+      const isComplaint = f.kind === 'reclamacao';
+      return `
+        <div class="review-item" data-id="${f.id}" ${isComplaint ? 'style="border-color:var(--rust);"' : ''}>
+          <div class="review-name">${isComplaint ? '⚠️ Reclamação' : '⭐ Avaliação'} sobre ${esc(prof.email || 'profissional')} ${prof.professional_label ? '· ' + esc(prof.professional_label) : ''}</div>
+          <div class="review-meta">
+            ${f.rating ? 'Nota: ' + '★'.repeat(f.rating) + '☆'.repeat(5-f.rating) + '<br>' : ''}
+            ${new Date(f.created_at).toLocaleString('pt-BR')}
+            ${f.message ? `<br>"${esc(f.message)}"` : ''}
+          </div>
+          <div class="review-actions">
+            <button data-action="review" data-id="${f.id}">Marcar como revisado</button>
+          </div>
+        </div>`;
+    }).join('');
+    el.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.addEventListener('click', async function(){
+        const id = this.getAttribute('data-id');
+        this.disabled = true; this.textContent = '...';
+        try{
+          const { error: updErr } = await sb.from('professional_feedback').update({ status: 'reviewed', reviewed_at: new Date().toISOString() }).eq('id', id);
+          if(updErr) throw updErr;
+          document.querySelector(`.review-item[data-id="${id}"]`).remove();
+        }catch(err){
+          console.error(err);
+          alert('Não foi possível concluir. Tente novamente.');
+          this.disabled = false; this.textContent = 'Marcar como revisado';
+        }
+      });
+    });
+  }
+
+  /* ---------- Documentos de profissionais pendentes ---------- */
+  // Não existe API pública dos conselhos (CFN/CREF) pra conferir o registro
+  // automaticamente — essas são só páginas feitas pra gente digitar o
+  // número/nome manualmente. Cada uma delas é organizada de um jeito
+  // diferente (CREF é por conselho regional, sem um link único nacional
+  // com busca por parâmetro), então aqui só abre a página de consulta —
+  // quem revisa digita o número lá.
+  const COUNCIL_CONSULT_LINKS = {
+    'Nutricionista': { label: 'Consultar no CFN (nutricionistas)', url: 'https://cnn.cfn.org.br/application/index/consulta-nacional' },
+    'Personal trainer': { label: 'Consultar no CONFEF (educação física)', url: 'https://www.confef.org.br/registrados/' },
+  };
+
+  async function renderProfDocsArea(){
+    const el = document.getElementById('prof-docs-area');
+    const { data, error } = await sb.from('professional_verifications').select('*').eq('status', 'pending').order('submitted_at');
+    if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
+    const list = data || [];
+    if(list.length===0){ el.innerHTML = `<p class="hint">Nenhum documento pendente.</p>`; return; }
+    const userIds = list.map(v=>v.user_id);
+    const { data: profs } = await sb.from('profiles').select('id, email, professional_label').in('id', userIds);
+    const profById = {}; (profs||[]).forEach(p=> profById[p.id]=p);
+
+    const rows = await Promise.all(list.map(async (v)=>{
+      const prof = profById[v.user_id] || {};
+      let docUrl = null;
+      if(v.doc_path){
+        const { data: signed } = await sb.storage.from('professional-docs').createSignedUrl(v.doc_path, 300);
+        docUrl = signed ? signed.signedUrl : null;
+      }
+      const council = COUNCIL_CONSULT_LINKS[prof.professional_label] || null;
+      return `
+        <div class="review-item" data-user="${v.user_id}">
+          <div class="review-name">${esc(prof.email || 'Pessoa')} · ${esc(prof.professional_label || 'Profissional')}</div>
+          <div class="review-meta">
+            Registro informado: <b>${esc(v.registration_number || '—')}</b><br>
+            Enviado em: ${v.submitted_at ? new Date(v.submitted_at).toLocaleString('pt-BR') : '—'}
+          </div>
+          ${docUrl ? `<a href="${docUrl}" target="_blank" rel="noopener" style="display:block;margin-bottom:8px;"><img src="${docUrl}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);display:block;"></a>` : '<p class="hint">Não foi possível carregar a foto.</p>'}
+          ${council ? `<a href="${council.url}" target="_blank" rel="noopener" class="hint" style="display:block;margin-bottom:10px;">${esc(council.label)} ↗</a>` : ''}
+          <div class="review-actions">
+            <button data-action="approve" data-user="${v.user_id}">Aprovar</button>
+            <button class="danger" data-action="reject" data-user="${v.user_id}">Recusar</button>
+          </div>
+        </div>`;
+    }));
+    el.innerHTML = rows.join('');
+
+    el.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.addEventListener('click', async function(){
+        const userId = this.getAttribute('data-user');
+        const action = this.getAttribute('data-action');
+        this.disabled = true; this.textContent = '...';
+        try{
+          let rejectionReason = null;
+          if(action === 'reject'){
+            rejectionReason = prompt('Motivo da recusa (a pessoa vai ver essa mensagem):', 'Foto ilegível, envie novamente com melhor iluminação.');
+            if(rejectionReason === null){ this.disabled = false; this.textContent = 'Recusar'; return; }
+          }
+          const { error: updErr } = await sb.from('professional_verifications').update({
+            status: action==='approve' ? 'approved' : 'rejected',
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: currentUser.id,
+            rejection_reason: action==='reject' ? rejectionReason : null
+          }).eq('user_id', userId);
+          if(updErr) throw updErr;
+          document.querySelector(`.review-item[data-user="${userId}"]`).remove();
+        }catch(err){
+          console.error(err);
+          alert('Não foi possível concluir. Tente novamente.');
+          this.disabled = false; this.textContent = action==='approve' ? 'Aprovar' : 'Recusar';
+        }
+      });
+    });
+  }
+
   /* ---------- Avaliações pendentes ---------- */
   async function renderAssessmentsArea(){
     const el = document.getElementById('assessments-area');
@@ -450,7 +579,8 @@
     document.getElementById('stats-people').innerHTML =
       statCard('Total de usuários', data.total_users) + statCard('Novos (7 dias)', data.signups_last_7_days) +
       statCard('Novos (30 dias)', data.signups_last_30_days) + statCard('Profissionais cadastrados', data.total_professionals) +
-      statCard('Vínculos profissional-cliente', data.total_client_links) + statCard('Acesso gratuito (código promo)', data.free_access_users);
+      statCard('Vínculos profissional-cliente', data.total_client_links) + statCard('Acesso gratuito (código promo)', data.free_access_users) +
+      statCard('Documentos de profissionais pendentes', data.pending_professional_docs) + statCard('Avaliações/reclamações pendentes', data.pending_professional_feedback);
     document.getElementById('stats-billing').innerHTML =
       statCard('Assinantes ativos', null, 'Aguardando sistema de pagamento') + statCard('Plano mensal', null, 'Aguardando sistema de pagamento') + statCard('Cancelamentos no mês', null, 'Aguardando sistema de pagamento');
     document.getElementById('stats-invoices').innerHTML = statCard('Notas emitidas no mês', null, 'Aguardando integração fiscal');
@@ -468,6 +598,8 @@
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('dashboard').style.display = '';
       loadDashboard();
+      renderProfFeedbackArea();
+      renderProfDocsArea();
       renderAssessmentsArea();
       renderSuggestionsArea();
       renderProblemsArea();
