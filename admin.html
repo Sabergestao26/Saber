@@ -47,6 +47,11 @@
   .toggle input:checked ~ .toggle-track{ background:var(--green-deep); }
   .toggle input:checked ~ .toggle-track .toggle-thumb{ transform:translateX(20px); }
   .toggle input:disabled ~ .toggle-track{ opacity:0.5; cursor:default; }
+  .tabs{ display:flex; gap:2px; margin-bottom:20px; border-bottom:1px solid var(--border); overflow-x:auto; }
+  .tab-btn{ width:auto; background:none; color:var(--ink-soft); font-weight:600; font-size:14px; padding:10px 14px; border:none; border-bottom:2px solid transparent; border-radius:0; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:6px; }
+  .tab-btn.active{ color:var(--green-deep); border-bottom-color:var(--green-deep); }
+  .tab-btn:hover{ opacity:0.85; }
+  .tab-badge{ background:var(--rust); color:#fff; font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; line-height:1.4; }
 </style>
 </head>
 <body>
@@ -66,72 +71,93 @@
   <h1>Painel de gestão</h1>
   <p class="hint" style="margin-bottom:20px;">Visão geral de uso, cadastros e conteúdo — separado do app que as pessoas usam.</p>
 
-  <div class="card">
-    <h4>Notificações</h4>
-    <p class="hint" style="margin-bottom:10px;">Receba um aviso, mesmo com essa aba fechada, quando chegar algo novo pra revisar.</p>
-    <div class="toggle-row">
-      <span class="toggle-row-label">Ativar notificações push</span>
-      <label class="toggle">
-        <input type="checkbox" id="notif-toggle">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-      </label>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="resumo">Resumo</button>
+    <button class="tab-btn" data-tab="clientes">Clientes<span class="tab-badge" id="badge-clientes" style="display:none;"></span></button>
+    <button class="tab-btn" data-tab="profissionais">Profissionais<span class="tab-badge" id="badge-profissionais" style="display:none;"></span></button>
+    <button class="tab-btn" data-tab="conteudo">Conteúdo<span class="tab-badge" id="badge-conteudo" style="display:none;"></span></button>
+    <button class="tab-btn" data-tab="config">Configurações</button>
+  </div>
+
+  <div class="tab-panel" data-panel="resumo">
+    <div class="card">
+      <h4>Pessoas</h4>
+      <div class="grid" id="stats-people"></div>
+    </div>
+
+    <div class="card">
+      <h4>Assinaturas</h4>
+      <div class="grid" id="stats-billing"></div>
+      <p class="hint" style="margin-top:10px;">Esses números ficam disponíveis assim que o sistema de assinatura paga for implementado.</p>
+    </div>
+
+    <div class="card">
+      <h4>Notas fiscais</h4>
+      <div class="grid" id="stats-invoices"></div>
+      <p class="hint" style="margin-top:10px;">Emissão de nota costuma ser controlada direto na plataforma de pagamento ou no sistema do contador — aqui pode entrar um resumo assim que essa integração existir.</p>
+    </div>
+
+    <div class="card">
+      <h4>Conteúdo</h4>
+      <div class="grid" id="stats-content"></div>
+    </div>
+
+    <div class="card">
+      <h4>Engajamento</h4>
+      <div class="grid" id="stats-engagement"></div>
     </div>
   </div>
 
-  <div class="card">
-    <h4>Avaliações e reclamações sobre profissionais</h4>
-    <div id="prof-feedback-area"><p class="hint">Carregando...</p></div>
+  <div class="tab-panel" data-panel="clientes" style="display:none;">
+    <div class="card">
+      <h4>Avaliações de treino pendentes</h4>
+      <div id="assessments-area"><p class="hint">Carregando...</p></div>
+    </div>
+
+    <div class="card">
+      <h4>Problemas reportados</h4>
+      <div id="problems-area"><p class="hint">Carregando...</p></div>
+    </div>
   </div>
 
-  <div class="card">
-    <h4>Documentos de profissionais pendentes</h4>
-    <p class="hint" style="margin-bottom:10px;">Confira se a foto bate com o nome e o número de registro informados. Não existe API oficial dos conselhos pra conferir automaticamente — use os links de consulta abaixo de cada envio pra checar na página oficial do conselho.</p>
-    <div id="prof-docs-area"><p class="hint">Carregando...</p></div>
+  <div class="tab-panel" data-panel="profissionais" style="display:none;">
+    <div class="card">
+      <h4>Documentos de profissionais pendentes</h4>
+      <p class="hint" style="margin-bottom:10px;">Confira se a foto bate com o nome e o número de registro informados. Não existe API oficial dos conselhos pra conferir automaticamente — clique em "Copiar número" antes de abrir o link de consulta, e cole direto no campo "Inscrição" do site do conselho (assim não precisa digitar de cabeça nem correr o risco de esquecer o número ao trocar de aba).</p>
+      <div id="prof-docs-area"><p class="hint">Carregando...</p></div>
+    </div>
+
+    <div class="card">
+      <h4>Avaliações e reclamações sobre profissionais</h4>
+      <div id="prof-feedback-area"><p class="hint">Carregando...</p></div>
+    </div>
   </div>
 
-  <div class="card">
-    <h4>Avaliações de treino pendentes</h4>
-    <div id="assessments-area"><p class="hint">Carregando...</p></div>
+  <div class="tab-panel" data-panel="conteudo" style="display:none;">
+    <div class="card">
+      <h4>Sugestões de alimentos</h4>
+      <div id="suggestions-area"><p class="hint">Carregando...</p></div>
+    </div>
   </div>
 
-  <div class="card">
-    <h4>Sugestões de alimentos</h4>
-    <div id="suggestions-area"><p class="hint">Carregando...</p></div>
-  </div>
+  <div class="tab-panel" data-panel="config" style="display:none;">
+    <div class="card">
+      <h4>Notificações</h4>
+      <p class="hint" style="margin-bottom:10px;">Receba um aviso, mesmo com essa aba fechada, quando chegar algo novo pra revisar.</p>
+      <div class="toggle-row">
+        <span class="toggle-row-label">Ativar notificações push</span>
+        <label class="toggle">
+          <input type="checkbox" id="notif-toggle">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+    </div>
 
-  <div class="card">
-    <h4>Problemas reportados</h4>
-    <div id="problems-area"><p class="hint">Carregando...</p></div>
+    <div class="card">
+      <h4>Conta</h4>
+      <button class="danger" id="logout-btn" style="max-width:200px;">Sair</button>
+    </div>
   </div>
-
-  <div class="card">
-    <h4>Pessoas</h4>
-    <div class="grid" id="stats-people"></div>
-  </div>
-
-  <div class="card">
-    <h4>Assinaturas</h4>
-    <div class="grid" id="stats-billing"></div>
-    <p class="hint" style="margin-top:10px;">Esses números ficam disponíveis assim que o sistema de assinatura paga for implementado.</p>
-  </div>
-
-  <div class="card">
-    <h4>Notas fiscais</h4>
-    <div class="grid" id="stats-invoices"></div>
-    <p class="hint" style="margin-top:10px;">Emissão de nota costuma ser controlada direto na plataforma de pagamento ou no sistema do contador — aqui pode entrar um resumo assim que essa integração existir.</p>
-  </div>
-
-  <div class="card">
-    <h4>Conteúdo</h4>
-    <div class="grid" id="stats-content"></div>
-  </div>
-
-  <div class="card">
-    <h4>Engajamento</h4>
-    <div class="grid" id="stats-engagement"></div>
-  </div>
-
-  <button class="danger" id="logout-btn" style="max-width:200px;">Sair</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -146,6 +172,33 @@
     const d = document.createElement('div');
     d.textContent = str == null ? '' : String(str);
     return d.innerHTML;
+  }
+  // esc() é seguro dentro de texto solto, mas um valor digitado por alguém
+  // (ex: número de registro) pode conter aspas duplas — isso escapa também
+  // pra poder usar com segurança dentro de um atributo tipo data-copy="...".
+  function escAttr(str){
+    return esc(str).replace(/"/g, '&quot;');
+  }
+  // Copia um texto pro clipboard, com um fallback pra navegadores/contextos
+  // onde a Clipboard API não estiver disponível.
+  async function copyToClipboard(text){
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    }catch(err){ console.error(err); }
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    }catch(err){ console.error(err); return false; }
   }
 
   /* ---------- Notificações push ---------- */
@@ -326,6 +379,7 @@
     const { data, error } = await sb.from('professional_feedback').select('*').eq('status', 'pending').order('created_at');
     if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
     const list = data || [];
+    pendingCounts.profFeedback = list.length; refreshBadges();
     if(list.length===0){ el.innerHTML = `<p class="hint">Nada pendente.</p>`; return; }
     const profIds = list.map(f=>f.professional_id);
     const { data: profs } = await sb.from('profiles').select('id, email, professional_label').in('id', profIds);
@@ -354,6 +408,7 @@
           const { error: updErr } = await sb.from('professional_feedback').update({ status: 'reviewed', reviewed_at: new Date().toISOString() }).eq('id', id);
           if(updErr) throw updErr;
           document.querySelector(`.review-item[data-id="${id}"]`).remove();
+          pendingCounts.profFeedback = Math.max(0, pendingCounts.profFeedback - 1); refreshBadges();
         }catch(err){
           console.error(err);
           alert('Não foi possível concluir. Tente novamente.');
@@ -380,6 +435,7 @@
     const { data, error } = await sb.from('professional_verifications').select('*').eq('status', 'pending').order('submitted_at');
     if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
     const list = data || [];
+    pendingCounts.profDocs = list.length; refreshBadges();
     if(list.length===0){ el.innerHTML = `<p class="hint">Nenhum documento pendente.</p>`; return; }
     const userIds = list.map(v=>v.user_id);
     const { data: profs } = await sb.from('profiles').select('id, email, professional_label').in('id', userIds);
@@ -393,11 +449,12 @@
         docUrl = signed ? signed.signedUrl : null;
       }
       const council = COUNCIL_CONSULT_LINKS[prof.professional_label] || null;
+      const copyBtn = v.registration_number ? `<button type="button" data-copy="${escAttr(v.registration_number)}" style="width:auto;display:inline-block;padding:3px 10px;font-size:12px;font-weight:600;margin-left:8px;vertical-align:middle;background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:6px;">Copiar número</button>` : '';
       return `
         <div class="review-item" data-user="${v.user_id}">
           <div class="review-name">${esc(prof.email || 'Pessoa')} · ${esc(prof.professional_label || 'Profissional')}</div>
           <div class="review-meta">
-            Registro informado: <b>${esc(v.registration_number || '—')}</b><br>
+            Registro informado: <b>${esc(v.registration_number || '—')}</b>${copyBtn}<br>
             Enviado em: ${v.submitted_at ? new Date(v.submitted_at).toLocaleString('pt-BR') : '—'}
           </div>
           ${docUrl ? `<a href="${docUrl}" target="_blank" rel="noopener" style="display:block;margin-bottom:8px;"><img src="${docUrl}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);display:block;"></a>` : '<p class="hint">Não foi possível carregar a foto.</p>'}
@@ -409,6 +466,20 @@
         </div>`;
     }));
     el.innerHTML = rows.join('');
+
+    // Botão "Copiar número" — só copia pro clipboard, não mexe no status
+    // da verificação. Fica num loop separado de propósito: ele também tem
+    // um atributo data-copy (não data-action), então nunca é pego pelo
+    // loop de aprovar/recusar abaixo.
+    el.querySelectorAll('button[data-copy]').forEach(btn=>{
+      btn.addEventListener('click', async function(){
+        const text = this.getAttribute('data-copy');
+        const original = this.textContent;
+        const ok = await copyToClipboard(text);
+        this.textContent = ok ? 'Copiado! ✓' : 'Não copiou, selecione manualmente';
+        setTimeout(()=>{ this.textContent = original; }, 1800);
+      });
+    });
 
     el.querySelectorAll('button[data-action]').forEach(btn=>{
       btn.addEventListener('click', async function(){
@@ -429,6 +500,7 @@
           }).eq('user_id', userId);
           if(updErr) throw updErr;
           document.querySelector(`.review-item[data-user="${userId}"]`).remove();
+          pendingCounts.profDocs = Math.max(0, pendingCounts.profDocs - 1); refreshBadges();
         }catch(err){
           console.error(err);
           alert('Não foi possível concluir. Tente novamente.');
@@ -444,6 +516,7 @@
     const { data, error } = await sb.from('assessment_submissions').select('*').eq('status', 'pending').order('created_at');
     if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
     const list = data || [];
+    pendingCounts.assessments = list.length; refreshBadges();
     if(list.length===0){ el.innerHTML = `<p class="hint">Nenhuma avaliação pendente.</p>`; return; }
     const userIds = list.map(a=>a.user_id);
     const { data: profs } = await sb.from('profiles').select('id, email').in('id', userIds);
@@ -484,6 +557,7 @@
             await sb.from('assessment_submissions').update({ status:'needs_professional', reviewed_at:new Date().toISOString() }).eq('id', id);
           }
           document.querySelector(`.review-item[data-id="${id}"]`).remove();
+          pendingCounts.assessments = Math.max(0, pendingCounts.assessments - 1); refreshBadges();
         }catch(err){
           console.error(err);
           alert('Não foi possível concluir. Tente novamente.');
@@ -499,6 +573,7 @@
     const { data, error } = await sb.from('food_suggestions').select('*').eq('status', 'pending').order('created_at');
     if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
     const list = data || [];
+    pendingCounts.suggestions = list.length; refreshBadges();
     if(list.length===0){ el.innerHTML = `<p class="hint">Nenhuma sugestão pendente.</p>`; return; }
     el.innerHTML = list.map(s=>`
       <div class="review-item" data-id="${s.id}">
@@ -523,6 +598,7 @@
           const { error: updErr } = await sb.from('food_suggestions').update({ status: action==='approve'?'approved':'rejected', reviewed_at: new Date().toISOString() }).eq('id', id);
           if(updErr) throw updErr;
           document.querySelector(`.review-item[data-id="${id}"]`).remove();
+          pendingCounts.suggestions = Math.max(0, pendingCounts.suggestions - 1); refreshBadges();
         }catch(err){
           console.error(err);
           alert('Não foi possível concluir. Tente novamente.');
@@ -538,6 +614,7 @@
     const { data, error } = await sb.from('problem_reports').select('*').eq('status', 'pending').order('created_at');
     if(error){ el.innerHTML = `<p class="hint">Não foi possível carregar.</p>`; return; }
     const list = data || [];
+    pendingCounts.problems = list.length; refreshBadges();
     if(list.length===0){ el.innerHTML = `<p class="hint">Nenhum problema pendente.</p>`; return; }
     el.innerHTML = list.map(r=>`
       <div class="review-item" data-id="${r.id}">
@@ -557,6 +634,7 @@
           const { error: updErr } = await sb.from('problem_reports').update({ status: action==='resolve'?'resolved':'dismissed', reviewed_at: new Date().toISOString() }).eq('id', id);
           if(updErr) throw updErr;
           document.querySelector(`.review-item[data-id="${id}"]`).remove();
+          pendingCounts.problems = Math.max(0, pendingCounts.problems - 1); refreshBadges();
         }catch(err){
           console.error(err);
           alert('Não foi possível concluir. Tente novamente.');
@@ -588,6 +666,32 @@
       statCard('Receitas no catálogo', data.total_recipes) + statCard('Treinos na biblioteca', data.total_library_workouts) + statCard('Treinos pessoais/atribuídos', data.total_personal_workouts);
     document.getElementById('stats-engagement').innerHTML =
       statCard('Conexões com Withings', data.withings_connections) + statCard('Notificações push ativas', data.push_subscriptions);
+  }
+
+  /* ---------- Abas do painel ---------- */
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+  tabButtons.forEach(btn=>{
+    btn.addEventListener('click', function(){
+      tabButtons.forEach(b=> b.classList.remove('active'));
+      this.classList.add('active');
+      const target = this.getAttribute('data-tab');
+      tabPanels.forEach(p=>{ p.style.display = (p.getAttribute('data-panel')===target) ? '' : 'none'; });
+    });
+  });
+  // Bolinha com contagem em cada aba, pra saber de longe onde tem algo
+  // esperando revisão, sem precisar clicar em cada uma pra descobrir.
+  const pendingCounts = { profDocs:0, profFeedback:0, assessments:0, problems:0, suggestions:0 };
+  function setTabBadge(tabKey, count){
+    const el = document.getElementById('badge-'+tabKey);
+    if(!el) return;
+    if(!count){ el.style.display = 'none'; el.textContent = ''; }
+    else { el.style.display = ''; el.textContent = count; }
+  }
+  function refreshBadges(){
+    setTabBadge('profissionais', pendingCounts.profDocs + pendingCounts.profFeedback);
+    setTabBadge('clientes', pendingCounts.assessments + pendingCounts.problems);
+    setTabBadge('conteudo', pendingCounts.suggestions);
   }
 
   /* ---------- Login ---------- */
