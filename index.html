@@ -1672,6 +1672,7 @@
       msgArea.innerHTML = '';
       await loadMessages();
       input.focus();
+      notifyChatMessage(professionalId, clientId, body);
     });
   }
 
@@ -4532,6 +4533,21 @@
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ kind })
       }).catch(err=> console.error('Não foi possível avisar a administração', err));
+    }catch(err){
+      console.error(err);
+    }
+  }
+
+  async function notifyChatMessage(professionalId, clientId, preview){
+    try{
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if(!token) return;
+      fetch(`${SUPABASE_URL}/functions/v1/notify-chat-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ professional_id: professionalId, client_id: clientId, preview })
+      }).catch(err=> console.error('Não foi possível avisar a outra pessoa', err));
     }catch(err){
       console.error(err);
     }
