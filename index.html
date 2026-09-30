@@ -902,6 +902,13 @@
     d.textContent = str == null ? '' : String(str);
     return d.innerHTML;
   }
+  // esc() \u00e9 seguro dentro de texto solto, mas um valor que vai ser usado
+  // como value="..." de um input (ex.: nome de exerc\u00edcio importado) pode
+  // conter aspas duplas \u2014 isso escapa tamb\u00e9m, pra poder usar com
+  // seguran\u00e7a dentro de um atributo.
+  function escAttr(str){
+    return esc(str).replace(/"/g, '&quot;');
+  }
   function normalize(str){ return (str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
   function numOrNull(v){ if(v===''||v===null||v===undefined) return null; const n=parseFloat(v); return isNaN(n)?null:n; }
   function n0(v){ return Number(v)||0; }
@@ -1971,6 +1978,11 @@
       });
       const result = await res.json();
       if(!res.ok || result.error || !result.init_point){
+        // O motivo real (erro devolvido pelo Mercado Pago, por exemplo)
+        // não aparece pra quem está assinando — só aqui no console, pra
+        // quem estiver com as ferramentas de desenvolvedor abertas
+        // testando o fluxo de pagamento.
+        console.error('Não foi possível criar o pagamento:', result);
         msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível iniciar o pagamento agora. Tente novamente em instantes.</p>`;
         container.querySelectorAll('.fr-sub-plan-btn').forEach(b=>{ b.disabled = false; });
         btn.innerHTML = originalLabel;
@@ -2426,6 +2438,7 @@
       <div class="fr-workout-actions">
         <button class="fr-btn-primary" id="fr-build-own" style="flex:1;">${PLUS_SVG} Montar meu treino</button>
         <button class="fr-btn-ghost" id="fr-take-assessment" style="flex:1;">Fazer avaliação</button>
+        <button class="fr-btn-ghost" id="fr-import-file" style="flex:1;">📄 Importar de arquivo</button>
       </div>
       <div class="fr-section-label">Meus treinos</div>
     `;
@@ -2445,6 +2458,7 @@
 
     document.getElementById('fr-build-own').addEventListener('click', openExercisePickerModal);
     document.getElementById('fr-take-assessment').addEventListener('click', openAssessmentModal);
+    document.getElementById('fr-import-file').addEventListener('click', openImportWorkoutModal);
     workouts.forEach(w=>{
       const card = document.getElementById('fr-workout-card-'+w.id);
       if(!card) return;
@@ -2570,6 +2584,138 @@
       showToast('Não foi possível salvar o treino agora.', 'err');
       return false;
     }
+  }
+
+  /* ---------- Importar treino de arquivo (PDF / XLSX / CSV) ---------- */
+  let importedExercisesDraft = [];
+
+  function openImportWorkoutModal(){
+    importedExercisesDraft = [];
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Importar treino de arquivo</h3>
+      <p class="fr-hint" style="margin-bottom:14px;">Envie um PDF ou uma planilha (Excel/CSV) com o treino que seu personal te passou. O Saber tenta identificar os exercícios automaticamente — você confere e ajusta antes de salvar.</p>
+      <div class="fr-field"><label for="fr-import-name">Nome do treino</label><input type="text" id="fr-import-name" placeholder="ex.: Treino do personal" value="Treino importado"></div>
+      <div class="fr-field"><label for="fr-import-file-input">Arquivo (PDF, XLSX, XLS ou CSV — até 4MB)</label><input type="file" id="fr-import-file-input" accept=".pdf,.xlsx,.xls,.csv"></div>
+      <button class="fr-btn-primary" id="fr-import-analyze" style="width:100%;margin-top:10px;">Analisar arquivo</button>
+      <div id="fr-import-result"></div>
+    `);
+    overlay.querySelector('#fr-import-analyze').addEventListener('click', analyzeImportFile);
+  }
+
+  function fileToBase64(file){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const result = String(reader.result || '');
+        resolve(result.split(',')[1] || '');
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function analyzeImportFile(){
+    const btn = document.getElementById('fr-import-analyze');
+    const fileInput = document.getElementById('fr-import-file-input');
+    const resultEl = document.getElementById('fr-import-result');
+    const file = fileInput.files && fileInput.files[0];
+    if(!file){ showToast('Escolha um arquivo primeiro.', 'err'); return; }
+    const MAX_BYTES = 4 * 1024 * 1024;
+    if(file.size > MAX_BYTES){ showToast('Arquivo muito grande (máximo 4MB).', 'err'); return; }
+    btn.disabled = true; btn.textContent = 'Analisando...';
+    resultEl.innerHTML = `<div class="fr-loading" style="margin-top:10px;">Lendo o arquivo...</div>`;
+    try{
+      const base64 = await fileToBase64(file);
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/import-workout-file`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, content_base64: base64 })
+      });
+      const result = await res.json();
+      if(!res.ok || result.error){
+        console.error('Não foi possível importar o arquivo:', result);
+        resultEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:8px;">Não consegui ler esse arquivo. Tente outro formato, ou monte o treino manualmente em "Montar meu treino".</p>`;
+        btn.disabled = false; btn.textContent = 'Analisar arquivo';
+        return;
+      }
+      importedExercisesDraft = (result.exercises || []).map((e,i)=> ({ ...e, _tmpId: 'imp'+i+'_'+Date.now() }));
+      renderImportReview(resultEl, result.warnings || []);
+      btn.style.display = 'none';
+    }catch(err){
+      console.error(err);
+      resultEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:8px;">Não consegui analisar o arquivo agora. Tente novamente.</p>`;
+      btn.disabled = false; btn.textContent = 'Analisar arquivo';
+    }
+  }
+
+  function renderImportReview(container, warnings){
+    const warnHtml = warnings.length ? `<div class="fr-hint" style="margin:10px 0;color:var(--ink-soft);">${warnings.map(w=>esc(w)).join('<br>')}</div>` : '';
+    container.innerHTML = `
+      ${warnHtml}
+      <div class="fr-section-label" style="padding-top:0;">Exercícios encontrados — confira e ajuste antes de salvar</div>
+      <div id="fr-import-list"></div>
+      <button type="button" class="fr-btn-ghost" id="fr-import-add-row" style="width:100%;margin-top:8px;">${PLUS_SVG} Adicionar exercício</button>
+      <button class="fr-btn-primary" id="fr-import-save" style="width:100%;margin-top:14px;">Salvar treino</button>
+    `;
+    renderImportRows();
+    container.querySelector('#fr-import-add-row').addEventListener('click', ()=>{
+      importedExercisesDraft.push({ name:'', sets:'', reps:'', rest_seconds:null, notes:'', _tmpId:'imp_new_'+Date.now() });
+      renderImportRows();
+    });
+    container.querySelector('#fr-import-save').addEventListener('click', saveImportedWorkout);
+  }
+
+  function renderImportRows(){
+    const listEl = document.getElementById('fr-import-list');
+    if(!listEl) return;
+    if(importedExercisesDraft.length===0){
+      listEl.innerHTML = `<p class="fr-hint">Nenhum exercício ainda — adicione manualmente abaixo.</p>`;
+      return;
+    }
+    listEl.innerHTML = importedExercisesDraft.map(e=>`
+      <div class="fr-import-row" data-tmp="${e._tmpId}" style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;">
+        <div class="fr-field"><label>Exercício</label><input type="text" class="fr-imp-name" value="${escAttr(e.name||'')}" placeholder="Nome do exercício"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div class="fr-field"><label>Séries</label><input type="text" class="fr-imp-sets" value="${escAttr(e.sets==null?'':e.sets)}"></div>
+          <div class="fr-field"><label>Repetições</label><input type="text" class="fr-imp-reps" value="${escAttr(e.reps==null?'':e.reps)}"></div>
+          <div class="fr-field"><label>Descanso (s)</label><input type="number" min="0" class="fr-imp-rest" value="${e.rest_seconds==null?'':e.rest_seconds}"></div>
+        </div>
+        <div class="fr-field"><label>Observações</label><input type="text" class="fr-imp-notes" value="${escAttr(e.notes||'')}"></div>
+        <button type="button" class="fr-btn-ghost fr-imp-remove" style="width:100%;">Remover</button>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.fr-import-row').forEach(row=>{
+      const tmpId = row.getAttribute('data-tmp');
+      row.querySelector('.fr-imp-remove').addEventListener('click', ()=>{
+        importedExercisesDraft = importedExercisesDraft.filter(e=> e._tmpId !== tmpId);
+        renderImportRows();
+      });
+    });
+  }
+
+  async function saveImportedWorkout(){
+    const listEl = document.getElementById('fr-import-list');
+    const rows = Array.from(listEl.querySelectorAll('.fr-import-row'));
+    const exercises = rows.map(row=>({
+      name: row.querySelector('.fr-imp-name').value.trim(),
+      sets: row.querySelector('.fr-imp-sets').value.trim() || null,
+      reps: row.querySelector('.fr-imp-reps').value.trim() || null,
+      rest_seconds: row.querySelector('.fr-imp-rest').value ? parseInt(row.querySelector('.fr-imp-rest').value, 10) : null,
+      notes: row.querySelector('.fr-imp-notes').value.trim() || null,
+      video_url: null
+    })).filter(e=> e.name);
+    if(exercises.length===0){ showToast('Adicione ao menos um exercício com nome.', 'err'); return; }
+    const name = document.getElementById('fr-import-name').value.trim() || 'Treino importado';
+    const btn = document.getElementById('fr-import-save');
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    const ok = await saveNewPersonalWorkout(name, exercises);
+    if(!ok){ btn.disabled = false; btn.textContent = 'Salvar treino'; return; }
+    showToast('Treino importado e salvo!', 'ok');
+    importedExercisesDraft = [];
+    closeOverlay();
+    loadWorkouts();
   }
 
   /* ---------- Avaliação: gera treino personalizado ---------- */
@@ -2939,7 +3085,9 @@
       const loadToggle = exEl.querySelector(`#fr-ex-load-toggle-${ex.id}`);
       if(loadToggle) loadToggle.addEventListener('click', ()=>{
         const box = document.getElementById(`fr-ex-load-box-${ex.id}`);
-        box.style.display = box.style.display==='none' ? '' : 'none';
+        const opening = box.style.display==='none';
+        box.style.display = opening ? '' : 'none';
+        if(opening) fillLastLoadHints(ex);
       });
       const loadSave = exEl.querySelector(`#fr-ex-load-save-${ex.id}`);
       if(loadSave) loadSave.addEventListener('click', ()=> saveExerciseLoad(ex));
@@ -3040,6 +3188,41 @@
       const numEl = card.querySelector('.fr-exercise-num');
       if(numEl) numEl.textContent = checked ? '✓' : numEl.getAttribute('data-num');
     }
+  }
+
+  // Mostra, como placeholder em cada série, o peso e as repetições
+  // feitos da última vez nesse exercício (numa sessão anterior, não na
+  // sessão atual) — assim a pessoa vê de cara "quanto fiz da última
+  // vez" ao abrir a caixa de registrar carga, sem precisar clicar em
+  // "Ver histórico" separadamente. Só busca uma vez por abertura da
+  // tela (dataset.hintsLoaded evita repetir a consulta toda hora que
+  // a caixa é aberta/fechada).
+  async function fillLastLoadHints(ex){
+    const box = document.getElementById(`fr-ex-load-box-${ex.id}`);
+    if(!box || box.dataset.hintsLoaded) return;
+    box.dataset.hintsLoaded = '1';
+    let q = sb.from('exercise_load_logs').select('set_number, weight_kg, reps_done, session_id, created_at')
+      .eq('user_id', currentUser.id).eq('exercise_id', ex.id)
+      .order('created_at', { ascending: false }).limit(60);
+    if(activeSessionId) q = q.neq('session_id', activeSessionId);
+    const { data, error } = await q;
+    if(error || !data || data.length===0) return;
+    // A primeira linha (mais recente) já diz qual foi a última sessão;
+    // pega só as séries dessa sessão específica.
+    const lastSessionId = data[0].session_id;
+    const bySet = {};
+    data.filter(l=> l.session_id===lastSessionId).forEach(l=>{
+      if(!(l.set_number in bySet)) bySet[l.set_number] = l;
+    });
+    Object.keys(bySet).forEach(setNum=>{
+      const row = box.querySelector(`.fr-load-set-row[data-set="${setNum}"]`);
+      if(!row) return;
+      const l = bySet[setNum];
+      const w = row.querySelector('.fr-load-weight');
+      const r = row.querySelector('.fr-load-reps');
+      if(w && l.weight_kg!=null) w.placeholder = `última: ${l.weight_kg}kg`;
+      if(r && l.reps_done!=null) r.placeholder = `última: ${l.reps_done}`;
+    });
   }
 
   async function saveExerciseLoad(ex){
