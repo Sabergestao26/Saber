@@ -2587,14 +2587,18 @@
   }
 
   /* ---------- Importar treino de arquivo (PDF / XLSX / CSV) ---------- */
-  let importedExercisesDraft = [];
+  // Cada item é { tmpId, name, exercises: [{...campos, _tmpId}] } — um
+  // arquivo pode trazer vários treinos juntos (ex.: "Legs",
+  // "Superiores", "Abs" separados no PDF do personal), e cada um vira
+  // seu próprio cartão editável na revisão, salvo como um treino
+  // separado.
+  let importedWorkoutsDraft = [];
 
   function openImportWorkoutModal(){
-    importedExercisesDraft = [];
+    importedWorkoutsDraft = [];
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Importar treino de arquivo</h3>
-      <p class="fr-hint" style="margin-bottom:14px;">Envie um PDF ou uma planilha (Excel/CSV) com o treino que seu personal te passou. O Saber tenta identificar os exercícios automaticamente — você confere e ajusta antes de salvar.</p>
-      <div class="fr-field"><label for="fr-import-name">Nome do treino</label><input type="text" id="fr-import-name" placeholder="ex.: Treino do personal" value="Treino importado"></div>
+      <p class="fr-hint" style="margin-bottom:14px;">Envie um PDF ou uma planilha (Excel/CSV) com o treino que seu personal te passou. O Saber tenta identificar os exercícios automaticamente — se o arquivo tiver mais de um treino (tipo "Superiores", "Inferiores", "Abs"), cada um vira um treino separado. Você confere e ajusta antes de salvar.</p>
       <div class="fr-field"><label for="fr-import-file-input">Arquivo (PDF, XLSX, XLS ou CSV — até 4MB)</label><input type="file" id="fr-import-file-input" accept=".pdf,.xlsx,.xls,.csv"></div>
       <button class="fr-btn-primary" id="fr-import-analyze" style="width:100%;margin-top:10px;">Analisar arquivo</button>
       <div id="fr-import-result"></div>
@@ -2640,7 +2644,15 @@
         btn.disabled = false; btn.textContent = 'Analisar arquivo';
         return;
       }
-      importedExercisesDraft = (result.exercises || []).map((e,i)=> ({ ...e, _tmpId: 'imp'+i+'_'+Date.now() }));
+      // Compatibilidade: se por algum motivo vier o formato antigo
+      // (lista simples de exercícios, sem divisão em treinos), trata
+      // como um treino só.
+      const rawWorkouts = result.workouts || (result.exercises ? [{ name: 'Treino importado', exercises: result.exercises }] : []);
+      importedWorkoutsDraft = rawWorkouts.map((w,wi)=> ({
+        tmpId: 'wk'+wi+'_'+Date.now(),
+        name: w.name || 'Treino importado',
+        exercises: (w.exercises||[]).map((e,i)=> ({ ...e, _tmpId: 'imp'+wi+'_'+i+'_'+Date.now() }))
+      }));
       renderImportReview(resultEl, result.warnings || []);
       btn.style.display = 'none';
     }catch(err){
@@ -2654,27 +2666,64 @@
     const warnHtml = warnings.length ? `<div class="fr-hint" style="margin:10px 0;color:var(--ink-soft);">${warnings.map(w=>esc(w)).join('<br>')}</div>` : '';
     container.innerHTML = `
       ${warnHtml}
-      <div class="fr-section-label" style="padding-top:0;">Exercícios encontrados — confira e ajuste antes de salvar</div>
-      <div id="fr-import-list"></div>
-      <button type="button" class="fr-btn-ghost" id="fr-import-add-row" style="width:100%;margin-top:8px;">${PLUS_SVG} Adicionar exercício</button>
-      <button class="fr-btn-primary" id="fr-import-save" style="width:100%;margin-top:14px;">Salvar treino</button>
+      <div class="fr-section-label" style="padding-top:0;">Treinos encontrados — confira nome, exercícios e ajuste antes de salvar</div>
+      <div id="fr-import-workout-list"></div>
+      <button type="button" class="fr-btn-ghost" id="fr-import-add-workout" style="width:100%;margin-top:8px;">${PLUS_SVG} Adicionar treino</button>
+      <button class="fr-btn-primary" id="fr-import-save" style="width:100%;margin-top:14px;">Salvar treino(s)</button>
     `;
-    renderImportRows();
-    container.querySelector('#fr-import-add-row').addEventListener('click', ()=>{
-      importedExercisesDraft.push({ name:'', sets:'', reps:'', rest_seconds:null, notes:'', _tmpId:'imp_new_'+Date.now() });
-      renderImportRows();
+    renderImportWorkoutGroups();
+    container.querySelector('#fr-import-add-workout').addEventListener('click', ()=>{
+      importedWorkoutsDraft.push({ tmpId:'wk_new_'+Date.now(), name:'Treino importado', exercises: [] });
+      renderImportWorkoutGroups();
     });
-    container.querySelector('#fr-import-save').addEventListener('click', saveImportedWorkout);
+    container.querySelector('#fr-import-save').addEventListener('click', saveImportedWorkouts);
   }
 
-  function renderImportRows(){
-    const listEl = document.getElementById('fr-import-list');
+  function renderImportWorkoutGroups(){
+    const listEl = document.getElementById('fr-import-workout-list');
     if(!listEl) return;
-    if(importedExercisesDraft.length===0){
-      listEl.innerHTML = `<p class="fr-hint">Nenhum exercício ainda — adicione manualmente abaixo.</p>`;
+    if(importedWorkoutsDraft.length===0){
+      listEl.innerHTML = `<p class="fr-hint">Nenhum treino ainda — adicione manualmente abaixo.</p>`;
       return;
     }
-    listEl.innerHTML = importedExercisesDraft.map(e=>`
+    listEl.innerHTML = importedWorkoutsDraft.map(w=>`
+      <div class="fr-import-workout" data-wk="${w.tmpId}" style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">
+        <div class="fr-field"><label>Nome do treino</label><input type="text" class="fr-imp-wk-name" value="${escAttr(w.name||'')}" placeholder="ex.: Superiores"></div>
+        <div class="fr-imp-rows" data-wk="${w.tmpId}"></div>
+        <button type="button" class="fr-btn-ghost fr-imp-add-ex" style="width:100%;margin-top:6px;">${PLUS_SVG} Adicionar exercício</button>
+        <button type="button" class="fr-btn-ghost fr-imp-remove-wk" style="width:100%;margin-top:6px;color:var(--rust);">Remover este treino</button>
+      </div>
+    `).join('');
+    importedWorkoutsDraft.forEach(w=> renderImportRows(w.tmpId));
+    listEl.querySelectorAll('.fr-import-workout').forEach(card=>{
+      const wkId = card.getAttribute('data-wk');
+      card.querySelector('.fr-imp-wk-name').addEventListener('input', (e)=>{
+        const w = importedWorkoutsDraft.find(x=> x.tmpId===wkId);
+        if(w) w.name = e.target.value;
+      });
+      card.querySelector('.fr-imp-add-ex').addEventListener('click', ()=>{
+        const w = importedWorkoutsDraft.find(x=> x.tmpId===wkId);
+        if(!w) return;
+        w.exercises.push({ name:'', sets:'', reps:'', rest_seconds:null, notes:'', _tmpId:'imp_new_'+Date.now() });
+        renderImportRows(wkId);
+      });
+      card.querySelector('.fr-imp-remove-wk').addEventListener('click', ()=>{
+        importedWorkoutsDraft = importedWorkoutsDraft.filter(x=> x.tmpId!==wkId);
+        renderImportWorkoutGroups();
+      });
+    });
+  }
+
+  function renderImportRows(wkId){
+    const listEl = document.querySelector(`.fr-imp-rows[data-wk="${wkId}"]`);
+    if(!listEl) return;
+    const w = importedWorkoutsDraft.find(x=> x.tmpId===wkId);
+    if(!w) return;
+    if(w.exercises.length===0){
+      listEl.innerHTML = `<p class="fr-hint">Nenhum exercício ainda neste treino — adicione manualmente abaixo.</p>`;
+      return;
+    }
+    listEl.innerHTML = w.exercises.map(e=>`
       <div class="fr-import-row" data-tmp="${e._tmpId}" style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;">
         <div class="fr-field"><label>Exercício</label><input type="text" class="fr-imp-name" value="${escAttr(e.name||'')}" placeholder="Nome do exercício"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
@@ -2682,38 +2731,49 @@
           <div class="fr-field"><label>Repetições</label><input type="text" class="fr-imp-reps" value="${escAttr(e.reps==null?'':e.reps)}"></div>
           <div class="fr-field"><label>Descanso (s)</label><input type="number" min="0" class="fr-imp-rest" value="${e.rest_seconds==null?'':e.rest_seconds}"></div>
         </div>
-        <div class="fr-field"><label>Observações</label><input type="text" class="fr-imp-notes" value="${escAttr(e.notes||'')}"></div>
+        <div class="fr-field"><label>Observações</label><textarea class="fr-imp-notes" rows="2" style="width:100%;resize:vertical;">${esc(e.notes||'')}</textarea></div>
         <button type="button" class="fr-btn-ghost fr-imp-remove" style="width:100%;">Remover</button>
       </div>
     `).join('');
     listEl.querySelectorAll('.fr-import-row').forEach(row=>{
       const tmpId = row.getAttribute('data-tmp');
       row.querySelector('.fr-imp-remove').addEventListener('click', ()=>{
-        importedExercisesDraft = importedExercisesDraft.filter(e=> e._tmpId !== tmpId);
-        renderImportRows();
+        w.exercises = w.exercises.filter(e=> e._tmpId !== tmpId);
+        renderImportRows(wkId);
       });
     });
   }
 
-  async function saveImportedWorkout(){
-    const listEl = document.getElementById('fr-import-list');
-    const rows = Array.from(listEl.querySelectorAll('.fr-import-row'));
-    const exercises = rows.map(row=>({
-      name: row.querySelector('.fr-imp-name').value.trim(),
-      sets: row.querySelector('.fr-imp-sets').value.trim() || null,
-      reps: row.querySelector('.fr-imp-reps').value.trim() || null,
-      rest_seconds: row.querySelector('.fr-imp-rest').value ? parseInt(row.querySelector('.fr-imp-rest').value, 10) : null,
-      notes: row.querySelector('.fr-imp-notes').value.trim() || null,
-      video_url: null
-    })).filter(e=> e.name);
-    if(exercises.length===0){ showToast('Adicione ao menos um exercício com nome.', 'err'); return; }
-    const name = document.getElementById('fr-import-name').value.trim() || 'Treino importado';
+  async function saveImportedWorkouts(){
     const btn = document.getElementById('fr-import-save');
+    // Lê os valores atuais direto dos inputs de cada cartão de treino
+    // (nome do treino + exercícios), na ordem em que aparecem na tela.
+    const toSave = [];
+    document.querySelectorAll('.fr-import-workout').forEach(card=>{
+      const wkId = card.getAttribute('data-wk');
+      const name = card.querySelector('.fr-imp-wk-name').value.trim() || 'Treino importado';
+      const rows = Array.from(card.querySelectorAll('.fr-import-row'));
+      const exercises = rows.map(row=>({
+        name: row.querySelector('.fr-imp-name').value.trim(),
+        sets: row.querySelector('.fr-imp-sets').value.trim() || null,
+        reps: row.querySelector('.fr-imp-reps').value.trim() || null,
+        rest_seconds: row.querySelector('.fr-imp-rest').value ? parseInt(row.querySelector('.fr-imp-rest').value, 10) : null,
+        notes: row.querySelector('.fr-imp-notes').value.trim() || null,
+        video_url: null
+      })).filter(e=> e.name);
+      if(exercises.length>0) toSave.push({ name, exercises });
+    });
+    if(toSave.length===0){ showToast('Adicione ao menos um exercício com nome.', 'err'); return; }
     btn.disabled = true; btn.textContent = 'Salvando...';
-    const ok = await saveNewPersonalWorkout(name, exercises);
-    if(!ok){ btn.disabled = false; btn.textContent = 'Salvar treino'; return; }
-    showToast('Treino importado e salvo!', 'ok');
-    importedExercisesDraft = [];
+    let okCount = 0;
+    for(const w of toSave){
+      const ok = await saveNewPersonalWorkout(w.name, w.exercises);
+      if(ok) okCount++;
+    }
+    btn.disabled = false; btn.textContent = 'Salvar treino(s)';
+    if(okCount===0){ return; } // saveNewPersonalWorkout já mostra o erro
+    showToast(okCount===1 ? 'Treino importado e salvo!' : `${okCount} treinos importados e salvos!`, 'ok');
+    importedWorkoutsDraft = [];
     closeOverlay();
     loadWorkouts();
   }
