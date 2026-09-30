@@ -3807,6 +3807,54 @@
     });
   }
 
+  // OCR gratuito (roda no navegador, sem API paga) pra ler uma foto de exercício
+  // e pré-preencher o formulário. Carrega a biblioteca só quando o botão é usado,
+  // pra não pesar o carregamento do app pra quem nunca usa essa função.
+  let __tesseractLoadPromise = null;
+  function loadTesseract(){
+    if(window.Tesseract) return Promise.resolve();
+    if(__tesseractLoadPromise) return __tesseractLoadPromise;
+    __tesseractLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      s.onload = ()=> resolve();
+      s.onerror = ()=> { __tesseractLoadPromise = null; reject(new Error('Falha ao carregar OCR')); };
+      document.head.appendChild(s);
+    });
+    return __tesseractLoadPromise;
+  }
+
+  // Tenta adivinhar nome/séries/repetições/descanso a partir do texto bruto
+  // reconhecido na foto. É uma heurística simples (sem IA paga) — por isso o
+  // resultado sempre fica pra revisão da pessoa antes de salvar.
+  function guessExerciseFromOcrText(text){
+    const lines = (text||'').split('\n').map(l=> l.replace(/\s+/g,' ').trim()).filter(l=> l.length>0);
+    const labelRe = /^(s[ée]ries?|repeti[çc][õo]es?|descanso|intervalo|carga|tempo|instru[çc][õo]es?)\b[:\s]/i;
+    let sets = null, reps = null, rest_seconds = null, name = null;
+    for(const line of lines){
+      if(sets==null){
+        const nx = line.match(/(\d{1,2})\s*[x×]\s*(\d{1,3}(?:\s*-\s*\d{1,3})?)/);
+        if(nx){ sets = nx[1]; reps = nx[2].replace(/\s+/g,''); }
+      }
+      if(rest_seconds==null){
+        const restM = line.match(/(?:descanso|intervalo|desc\.?|rest)[:\s]*(\d{1,3})\s*(s|seg|min)?/i);
+        if(restM){
+          let v = parseInt(restM[1],10);
+          if(/min/i.test(restM[2]||'')) v = v*60;
+          rest_seconds = v;
+        }
+      }
+    }
+    for(const line of lines){
+      if(labelRe.test(line)) continue;
+      if(/^[\d\sx×\-.,:]+$/i.test(line)) continue;
+      if(line.length < 3 || line.length > 60) continue;
+      name = line;
+      break;
+    }
+    return { name, sets, reps, rest_seconds, notes: name ? null : lines.slice(0,8).join('\n') };
+  }
+
   function openExerciseFormModal(workoutId, workoutName, existing){
     const isEdit = !!existing;
     const ex = existing || { name:'', sets:'', reps:'', rest_seconds:'', video_url:'', notes:'' };
@@ -3815,6 +3863,11 @@
     catalog.forEach(e=>{ if(!uniqueByName.has(e.name)) uniqueByName.set(e.name, e); });
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">${isEdit ? 'Editar' : 'Novo'} exercício</h3>
+      ${!isEdit ? `
+      <button type="button" class="fr-btn-ghost" id="fr-ex-ocr-btn" style="width:100%;margin-bottom:6px;">📷 Preencher tirando uma foto (beta)</button>
+      <input type="file" id="fr-ex-ocr-file" accept="image/*" capture="environment" style="display:none;">
+      <div id="fr-ex-ocr-status" class="fr-hint" style="display:none;margin-bottom:12px;"></div>
+      ` : ''}
       <form id="fr-exform">
         <div class="fr-field"><label for="fr-ex-name">Nome do exercício</label>
           <input type="text" id="fr-ex-name" required value="${esc(ex.name)}" list="fr-ex-catalog" autocomplete="off" placeholder="Digite pra buscar no catálogo...">
@@ -3845,6 +3898,38 @@
       document.getElementById('fr-ex-video').value = match.video_url || '';
       document.getElementById('fr-ex-notes').value = match.notes || '';
     });
+    const ocrBtn = overlay.querySelector('#fr-ex-ocr-btn');
+    if(ocrBtn){
+      const ocrFile = overlay.querySelector('#fr-ex-ocr-file');
+      const ocrStatus = overlay.querySelector('#fr-ex-ocr-status');
+      ocrBtn.addEventListener('click', ()=> ocrFile.click());
+      ocrFile.addEventListener('change', async function(){
+        const file = this.files[0];
+        if(!file) return;
+        ocrStatus.style.display = '';
+        ocrStatus.textContent = 'Lendo a foto... isso pode levar alguns segundos.';
+        ocrBtn.disabled = true;
+        try{
+          await loadTesseract();
+          const { data } = await Tesseract.recognize(file, 'por');
+          const guess = guessExerciseFromOcrText(data.text || '');
+          if(guess.name) document.getElementById('fr-ex-name').value = guess.name;
+          if(guess.sets != null) document.getElementById('fr-ex-sets').value = guess.sets;
+          if(guess.reps) document.getElementById('fr-ex-reps').value = guess.reps;
+          if(guess.rest_seconds != null) document.getElementById('fr-ex-rest').value = guess.rest_seconds;
+          const notesEl = document.getElementById('fr-ex-notes');
+          if(!notesEl.value && guess.notes) notesEl.value = guess.notes;
+          ocrStatus.textContent = guess.name
+            ? 'Preenchi os campos com o que consegui ler — confira tudo antes de salvar, a leitura por foto pode errar.'
+            : 'Não consegui identificar o exercício com clareza — preencha ou corrija os campos manualmente.';
+        }catch(err){
+          console.error(err);
+          ocrStatus.textContent = 'Não consegui ler essa foto agora. Preencha manualmente ou tente outra foto (nítida e sem cortar o texto).';
+        }finally{
+          ocrBtn.disabled = false;
+        }
+      });
+    }
     if(overlay.querySelector('#fr-ex-back')){
       overlay.querySelector('#fr-ex-back').addEventListener('click', ()=>{ closeOverlay(); openWorkoutExerciseManager(workoutId, workoutName); });
     }
