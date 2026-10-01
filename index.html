@@ -242,6 +242,18 @@
   .fr-cardio-pick-row .name{ font-weight:600; font-size:13.5px; }
   .fr-cardio-pick-row small{ color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; font-size:10.5px; flex-shrink:0; }
 
+  .fr-exd-row{
+    display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:8px;
+    border:1px solid var(--border); border-radius:8px; margin-bottom:8px; background:var(--surface);
+  }
+  .fr-exd-row input{
+    flex:1 1 90px; min-width:0; font-family:'Inter',sans-serif; font-size:13px; padding:8px 9px;
+    border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--ink);
+  }
+  .fr-exd-row input:focus{ outline:2px solid var(--green); outline-offset:1px; }
+  .fr-exd-num{ flex:0 0 52px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
+  .fr-exd-remove{ flex:0 0 auto; padding:5px 9px; }
+
   .fr-session-hist-row{
     display:flex; justify-content:space-between; align-items:center; background:var(--surface);
     border:1px solid var(--border); border-radius:7px; padding:9px 12px; margin-bottom:6px; font-size:12.5px;
@@ -3748,6 +3760,7 @@
       localStorage.setItem(CARDIO_STORAGE_KEY, JSON.stringify({
         name: activeCardio.name, startedAt: activeCardio.startedAt,
         paused: activeCardio.paused, pausedElapsed: activeCardio.pausedElapsed,
+        targetSeconds: activeCardio.targetSeconds, notifiedDone: activeCardio.notifiedDone,
       }));
     }catch(e){}
   }
@@ -3757,7 +3770,10 @@
       if(!raw) return;
       const saved = JSON.parse(raw);
       if(!saved || !saved.name || !saved.startedAt) return;
-      activeCardio = { name: saved.name, startedAt: saved.startedAt, paused: !!saved.paused, pausedElapsed: saved.pausedElapsed || 0, interval: null };
+      activeCardio = {
+        name: saved.name, startedAt: saved.startedAt, paused: !!saved.paused, pausedElapsed: saved.pausedElapsed || 0,
+        targetSeconds: saved.targetSeconds || null, notifiedDone: !!saved.notifiedDone, interval: null,
+      };
     }catch(e){}
   }
 
@@ -3765,6 +3781,28 @@
     if(!activeCardio) return 0;
     if(activeCardio.paused) return activeCardio.pausedElapsed;
     return activeCardio.pausedElapsed + Math.floor((Date.now() - activeCardio.startedAt)/1000);
+  }
+
+  // Quando a pessoa escolhe treinar por um tempo específico (em vez do
+  // cronômetro livre), isso aqui é o que falta pra acabar — null quando
+  // não tem tempo definido (modo cronômetro livre).
+  function cardioRemainingSeconds(){
+    if(!activeCardio || activeCardio.targetSeconds == null) return null;
+    return Math.max(0, activeCardio.targetSeconds - cardioElapsedSeconds());
+  }
+
+  // Toca o som e dispara uma notificação local (igual ao cronômetro de
+  // descanso) na hora exata em que o tempo escolhido se esgota. Só
+  // funciona enquanto o app estiver aberto/rodando (mesmo em segundo
+  // plano) — diferente do aviso de descanso, não dá pra agendar uma
+  // notificação push de verdade pra isso, porque a função do servidor
+  // que envia push só segura por até ~140 segundos, e um cardio costuma
+  // durar bem mais que isso.
+  function notifyCardioDone(){
+    playTimerEndSound();
+    if('Notification' in window && Notification.permission === 'granted'){
+      try{ new Notification('Tempo de cardio concluído!', { body: `${activeCardio.name} — hora de finalizar ou continuar por conta própria.`, icon: 'icon-192.png' }); }catch(e){}
+    }
   }
 
   function openCardioModal(){
@@ -3784,26 +3822,66 @@
       <div id="fr-cardio-history-box"></div>
     `);
     overlay.querySelectorAll('.fr-cardio-pick-row').forEach(row=>{
-      const start = ()=> startCardio(row.getAttribute('data-name'));
-      row.addEventListener('click', start);
-      row.addEventListener('keydown', e=>{ if(e.key==='Enter') start(); });
+      const open = ()=> openCardioModeChooser(row.getAttribute('data-name'));
+      row.addEventListener('click', open);
+      row.addEventListener('keydown', e=>{ if(e.key==='Enter') open(); });
     });
     overlay.querySelector('#fr-cardio-history-toggle').addEventListener('click', toggleCardioHistory);
   }
 
-  function startCardio(name){
+  // Tela intermediária entre escolher o tipo de cardio e começar: pode
+  // iniciar um cronômetro livre (conta o tempo todo, sem fim definido)
+  // ou escolher treinar por um tempo específico em minutos — nesse
+  // caso, ao bater o tempo, toca um som e avisa, sem precisar ficar
+  // olhando pra tela o tempo todo.
+  function openCardioModeChooser(name){
+    const kcalMin = cardioKcalPerMinute(name);
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">🏃 ${esc(name)}</h3>
+      <p class="fr-hint" style="margin-bottom:14px;">~${kcalMin.toFixed(1)} kcal/min estimado.</p>
+      <button type="button" class="fr-btn-primary" id="fr-cardio-start-free" style="width:100%;margin-bottom:14px;">⏱ Iniciar cronômetro livre</button>
+      <div class="fr-field">
+        <label for="fr-cardio-minutes">Ou treinar por um tempo específico (minutos)</label>
+        <div style="display:flex;gap:8px;">
+          <input type="number" min="1" max="600" id="fr-cardio-minutes" placeholder="ex.: 20" style="flex:1;">
+          <button type="button" class="fr-btn-ghost" id="fr-cardio-start-timer">⏰ Iniciar</button>
+        </div>
+        <p class="fr-hint" style="margin-top:6px;">Quando o tempo acabar, toca um som e mostra um aviso — mas isso só funciona com o app aberto (mesmo que em segundo plano); se você fechar o Saber de vez, o aviso não chega.</p>
+      </div>
+      <button type="button" class="fr-btn-ghost" id="fr-cardio-mode-back" style="width:100%;margin-top:14px;">← Voltar</button>
+    `);
+    overlay.querySelector('#fr-cardio-start-free').addEventListener('click', ()=> startCardio(name, null));
+    overlay.querySelector('#fr-cardio-start-timer').addEventListener('click', function(){
+      const minutes = parseFloat(document.getElementById('fr-cardio-minutes').value);
+      if(!minutes || minutes <= 0){ showToast('Informe quantos minutos.', 'err'); return; }
+      startCardio(name, Math.round(minutes*60));
+    });
+    overlay.querySelector('#fr-cardio-mode-back').addEventListener('click', openCardioModal);
+  }
+
+  function startCardio(name, targetSeconds){
     unlockAudio();
-    activeCardio = { name, startedAt: Date.now(), paused: false, pausedElapsed: 0, interval: null };
+    activeCardio = { name, startedAt: Date.now(), paused: false, pausedElapsed: 0, targetSeconds: targetSeconds || null, notifiedDone: false, interval: null };
     saveCardioToStorage();
     renderCardioRunning();
   }
 
+  function cardioTimerLabel(){
+    if(activeCardio.paused) return 'pausado';
+    if(activeCardio.targetSeconds != null){
+      return cardioRemainingSeconds() <= 0 ? 'tempo concluído! pode finalizar ou continuar' : 'restando';
+    }
+    return 'em andamento';
+  }
+
   function renderCardioRunning(){
+    const isCountdown = activeCardio.targetSeconds != null;
+    const displaySecs = isCountdown ? cardioRemainingSeconds() : cardioElapsedSeconds();
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">🏃 ${esc(activeCardio.name)}</h3>
       <div class="fr-cardio-timer-box">
-        <div class="fr-cardio-timer-num" id="fr-cardio-timer-num">${formatTimer(cardioElapsedSeconds())}</div>
-        <div class="fr-cardio-timer-label" id="fr-cardio-timer-label">${activeCardio.paused ? 'pausado' : 'em andamento'}</div>
+        <div class="fr-cardio-timer-num" id="fr-cardio-timer-num">${formatTimer(displaySecs)}</div>
+        <div class="fr-cardio-timer-label" id="fr-cardio-timer-label">${cardioTimerLabel()}</div>
         <div class="fr-cardio-kcal" id="fr-cardio-kcal">🔥 ~${Math.round(cardioElapsedSeconds()/60*cardioKcalPerMinute(activeCardio.name))} kcal</div>
       </div>
       <div class="fr-cardio-controls">
@@ -3821,11 +3899,21 @@
 
   function updateCardioTimerDisplay(){
     if(!activeCardio) return;
+    if(activeCardio.paused) return;
+    // Mesmo sem a tela do cardio aberta, continua verificando se o tempo
+    // escolhido acabou, pra disparar o aviso sonoro/notificação na hora certa.
+    if(activeCardio.targetSeconds != null && !activeCardio.notifiedDone && cardioRemainingSeconds() <= 0){
+      activeCardio.notifiedDone = true;
+      saveCardioToStorage();
+      notifyCardioDone();
+    }
     const numEl = document.getElementById('fr-cardio-timer-num');
     if(!numEl) return; // tela do cardio não tá aberta agora — a sessão continua contando sozinha
-    if(activeCardio.paused) return;
+    const isCountdown = activeCardio.targetSeconds != null;
     const secs = cardioElapsedSeconds();
-    numEl.textContent = formatTimer(secs);
+    numEl.textContent = formatTimer(isCountdown ? cardioRemainingSeconds() : secs);
+    const labelEl = document.getElementById('fr-cardio-timer-label');
+    if(labelEl) labelEl.textContent = cardioTimerLabel();
     const kcalEl = document.getElementById('fr-cardio-kcal');
     if(kcalEl) kcalEl.textContent = `🔥 ~${Math.round(secs/60*cardioKcalPerMinute(activeCardio.name))} kcal`;
   }
@@ -4135,12 +4223,33 @@
     return { name, sets, reps, rest_seconds, notes: name ? null : lines.slice(0,8).join('\n') };
   }
 
+  // Uma linha do detalhe por série, editada manualmente (mesma estrutura
+  // que a importação de arquivo gera automaticamente a partir do PDF).
+  function exDetailRowHtml(row, idx){
+    const r = row || {};
+    return `<div class="fr-exd-row" data-idx="${idx}">
+      <span class="fr-exd-num">Série ${idx+1}</span>
+      <input type="text" class="fr-exd-series" placeholder="reps/observação (ex.: 12, até falha)" value="${esc(r.series||'')}">
+      <input type="text" class="fr-exd-carga" placeholder="carga (ex.: 20kg)" value="${esc(r.carga||'')}">
+      <input type="text" class="fr-exd-tempo" placeholder="tempo (opcional)" value="${esc(r.tempo||'')}">
+      <input type="number" min="0" class="fr-exd-rest" placeholder="descanso (s)" value="${r.rest_seconds ?? ''}">
+      <button type="button" class="fr-btn-ghost fr-exd-remove" aria-label="Remover série">✕</button>
+    </div>`;
+  }
+  function renumberExDetailRows(container){
+    container.querySelectorAll('.fr-exd-row').forEach((row, i)=>{
+      row.setAttribute('data-idx', i);
+      row.querySelector('.fr-exd-num').textContent = `Série ${i+1}`;
+    });
+  }
+
   function openExerciseFormModal(workoutId, workoutName, existing){
     const isEdit = !!existing;
-    const ex = existing || { name:'', sets:'', reps:'', rest_seconds:'', video_url:'', notes:'' };
+    const ex = existing || { name:'', sets:'', reps:'', rest_seconds:'', video_url:'', notes:'', sets_detail:null };
     const catalog = exerciseLibrary.length ? exerciseLibrary : [];
     const uniqueByName = new Map();
     catalog.forEach(e=>{ if(!uniqueByName.has(e.name)) uniqueByName.set(e.name, e); });
+    const hasExistingDetail = Array.isArray(ex.sets_detail) && ex.sets_detail.length > 0;
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">${isEdit ? 'Editar' : 'Novo'} exercício</h3>
       ${!isEdit ? `
@@ -4156,10 +4265,21 @@
           </datalist>
           <p class="fr-hint" style="margin-top:4px;">Se o nome bater com um exercício já cadastrado, os campos abaixo preenchem sozinhos.</p>
         </div>
-        <div class="fr-row4">
+        <div class="fr-row4" id="fr-ex-simple-fields" style="${hasExistingDetail ? 'display:none;' : ''}">
           <div class="fr-field"><label for="fr-ex-sets">Séries</label><input type="number" min="0" id="fr-ex-sets" value="${esc(ex.sets ?? '')}"></div>
           <div class="fr-field"><label for="fr-ex-reps">Repetições</label><input type="text" id="fr-ex-reps" placeholder="ex.: 10-12" value="${esc(ex.reps||'')}"></div>
           <div class="fr-field"><label for="fr-ex-rest">Descanso (s)</label><input type="number" min="0" id="fr-ex-rest" value="${esc(ex.rest_seconds ?? '')}"></div>
+        </div>
+        <div class="fr-toggle-row">
+          <span class="fr-toggle-row-label">Personalizar cada série (reps, carga, tempo e descanso diferentes por série — como na tela de treinar)</span>
+          <label class="fr-toggle">
+            <input type="checkbox" id="fr-ex-detail-toggle" ${hasExistingDetail ? 'checked' : ''}>
+            <span class="fr-toggle-track"><span class="fr-toggle-thumb"></span></span>
+          </label>
+        </div>
+        <div id="fr-ex-detail-section" style="${hasExistingDetail ? '' : 'display:none;'}margin-bottom:14px;">
+          <div id="fr-ex-detail-rows"></div>
+          <button type="button" class="fr-btn-ghost" id="fr-ex-detail-add" style="width:100%;margin-top:4px;">+ Adicionar série</button>
         </div>
         <div class="fr-field"><label for="fr-ex-video">Link do vídeo de demonstração</label><input type="url" id="fr-ex-video" placeholder="https://..." value="${esc(ex.video_url||'')}"></div>
         <div class="fr-field"><label for="fr-ex-notes">Observações</label><textarea id="fr-ex-notes" style="min-height:50px">${esc(ex.notes||'')}</textarea></div>
@@ -4169,6 +4289,30 @@
         </div>
       </form>
     `);
+
+    // ---- Detalhe por série (manual) ----
+    const detailRowsEl = overlay.querySelector('#fr-ex-detail-rows');
+    const detailToggle = overlay.querySelector('#fr-ex-detail-toggle');
+    const detailSection = overlay.querySelector('#fr-ex-detail-section');
+    const simpleFields = overlay.querySelector('#fr-ex-simple-fields');
+    function addExDetailRow(row){
+      const idx = detailRowsEl.children.length;
+      detailRowsEl.insertAdjacentHTML('beforeend', exDetailRowHtml(row, idx));
+      const newRow = detailRowsEl.lastElementChild;
+      newRow.querySelector('.fr-exd-remove').addEventListener('click', ()=>{ newRow.remove(); renumberExDetailRows(detailRowsEl); });
+    }
+    function syncDetailVisibility(){
+      const on = detailToggle.checked;
+      detailSection.style.display = on ? '' : 'none';
+      simpleFields.style.display = on ? 'none' : '';
+      if(on && detailRowsEl.children.length===0){
+        addExDetailRow({}); addExDetailRow({}); addExDetailRow({});
+      }
+    }
+    (Array.isArray(ex.sets_detail) ? ex.sets_detail : []).forEach(r=> addExDetailRow(r));
+    detailToggle.addEventListener('change', syncDetailVisibility);
+    overlay.querySelector('#fr-ex-detail-add').addEventListener('click', ()=> addExDetailRow({}));
+
     overlay.querySelector('#fr-ex-name').addEventListener('input', function(){
       const match = uniqueByName.get(this.value);
       if(!match) return;
@@ -4177,6 +4321,12 @@
       document.getElementById('fr-ex-rest').value = match.rest_seconds ?? '';
       document.getElementById('fr-ex-video').value = match.video_url || '';
       document.getElementById('fr-ex-notes').value = match.notes || '';
+      // Também copia o detalhe por série, se o exercício do catálogo tiver.
+      detailRowsEl.innerHTML = '';
+      const matchDetail = Array.isArray(match.sets_detail) ? match.sets_detail : [];
+      matchDetail.forEach(r=> addExDetailRow(r));
+      detailToggle.checked = matchDetail.length > 0;
+      syncDetailVisibility();
     });
     const ocrBtn = overlay.querySelector('#fr-ex-ocr-btn');
     if(ocrBtn){
@@ -4228,13 +4378,33 @@
       const btn = overlay.querySelector('button[type="submit"]');
       const name = document.getElementById('fr-ex-name').value.trim();
       if(!name){ document.getElementById('fr-ex-name').focus(); return; }
+      // Quando "Personalizar cada série" está ligado, o detalhe por série manda
+      // nos campos de séries/repetições/descanso — do mesmo jeito que a
+      // importação de arquivo já faz (ver consolidateExercise na Edge Function).
+      let sets_detail = null;
+      if(detailToggle.checked){
+        const rows = Array.from(detailRowsEl.querySelectorAll('.fr-exd-row')).map(row=>({
+          series: row.querySelector('.fr-exd-series').value.trim() || null,
+          carga: row.querySelector('.fr-exd-carga').value.trim() || null,
+          tempo: row.querySelector('.fr-exd-tempo').value.trim() || null,
+          rest_seconds: row.querySelector('.fr-exd-rest').value ? parseInt(row.querySelector('.fr-exd-rest').value, 10) : null,
+        })).filter(r=> r.series || r.carga || r.tempo || r.rest_seconds!=null);
+        if(rows.length > 0) sets_detail = rows;
+      }
+      let detailRestSeconds = null;
+      if(sets_detail){
+        for(let i=sets_detail.length-1; i>=0; i--){
+          if(sets_detail[i].rest_seconds!=null){ detailRestSeconds = sets_detail[i].rest_seconds; break; }
+        }
+      }
       const payload = {
         name,
-        sets: numOrNull(document.getElementById('fr-ex-sets').value),
-        reps: document.getElementById('fr-ex-reps').value.trim() || null,
-        rest_seconds: numOrNull(document.getElementById('fr-ex-rest').value),
+        sets: sets_detail ? sets_detail.length : numOrNull(document.getElementById('fr-ex-sets').value),
+        reps: sets_detail ? (sets_detail.map(r=>r.series).filter(Boolean).join(' / ') || null) : (document.getElementById('fr-ex-reps').value.trim() || null),
+        rest_seconds: sets_detail ? detailRestSeconds : numOrNull(document.getElementById('fr-ex-rest').value),
         video_url: document.getElementById('fr-ex-video').value.trim() || null,
-        notes: document.getElementById('fr-ex-notes').value
+        notes: document.getElementById('fr-ex-notes').value,
+        sets_detail
       };
       btn.disabled = true; btn.textContent = 'Salvando...';
       try{
