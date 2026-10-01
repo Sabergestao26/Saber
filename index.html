@@ -478,7 +478,7 @@
 
   .fr-detail-tab{ display:inline-block; font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; font-weight:600; color:#fff; padding:4px 10px; border-radius:6px; margin-bottom:10px; }
   .fr-detail-name{ font-family:'Fraunces', serif; font-weight:700; font-size:26px; color: var(--green-deep); margin: 0 0 4px; line-height:1.15; }
-  .fr-nutrition{ display:grid; grid-template-columns: repeat(4,1fr); gap:1px; background: var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin: 16px 0; }
+  .fr-nutrition{ display:grid; grid-template-columns: repeat(5,1fr); gap:1px; background: var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin: 16px 0; }
   .fr-nutrition div{ background:var(--surface); padding:10px 6px; text-align:center; }
   .fr-nutrition .fr-nut-val{ font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:16px; color:var(--ink); display:block; }
   .fr-nutrition .fr-nut-label{ font-size:9.5px; text-transform:uppercase; letter-spacing:0.05em; color: var(--ink-soft); }
@@ -574,7 +574,7 @@
   .fr-log-subtab.active{ background:var(--green-deep); color:#F6F1DF; border-color:var(--green-deep); }
   .fr-log-panel{ display:none; }
   .fr-log-panel.active{ display:block; }
-  .fr-log-preview{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin:12px 0 4px; }
+  .fr-log-preview{ display:grid; grid-template-columns:repeat(5,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin:12px 0 4px; }
   .fr-log-preview div{ background:var(--surface); padding:8px 4px; text-align:center; }
   .fr-log-preview .v{ font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px; display:block; }
   .fr-log-preview .l{ font-size:9px; text-transform:uppercase; color:var(--ink-soft); }
@@ -604,6 +604,7 @@
 
   @media (max-width: 480px){
     .fr-row, .fr-row4{ grid-template-columns:1fr 1fr; }
+    .fr-nutrition, .fr-log-preview{ grid-template-columns: repeat(3,1fr); }
     .fr-title{ font-size:24px; }
     .fr-modal{ padding:20px 18px; }
     .fr-summary-kcal .val{ font-size:26px; }
@@ -686,6 +687,11 @@
 
   <div id="fr-view-shopping" style="display:none">
     <div id="fr-shopping-content"></div>
+  </div>
+
+  <div id="fr-view-articles" style="display:none">
+    <div class="fr-tabs" id="fr-article-tabs"></div>
+    <div id="fr-articles-content"></div>
   </div>
 
   <div id="fr-view-workouts" style="display:none">
@@ -863,6 +869,19 @@
     doces:   { label:'Doces',           color:'#B5495B' }
   };
   const PLUS_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  const ARTICLE_CATS = {
+    todos:          { label:'Todos',          color:'#262B1E' },
+    musculacao:     { label:'Musculação',     color:'#A8481F' },
+    cardio:         { label:'Cardio',         color:'#46687A' },
+    proteina:       { label:'Proteína',       color:'#3F6B4A' },
+    fibra:          { label:'Fibra',          color:'#2E4F37' },
+    agua:           { label:'Água',           color:'#46687A' },
+    vida_saudavel:  { label:'Vida saudável',  color:'#BF8A2E' }
+  };
+  let articles = [];
+  let articlesLoaded = false;
+  let activeArticleCat = 'todos';
 
   let currentUser = null;
   let currentProfile = null;
@@ -2271,7 +2290,7 @@
 
   /* ---------- View switching ---------- */
   function renderViewTabs(){
-    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['settings','Configurações']];
+    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['articles','Artigos'], ['settings','Configurações']];
     document.getElementById('fr-view-tabs').innerHTML = tabs.map(t=>
       `<button class="fr-view-tab ${currentView===t[0]?'active':''}" data-view="${t[0]}">${t[1]}</button>`
     ).join('');
@@ -2308,6 +2327,7 @@
     document.getElementById('fr-view-diary').style.display = view==='diary' ? '' : 'none';
     document.getElementById('fr-view-shopping').style.display = view==='shopping' ? '' : 'none';
     document.getElementById('fr-view-workouts').style.display = view==='workouts' ? '' : 'none';
+    document.getElementById('fr-view-articles').style.display = view==='articles' ? '' : 'none';
     document.getElementById('fr-view-settings').style.display = view==='settings' ? '' : 'none';
     renderViewTabs();
     renderPrimaryAction();
@@ -2315,6 +2335,7 @@
     if(view==='diary') renderDiary();
     if(view==='shopping') renderShoppingView();
     if(view==='workouts') renderWorkoutsView();
+    if(view==='articles') renderArticlesView();
     if(view==='settings') renderSettingsView();
   }
 
@@ -2382,6 +2403,70 @@
       renderRows();
     });
     document.getElementById('fr-shop-generate').addEventListener('click', ()=> generateShoppingList(list));
+  }
+
+  /* ---------- Artigos (estrutura só — conteúdo vem depois) ---------- */
+  async function loadArticles(){
+    if(articlesLoaded) return;
+    const { data, error } = await sb.from('articles').select('*').eq('published', true).order('created_at', { ascending:false });
+    if(error){ console.error('Erro ao carregar artigos', error); articles = []; articlesLoaded = true; return; }
+    articles = data || [];
+    articlesLoaded = true;
+  }
+
+  function renderArticleTabs(){
+    const el = document.getElementById('fr-article-tabs');
+    el.innerHTML = Object.keys(ARTICLE_CATS).map(key =>
+      `<button class="fr-tab ${key===activeArticleCat?'active':''}" data-cat="${key}">${esc(ARTICLE_CATS[key].label)}</button>`
+    ).join('');
+    el.querySelectorAll('.fr-tab').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        activeArticleCat = btn.getAttribute('data-cat');
+        renderArticleTabs();
+        renderArticlesList();
+      });
+    });
+  }
+
+  function renderArticlesList(){
+    const el = document.getElementById('fr-articles-content');
+    const filtered = activeArticleCat==='todos' ? articles : articles.filter(a=>a.category===activeArticleCat);
+    if(filtered.length===0){
+      el.innerHTML = `<div class="fr-empty-diary"><h3>Em breve</h3><p>Artigos sobre ${esc((ARTICLE_CATS[activeArticleCat]||ARTICLE_CATS.todos).label.toLowerCase())}, revisados pela nossa equipe, vão aparecer aqui.</p></div>`;
+      return;
+    }
+    el.innerHTML = filtered.map(a=>{
+      const cat = ARTICLE_CATS[a.category] || ARTICLE_CATS.todos;
+      return `
+        <div class="fr-client-row" data-id="${a.id}">
+          <span class="fr-client-name">${esc(a.title)} <span style="color:${cat.color};font-family:'IBM Plex Mono',monospace;font-size:10px;">· ${esc(cat.label)}</span></span>
+          <span class="fr-client-arrow">›</span>
+        </div>`;
+    }).join('');
+    el.querySelectorAll('.fr-client-row').forEach(row=>{
+      row.addEventListener('click', ()=>{
+        const article = filtered.find(a=>a.id===row.getAttribute('data-id'));
+        if(article) openArticleDetail(article);
+      });
+    });
+  }
+
+  function openArticleDetail(article){
+    const cat = ARTICLE_CATS[article.category] || ARTICLE_CATS.todos;
+    buildOverlay(`
+      <div class="fr-detail-tab" style="background:${cat.color}">${esc(cat.label)}</div>
+      <h2 class="fr-detail-name">${esc(article.title)}</h2>
+      ${article.summary ? `<div class="fr-hint">${esc(article.summary)}</div>` : ''}
+      ${article.content ? `<div class="fr-detail-section"><div class="fr-detail-pre">${esc(article.content)}</div></div>` : ''}
+    `);
+  }
+
+  async function renderArticlesView(){
+    renderArticleTabs();
+    const el = document.getElementById('fr-articles-content');
+    el.innerHTML = `<div class="fr-loading">Carregando artigos...</div>`;
+    await loadArticles();
+    renderArticlesList();
   }
 
   // Fatores de rendimento (peso cozido ÷ peso cru) pros alimentos mais comuns que
@@ -2596,14 +2681,20 @@
       const btn = this;
       btn.disabled = true; btn.textContent = 'Salvando...';
       const selectedExercises = exerciseLibrary.filter(e=> checked.includes(e.id));
-      const ok = await saveNewPersonalWorkout(name, selectedExercises);
-      if(!ok){ btn.disabled=false; btn.textContent='Salvar meu treino'; return; }
-      showToast('Treino montado!', 'ok');
+      const workoutId = await saveNewPersonalWorkout(name, selectedExercises);
+      if(!workoutId){ btn.disabled=false; btn.textContent='Salvar meu treino'; return; }
+      showToast('Treino montado! Ajuste os detalhes de cada exercício se quiser.', 'ok');
       closeOverlay();
-      loadWorkouts();
+      // Encaminha direto pra tela de editar os exercícios — é lá que dá pra
+      // personalizar série por série (carga, tempo, descanso individual),
+      // assim que o treino acaba de ser criado, sem precisar voltar depois
+      // pela lista de treinos e entrar em "editar".
+      openWorkoutExerciseManager(workoutId, name);
     });
   }
 
+  // Retorna o id do treino criado (usado pra já encaminhar pra tela de
+  // editar os exercícios logo depois de criar), ou null se der erro.
   async function saveNewPersonalWorkout(name, exercisesToCopy){
     try{
       const { data: w, error: wErr } = await sb.from('workouts').insert({
@@ -2617,11 +2708,11 @@
       }));
       const { error: exErr } = await sb.from('workout_exercises').insert(rows);
       if(exErr) throw exErr;
-      return true;
+      return w.id;
     }catch(err){
       console.error(err);
       showToast('Não foi possível salvar o treino agora.', 'err');
-      return false;
+      return null;
     }
   }
 
@@ -4529,13 +4620,19 @@
       <h2 class="fr-detail-name">${esc(r.name)}</h2>
       ${recipeScope==='personal' && r.assigned_by_professional_id ? `<div class="fr-hint" style="color:var(--green-deep);font-weight:600;">Adicionada por seu profissional vinculado</div>` : ''}
       ${r.portions ? `<div class="fr-hint">Rende ${esc(r.portions)} porção(ões)</div>` : ''}
+      ${(hasStructured || r.portions) ? `
+      <div class="fr-field" style="margin:4px 0 2px;">
+        <label for="fr-detail-portion-qty">Quantas porções você vai comer</label>
+        <input type="number" min="0.25" step="0.25" id="fr-detail-portion-qty" value="1">
+      </div>` : ''}
       <div class="fr-nutrition">
-        <div><span class="fr-nut-val">${esc(r.calories ?? '—')}</span><span class="fr-nut-label">kcal</span></div>
-        <div><span class="fr-nut-val">${esc(r.protein ?? '—')}</span><span class="fr-nut-label">ptn (g)</span></div>
-        <div><span class="fr-nut-val">${esc(r.carbs ?? '—')}</span><span class="fr-nut-label">carb (g)</span></div>
-        <div><span class="fr-nut-val">${esc(r.fat ?? '—')}</span><span class="fr-nut-label">gord (g)</span></div>
+        <div><span class="fr-nut-val" id="fr-nut-cal">${esc(r.calories ?? '—')}</span><span class="fr-nut-label">kcal</span></div>
+        <div><span class="fr-nut-val" id="fr-nut-prot">${esc(r.protein ?? '—')}</span><span class="fr-nut-label">ptn (g)</span></div>
+        <div><span class="fr-nut-val" id="fr-nut-carb">${esc(r.carbs ?? '—')}</span><span class="fr-nut-label">carb (g)</span></div>
+        <div><span class="fr-nut-val" id="fr-nut-fat">${esc(r.fat ?? '—')}</span><span class="fr-nut-label">gord (g)</span></div>
+        <div><span class="fr-nut-val" id="fr-nut-fiber">${esc(r.fiber ?? '—')}</span><span class="fr-nut-label">fibra (g)</span></div>
       </div>
-      ${hasStructured ? `<div class="fr-detail-section"><h4>Ingredientes</h4>${ingredientsListHtml(r.ingredients_structured)}</div>` : (legacyIngredients.length ? `<div class="fr-detail-section"><h4>Ingredientes</h4><ul>${legacyIngredients.map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>` : '')}
+      <div id="fr-detail-ingredients">${hasStructured ? `<div class="fr-detail-section"><h4>Ingredientes</h4>${ingredientsListHtml(r.ingredients_structured)}</div>` : (legacyIngredients.length ? `<div class="fr-detail-section"><h4>Ingredientes</h4><ul>${legacyIngredients.map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>` : '')}</div>
       ${r.instructions ? `<div class="fr-detail-section"><h4>Modo de preparo</h4><div class="fr-detail-pre">${esc(r.instructions)}</div></div>` : ''}
       ${r.notes ? `<div class="fr-detail-notes">${esc(r.notes)}</div>` : ''}
       ${canEdit ? `
@@ -4544,6 +4641,26 @@
         <button class="fr-btn-primary" id="fr-edit-btn">Editar</button>
       </div>` : ''}
     `);
+    const portionQtyInput = overlay.querySelector('#fr-detail-portion-qty');
+    if(portionQtyInput){
+      portionQtyInput.addEventListener('input', ()=>{
+        const desired = parseFloat(portionQtyInput.value) || 0;
+        const ingFactor = (r.portions && Number(r.portions)>0) ? (desired / Number(r.portions)) : 1;
+        const fmt = v => v==null ? '—' : Math.round(v*desired*100)/100;
+        overlay.querySelector('#fr-nut-cal').textContent = r.calories!=null ? fmt(Number(r.calories)) : '—';
+        overlay.querySelector('#fr-nut-prot').textContent = r.protein!=null ? fmt(Number(r.protein)) : '—';
+        overlay.querySelector('#fr-nut-carb').textContent = r.carbs!=null ? fmt(Number(r.carbs)) : '—';
+        overlay.querySelector('#fr-nut-fat').textContent = r.fat!=null ? fmt(Number(r.fat)) : '—';
+        overlay.querySelector('#fr-nut-fiber').textContent = r.fiber!=null ? fmt(Number(r.fiber)) : '—';
+        if(hasStructured){
+          const scaled = r.ingredients_structured.map(i=> ({
+            ...i,
+            quantity: (i.quantity!=null && i.quantity!=='') ? Math.round(Number(i.quantity)*ingFactor*100)/100 : i.quantity
+          }));
+          overlay.querySelector('#fr-detail-ingredients').innerHTML = `<div class="fr-detail-section"><h4>Ingredientes</h4>${ingredientsListHtml(scaled)}</div>`;
+        }
+      });
+    }
     if(!canEdit) return;
     overlay.querySelector('#fr-delete-btn').addEventListener('click', function(){
       const actionsEl = overlay.querySelector('#fr-detail-actions');
@@ -4663,6 +4780,7 @@
           <div class="fr-field"><label for="fr-f-carb">Carbo (g)</label><input type="number" min="0" id="fr-f-carb" value="${esc(r.carbs ?? '')}"></div>
           <div class="fr-field"><label for="fr-f-fat">Gordura (g)</label><input type="number" min="0" id="fr-f-fat" value="${esc(r.fat ?? '')}"></div>
         </div>
+        <div class="fr-field"><label for="fr-f-fiber">Fibra (g)</label><input type="number" min="0" step="0.1" id="fr-f-fiber" value="${esc(r.fiber ?? '')}" placeholder="ainda sem dado oficial — deixe em branco se não souber"></div>
         <div class="fr-field"><label>Ingredientes</label>
           <div id="fr-ing-rows"></div>
           <button type="button" class="fr-btn-ghost" id="fr-ing-add" style="width:100%;margin-top:6px;">+ Adicionar ingrediente</button>
@@ -4690,6 +4808,7 @@
         calories: numOrNull(document.getElementById('fr-f-cal').value),
         protein: numOrNull(document.getElementById('fr-f-prot').value),
         carbs: numOrNull(document.getElementById('fr-f-carb').value),
+        fiber: numOrNull(document.getElementById('fr-f-fiber').value),
         fat: numOrNull(document.getElementById('fr-f-fat').value),
         ingredients_structured: ingEditor.getRows(),
         instructions: document.getElementById('fr-f-inst').value,
@@ -4773,6 +4892,7 @@
           <div class="fr-field"><label for="fr-cf-carb">Carbo (g)</label><input type="number" min="0" id="fr-cf-carb" value="${esc(r.carbs ?? '')}"></div>
           <div class="fr-field"><label for="fr-cf-fat">Gordura (g)</label><input type="number" min="0" id="fr-cf-fat" value="${esc(r.fat ?? '')}"></div>
         </div>
+        <div class="fr-field"><label for="fr-cf-fiber">Fibra (g)</label><input type="number" min="0" step="0.1" id="fr-cf-fiber" value="${esc(r.fiber ?? '')}" placeholder="ainda sem dado oficial — deixe em branco se não souber"></div>
         <div class="fr-field"><label>Ingredientes</label>
           <div id="fr-cing-rows"></div>
           <button type="button" class="fr-btn-ghost" id="fr-cing-add" style="width:100%;margin-top:6px;">+ Adicionar ingrediente</button>
@@ -4814,6 +4934,7 @@
         protein: numOrNull(document.getElementById('fr-cf-prot').value),
         carbs: numOrNull(document.getElementById('fr-cf-carb').value),
         fat: numOrNull(document.getElementById('fr-cf-fat').value),
+        fiber: numOrNull(document.getElementById('fr-cf-fiber').value),
         ingredients_structured: cIngEditor.getRows(),
         instructions: document.getElementById('fr-cf-inst').value,
         notes: document.getElementById('fr-cf-notes').value
@@ -4986,9 +5107,9 @@
 
   function dayTotals(){
     return currentDayLogs.reduce((acc,l)=>{
-      acc.calories += n0(l.calories); acc.protein += n0(l.protein); acc.carbs += n0(l.carbs); acc.fat += n0(l.fat);
+      acc.calories += n0(l.calories); acc.protein += n0(l.protein); acc.carbs += n0(l.carbs); acc.fat += n0(l.fat); acc.fiber += n0(l.fiber);
       return acc;
-    }, {calories:0, protein:0, carbs:0, fat:0});
+    }, {calories:0, protein:0, carbs:0, fat:0, fiber:0});
   }
 
   async function renderDiary(){
@@ -5066,6 +5187,7 @@
       ${barRow('Proteína', totals.protein, targets.protein, 'var(--green)')}
       ${barRow('Carboidrato', totals.carbs, targets.carbs, 'var(--mustard)')}
       ${barRow('Gordura', totals.fat, targets.fat, 'var(--rust)')}
+      ${barRow('Fibra', totals.fiber, targets.fiber, 'var(--green-deep)')}
       ${waterHtml}
     `;
     wireWaterButtons(el);
@@ -5091,7 +5213,7 @@
     return `
       <div class="fr-log-row">
         <div class="fr-log-name">${esc(e.name)}${e.source==='recipe' ? `<small>${esc(e.quantity)}× porção</small>` : (e.source==='food' ? `<small>${esc(e.quantity)}g</small>` : '')}</div>
-        <div class="fr-log-macros"><b>${Math.round(n0(e.calories))}</b> kcal &nbsp;P:${Math.round(n0(e.protein))} C:${Math.round(n0(e.carbs))} G:${Math.round(n0(e.fat))}</div>
+        <div class="fr-log-macros"><b>${Math.round(n0(e.calories))}</b> kcal &nbsp;P:${Math.round(n0(e.protein))} C:${Math.round(n0(e.carbs))} G:${Math.round(n0(e.fat))} F:${Math.round(n0(e.fiber))}</div>
         <button class="fr-log-del" id="fr-log-del-${e.id}" aria-label="Remover ${esc(e.name)}">&times;</button>
       </div>`;
   }
@@ -5420,6 +5542,7 @@
           <div class="fr-field"><label for="fr-t-carb">Carbo (g)</label><input type="number" min="0" id="fr-t-carb" value="${esc(targets.carbs ?? '')}"></div>
           <div class="fr-field"><label for="fr-t-fat">Gordura (g)</label><input type="number" min="0" id="fr-t-fat" value="${esc(targets.fat ?? '')}"></div>
         </div>
+        <div class="fr-field"><label for="fr-t-fiber">Fibra (g)</label><input type="number" min="0" id="fr-t-fiber" value="${esc(targets.fiber ?? '')}"></div>
         <div class="fr-field"><label for="fr-t-water">Meta de água (ml)</label><input type="number" min="0" id="fr-t-water" value="${esc(targets.water_goal_ml ?? '')}"></div>
         <div class="fr-hint" style="margin:10px 0 8px;font-weight:600;color:var(--green-deep);">Metas semanais</div>
         <div class="fr-row">
@@ -5450,6 +5573,7 @@
         protein: numOrNull(document.getElementById('fr-t-prot').value),
         carbs: numOrNull(document.getElementById('fr-t-carb').value),
         fat: numOrNull(document.getElementById('fr-t-fat').value),
+        fiber: numOrNull(document.getElementById('fr-t-fiber').value),
         water_goal_ml: numOrNull(document.getElementById('fr-t-water').value),
         weekly_workout_days: numOrNull(document.getElementById('fr-t-wk-workout').value),
         weekly_water_days: numOrNull(document.getElementById('fr-t-wk-water').value),
@@ -5488,6 +5612,7 @@
             <div><span class="v" id="fr-lp-prot">0</span><span class="l">ptn</span></div>
             <div><span class="v" id="fr-lp-carb">0</span><span class="l">carb</span></div>
             <div><span class="v" id="fr-lp-fat">0</span><span class="l">gord</span></div>
+            <div><span class="v" id="fr-lp-fiber">0</span><span class="l">fibra</span></div>
           </div>` : `<p class="fr-hint">Ainda não há receitas cadastradas.</p>`}
         </div>
         <div class="fr-log-panel ${hasRecipes?'':'active'}" id="fr-log-panel-custom">
@@ -5505,6 +5630,7 @@
                 <div><span class="v" id="fr-fp-prot">0</span><span class="l">ptn</span></div>
                 <div><span class="v" id="fr-fp-carb">0</span><span class="l">carb</span></div>
                 <div><span class="v" id="fr-fp-fat">0</span><span class="l">gord</span></div>
+                <div><span class="v" id="fr-fp-fiber">0</span><span class="l">fibra</span></div>
               </div>
               <button type="button" class="fr-btn-ghost" id="fr-food-change" style="width:100%;margin-top:8px;">Trocar alimento</button>
             </div>
@@ -5519,6 +5645,7 @@
               <div class="fr-field"><label for="fr-log-carb">Carbo (g)</label><input type="number" min="0" id="fr-log-carb" value=""></div>
               <div class="fr-field"><label for="fr-log-fat">Gordura (g)</label><input type="number" min="0" id="fr-log-fat" value=""></div>
             </div>
+            <div class="fr-field"><label for="fr-log-fiber">Fibra (g)</label><input type="number" min="0" step="0.1" id="fr-log-fiber" value=""></div>
           </div>
         </div>
         <div class="fr-row">
@@ -5596,7 +5723,7 @@
       foodSearchInput.value = '';
       foodResultsEl.innerHTML = '';
       foodSelectedEl.style.display = '';
-      foodPickedLabel.innerHTML = `<b>${esc(food.name)}</b><span>100g = ${Math.round(food.kcal)} kcal · P:${food.protein}g C:${food.carbs}g G:${food.fat}g</span>`;
+      foodPickedLabel.innerHTML = `<b>${esc(food.name)}</b><span>100g = ${Math.round(food.kcal)} kcal · P:${food.protein}g C:${food.carbs}g G:${food.fat}g${food.fiber!=null?` F:${food.fiber}g`:''}</span>`;
       updateFoodPreview();
     }
     overlay.querySelector('#fr-food-change').addEventListener('click', ()=>{
@@ -5611,6 +5738,7 @@
       overlay.querySelector('#fr-fp-prot').textContent = Math.round(selectedFood.protein*factor);
       overlay.querySelector('#fr-fp-carb').textContent = Math.round(selectedFood.carbs*factor);
       overlay.querySelector('#fr-fp-fat').textContent = Math.round(selectedFood.fat*factor);
+      overlay.querySelector('#fr-fp-fiber').textContent = Math.round(n0(selectedFood.fiber)*factor);
     }
     foodQtyInput.addEventListener('input', updateFoodPreview);
 
@@ -5624,6 +5752,7 @@
       document.getElementById('fr-lp-prot').textContent = Math.round(n0(recipe.protein)*qty);
       document.getElementById('fr-lp-carb').textContent = Math.round(n0(recipe.carbs)*qty);
       document.getElementById('fr-lp-fat').textContent = Math.round(n0(recipe.fat)*qty);
+      document.getElementById('fr-lp-fiber').textContent = Math.round(n0(recipe.fiber)*qty);
       const mealSel = document.getElementById('fr-log-meal');
       if(mealSel && CATS[recipe.category]) mealSel.value = recipe.category;
     }
@@ -5647,7 +5776,7 @@
         if(!recipe || qty<=0){ return; }
         entry = {
           user_id: currentUser.id, date, meal_type: mealType, source:'recipe', recipe_id:recipe.id, name:recipe.name, quantity:qty,
-          calories:n0(recipe.calories)*qty, protein:n0(recipe.protein)*qty, carbs:n0(recipe.carbs)*qty, fat:n0(recipe.fat)*qty
+          calories:n0(recipe.calories)*qty, protein:n0(recipe.protein)*qty, carbs:n0(recipe.carbs)*qty, fat:n0(recipe.fat)*qty, fiber:n0(recipe.fiber)*qty
         };
       } else {
         if(customMode === 'search'){
@@ -5661,7 +5790,7 @@
           entry = {
             user_id: currentUser.id, date, meal_type: mealType, source:'food', name: selectedFood.name, quantity: qty,
             calories: selectedFood.kcal*factor, protein: selectedFood.protein*factor,
-            carbs: selectedFood.carbs*factor, fat: selectedFood.fat*factor
+            carbs: selectedFood.carbs*factor, fat: selectedFood.fat*factor, fiber: n0(selectedFood.fiber)*factor
           };
         } else {
           const name = document.getElementById('fr-log-name').value.trim();
@@ -5671,11 +5800,12 @@
             calories: numOrNull(document.getElementById('fr-log-cal').value) || 0,
             protein: numOrNull(document.getElementById('fr-log-prot').value) || 0,
             carbs: numOrNull(document.getElementById('fr-log-carb').value) || 0,
-            fat: numOrNull(document.getElementById('fr-log-fat').value) || 0
+            fat: numOrNull(document.getElementById('fr-log-fat').value) || 0,
+            fiber: numOrNull(document.getElementById('fr-log-fiber').value) || 0
           };
           sb.from('food_suggestions').insert({
             submitted_by: currentUser.id, name,
-            kcal: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat
+            kcal: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat, fiber: entry.fiber
           }).then(({error})=>{
             if(error){ console.error('Erro ao enviar sugestão de alimento', error); return; }
             notifyAdminsPendingReview('food');

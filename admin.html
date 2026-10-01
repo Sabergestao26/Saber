@@ -578,7 +578,7 @@
     el.innerHTML = list.map(s=>`
       <div class="review-item" data-id="${s.id}">
         <div class="review-name">${esc(s.name)}</div>
-        <div class="review-meta">${Math.round(s.kcal||0)} kcal · P:${Math.round(s.protein||0)}g C:${Math.round(s.carbs||0)}g G:${Math.round(s.fat||0)}g <i>(por porção informada)</i></div>
+        <div class="review-meta">${Math.round(s.kcal||0)} kcal · P:${Math.round(s.protein||0)}g C:${Math.round(s.carbs||0)}g G:${Math.round(s.fat||0)}g${s.fiber!=null?` F:${Math.round(s.fiber)}g`:''} <i>(por porção informada)</i></div>
         <div class="review-actions">
           <button data-action="approve" data-id="${s.id}">Aprovar e adicionar</button>
           <button class="danger" data-action="reject" data-id="${s.id}">Rejeitar</button>
@@ -592,7 +592,7 @@
         this.disabled = true; this.textContent = '...';
         try{
           if(action==='approve'){
-            const { error: insErr } = await sb.from('foods').insert({ name: suggestion.name, category: null, kcal: suggestion.kcal||0, protein: suggestion.protein||0, carbs: suggestion.carbs||0, fat: suggestion.fat||0 });
+            const { error: insErr } = await sb.from('foods').insert({ name: suggestion.name, category: null, kcal: suggestion.kcal||0, protein: suggestion.protein||0, carbs: suggestion.carbs||0, fat: suggestion.fat||0, fiber: suggestion.fiber ?? null });
             if(insErr) throw insErr;
           }
           const { error: updErr } = await sb.from('food_suggestions').update({ status: action==='approve'?'approved':'rejected', reviewed_at: new Date().toISOString() }).eq('id', id);
