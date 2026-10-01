@@ -290,7 +290,17 @@
   .fr-toggle input:disabled ~ .fr-toggle-track{ opacity:0.5; cursor:default; }
 
   .fr-load-box{ background:var(--surface); border:1px dashed var(--border); border-radius:8px; padding:10px; margin-top:10px; }
+  .fr-load-box-detail{ border-style:solid; }
   .fr-load-set-row{ display:grid; grid-template-columns: 70px 1fr 1fr; gap:8px; align-items:center; margin-bottom:6px; }
+  .fr-load-set-row-detail{
+    display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;
+    padding:8px 0; border-bottom:1px dashed var(--border);
+  }
+  .fr-load-set-row-detail:last-child{ border-bottom:none; }
+  .fr-load-set-target{ flex:1 1 100%; display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; }
+  .fr-load-set-target-text{ font-size:12.5px; color:var(--ink-soft); }
+  .fr-load-set-row-detail .fr-load-weight, .fr-load-set-row-detail .fr-load-reps{ flex:1 1 70px; min-width:0; }
+  .fr-set-timer-btn{ flex:0 0 auto; padding:5px 10px; font-size:11.5px; }
   .fr-load-set-num{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
   .fr-load-weight, .fr-load-reps{
     padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:12.5px;
@@ -2574,7 +2584,8 @@
       if(wErr) throw wErr;
       const rows = exercisesToCopy.map((e,i)=> ({
         workout_id: w.id, position: i+1, name: e.name, sets: e.sets, reps: e.reps,
-        rest_seconds: e.rest_seconds, video_url: e.video_url, notes: e.notes
+        rest_seconds: e.rest_seconds, video_url: e.video_url, notes: e.notes,
+        sets_detail: e.sets_detail || null
       }));
       const { error: exErr } = await sb.from('workout_exercises').insert(rows);
       if(exErr) throw exErr;
@@ -2751,16 +2762,25 @@
     const toSave = [];
     document.querySelectorAll('.fr-import-workout').forEach(card=>{
       const wkId = card.getAttribute('data-wk');
+      const draftW = importedWorkoutsDraft.find(x=> x.tmpId===wkId);
       const name = card.querySelector('.fr-imp-wk-name').value.trim() || 'Treino importado';
       const rows = Array.from(card.querySelectorAll('.fr-import-row'));
-      const exercises = rows.map(row=>({
-        name: row.querySelector('.fr-imp-name').value.trim(),
-        sets: row.querySelector('.fr-imp-sets').value.trim() || null,
-        reps: row.querySelector('.fr-imp-reps').value.trim() || null,
-        rest_seconds: row.querySelector('.fr-imp-rest').value ? parseInt(row.querySelector('.fr-imp-rest').value, 10) : null,
-        notes: row.querySelector('.fr-imp-notes').value.trim() || null,
-        video_url: null
-      })).filter(e=> e.name);
+      const exercises = rows.map(row=>{
+        const tmpId = row.getAttribute('data-tmp');
+        // sets_detail (o detalhe série a série vindo do PDF/planilha) não
+        // tem campo editável na revisão — vem direto do que foi analisado,
+        // casando pelo _tmpId de cada linha.
+        const draftEx = draftW ? draftW.exercises.find(e=> e._tmpId===tmpId) : null;
+        return {
+          name: row.querySelector('.fr-imp-name').value.trim(),
+          sets: row.querySelector('.fr-imp-sets').value.trim() || null,
+          reps: row.querySelector('.fr-imp-reps').value.trim() || null,
+          rest_seconds: row.querySelector('.fr-imp-rest').value ? parseInt(row.querySelector('.fr-imp-rest').value, 10) : null,
+          notes: row.querySelector('.fr-imp-notes').value.trim() || null,
+          video_url: null,
+          sets_detail: (draftEx && Array.isArray(draftEx.sets_detail) && draftEx.sets_detail.length) ? draftEx.sets_detail : null
+        };
+      }).filter(e=> e.name);
       if(exercises.length>0) toSave.push({ name, exercises });
     });
     if(toSave.length===0){ showToast('Adicione ao menos um exercício com nome.', 'err'); return; }
@@ -3153,6 +3173,19 @@
       if(loadSave) loadSave.addEventListener('click', ()=> saveExerciseLoad(ex));
       const loadHistory = exEl.querySelector(`#fr-ex-load-history-${ex.id}`);
       if(loadHistory) loadHistory.addEventListener('click', ()=> toggleLoadHistory(ex));
+      // Exercícios com detalhe por série (vindos de importação) já mostram
+      // a caixa de registrar carga aberta direto, sem precisar clicar em
+      // "Registrar carga" (esse botão nem existe nesse caso) — então busca
+      // o "quanto fiz da última vez" assim que o cartão é montado.
+      if(Array.isArray(ex.sets_detail) && ex.sets_detail.length > 0){
+        fillLastLoadHints(ex);
+        const loadBox = document.getElementById(`fr-ex-load-box-${ex.id}`);
+        if(loadBox){
+          loadBox.querySelectorAll('.fr-set-timer-btn').forEach(btn=>{
+            btn.addEventListener('click', ()=> startRestTimer(ex.id, parseInt(btn.getAttribute('data-rest'), 10) || 60));
+          });
+        }
+      }
     });
   }
 
@@ -3367,19 +3400,54 @@
     `;
   }
 
+  // Quando o exercício veio de uma importação com detalhe por série
+  // (ex.sets_detail: [{series, carga, tempo, rest_seconds}, ...], vindo
+  // do arquivo do personal), cada série tem seu próprio alvo e seu
+  // próprio tempo de descanso — diferente de um exercício cadastrado à
+  // mão, que só tem um sets/reps/rest_seconds genérico pra tudo. Por
+  // isso o cartão de treino tem dois jeitos de mostrar as séries:
+  // hasDetail=true mostra uma linha por série (com o texto original do
+  // alvo e um botão de descanso com a duração daquela série específica);
+  // hasDetail=false mantém o jeito antigo (série 1, 2, 3... genéricas).
   function exerciseCardHtml(ex, num, sessionActive, isCompleted){
+    const hasDetail = Array.isArray(ex.sets_detail) && ex.sets_detail.length > 0;
     const metaParts = [];
-    if(ex.sets) metaParts.push(`${esc(ex.sets)} séries`);
-    if(ex.reps) metaParts.push(`${esc(ex.reps)} repetições`);
-    if(ex.rest_seconds) metaParts.push(`descanso ${esc(ex.rest_seconds)}s`);
-    const setsCount = parseInt(ex.sets) || 3;
+    if(!hasDetail){
+      if(ex.sets) metaParts.push(`${esc(ex.sets)} séries`);
+      if(ex.reps) metaParts.push(`${esc(ex.reps)} repetições`);
+      if(ex.rest_seconds) metaParts.push(`descanso ${esc(ex.rest_seconds)}s`);
+    } else {
+      metaParts.push(`${ex.sets_detail.length} séries`);
+    }
+
     let loadRows = '';
-    for(let s=1; s<=setsCount; s++){
-      loadRows += `<div class="fr-load-set-row" data-set="${s}">
-        <span class="fr-load-set-num">Série ${s}</span>
-        <input type="number" step="0.5" min="0" class="fr-load-weight" placeholder="kg">
-        <input type="number" min="0" class="fr-load-reps" placeholder="reps">
-      </div>`;
+    if(hasDetail){
+      loadRows = ex.sets_detail.map((sd, idx)=>{
+        const s = idx + 1;
+        const targetParts = [];
+        if(sd.series) targetParts.push(esc(sd.series));
+        if(sd.carga) targetParts.push(`carga alvo ${esc(sd.carga)}`);
+        if(sd.tempo) targetParts.push(`tempo ${esc(sd.tempo)}`);
+        const restSec = sd.rest_seconds || null;
+        return `<div class="fr-load-set-row fr-load-set-row-detail" data-set="${s}">
+          <div class="fr-load-set-target">
+            <span class="fr-load-set-num">Série ${s}</span>
+            ${targetParts.length ? `<span class="fr-load-set-target-text">${targetParts.join(' · ')}</span>` : ''}
+          </div>
+          <input type="number" step="0.5" min="0" class="fr-load-weight" placeholder="kg feito">
+          <input type="number" min="0" class="fr-load-reps" placeholder="reps feitas">
+          ${restSec ? `<button type="button" class="fr-chip fr-chip-timer fr-set-timer-btn" data-rest="${restSec}">⏱ ${esc(formatTimer(restSec))}</button>` : ''}
+        </div>`;
+      }).join('');
+    } else {
+      const setsCount = parseInt(ex.sets) || 3;
+      for(let s=1; s<=setsCount; s++){
+        loadRows += `<div class="fr-load-set-row" data-set="${s}">
+          <span class="fr-load-set-num">Série ${s}</span>
+          <input type="number" step="0.5" min="0" class="fr-load-weight" placeholder="kg">
+          <input type="number" min="0" class="fr-load-reps" placeholder="reps">
+        </div>`;
+      }
     }
     return `
       <div class="fr-exercise ${isCompleted ? 'fr-exercise-done' : ''}">
@@ -3391,13 +3459,14 @@
         ${ex.notes ? `<div class="fr-hint" style="margin-bottom:10px;">${esc(ex.notes)}</div>` : ''}
         <div class="fr-exercise-actions">
           ${ex.video_url ? `<button type="button" class="fr-chip fr-chip-video" id="fr-ex-video-${ex.id}">▶ Ver vídeo</button>` : ''}
-          ${ex.rest_seconds ? `<button type="button" class="fr-chip fr-chip-timer" id="fr-ex-timer-${ex.id}">⏱ Iniciar descanso</button>` : ''}
+          ${(!hasDetail && ex.rest_seconds) ? `<button type="button" class="fr-chip fr-chip-timer" id="fr-ex-timer-${ex.id}">⏱ Iniciar descanso</button>` : ''}
           <button type="button" class="fr-chip fr-chip-upload" id="fr-ex-upload-${ex.id}">📎 Enviar meu vídeo</button>
-          <button type="button" class="fr-chip fr-chip-load" id="fr-ex-load-toggle-${ex.id}">🏋 Registrar carga</button>
+          ${!hasDetail ? `<button type="button" class="fr-chip fr-chip-load" id="fr-ex-load-toggle-${ex.id}">🏋 Registrar carga</button>` : ''}
         </div>
         ${sessionActive ? `<label class="fr-ex-check"><input type="checkbox" id="fr-ex-done-${ex.id}" ${isCompleted?'checked':''}> Concluí esse exercício</label>` : ''}
         <div id="fr-ex-timer-box-${ex.id}"></div>
-        <div id="fr-ex-load-box-${ex.id}" class="fr-load-box" style="display:none">
+        <div id="fr-ex-load-box-${ex.id}" class="fr-load-box ${hasDetail ? 'fr-load-box-detail' : ''}" style="${hasDetail ? '' : 'display:none'}">
+          ${hasDetail ? `<div class="fr-section-label" style="padding-top:0;">Séries deste treino — registre o que você fez</div>` : ''}
           ${loadRows}
           <button type="button" class="fr-btn-primary" id="fr-ex-load-save-${ex.id}" style="width:100%;margin-top:8px;">Salvar cargas</button>
           <button type="button" class="fr-btn-ghost" id="fr-ex-load-history-${ex.id}" style="width:100%;margin-top:6px;">Ver/ocultar histórico</button>
