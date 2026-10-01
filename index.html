@@ -229,6 +229,19 @@
   }
   .fr-timer-btn:hover{ background:var(--card); }
 
+  .fr-cardio-timer-box{ background:var(--green-deep); border-radius:12px; padding:24px 16px; text-align:center; margin-bottom:14px; }
+  .fr-cardio-timer-num{ font-family:'Fraunces',serif; font-weight:700; font-size:42px; color:#F6F1DF; line-height:1; }
+  .fr-cardio-timer-label{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#F6F1DF; opacity:.85; margin-top:4px; }
+  .fr-cardio-kcal{ font-family:'IBM Plex Mono',monospace; font-size:15px; color:var(--mustard); margin-top:12px; }
+  .fr-cardio-controls{ display:flex; gap:8px; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  .fr-cardio-pick-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 12px;
+    border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; background:var(--surface);
+  }
+  .fr-cardio-pick-row:hover{ background:var(--paper-deep); }
+  .fr-cardio-pick-row .name{ font-weight:600; font-size:13.5px; }
+  .fr-cardio-pick-row small{ color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; font-size:10.5px; flex-shrink:0; }
+
   .fr-session-hist-row{
     display:flex; justify-content:space-between; align-items:center; background:var(--surface);
     border:1px solid var(--border); border-radius:7px; padding:9px 12px; margin-bottom:6px; font-size:12.5px;
@@ -2218,6 +2231,7 @@
 
   async function boot(){
     await ensureProfile();
+    restoreCardioFromStorage();
     authScreen.style.display = 'none';
     root.style.display = '';
     renderUserBar();
@@ -2449,6 +2463,7 @@
         <button class="fr-btn-primary" id="fr-build-own" style="flex:1;">${PLUS_SVG} Montar meu treino</button>
         <button class="fr-btn-ghost" id="fr-take-assessment" style="flex:1;">Fazer avaliação</button>
         <button class="fr-btn-ghost" id="fr-import-file" style="flex:1;">📄 Importar de arquivo</button>
+        <button class="fr-btn-ghost" id="fr-open-cardio" style="flex:1;">${activeCardio ? '🏃 Cardio em andamento...' : '🏃 Cardio'}</button>
       </div>
       <div class="fr-section-label">Meus treinos</div>
     `;
@@ -2469,6 +2484,7 @@
     document.getElementById('fr-build-own').addEventListener('click', openExercisePickerModal);
     document.getElementById('fr-take-assessment').addEventListener('click', openAssessmentModal);
     document.getElementById('fr-import-file').addEventListener('click', openImportWorkoutModal);
+    document.getElementById('fr-open-cardio').addEventListener('click', openCardioModal);
     workouts.forEach(w=>{
       const card = document.getElementById('fr-workout-card-'+w.id);
       if(!card) return;
@@ -3687,6 +3703,201 @@
       }
       if(currentView==='settings') renderSettingsView();
     });
+  }
+
+  /* ---------- Cardio: cronômetro com estimativa de calorias ---------- */
+  // Referência de MET (Metabolic Equivalent of Task) pra cada opção da
+  // biblioteca "Treino de Cardio" (ver cardio_seed.sql) — valores médios
+  // de intensidade moderada, do Compêndio de Atividades Físicas (fonte
+  // científica padrão). Cálculo: kcal = MET * 3.5 * peso_kg / 200 * min.
+  // Sem peso cadastrado no perfil, assume 70kg. São estimativas gerais,
+  // não uma medição real (tipo um relógio com frequência cardíaca) —
+  // servem pra ter uma ideia, não um número exato.
+  const CARDIO_MET = {
+    'Caminhada rápida': 4.5,
+    'Corrida (esteira ou rua)': 9.0,
+    'Bicicleta ergométrica': 7.0,
+    'Elíptico (transport)': 5.0,
+    'Pular corda': 8.8,
+    'Subir escada / step': 8.0,
+    'HIIT (intervalado de alta intensidade)': 8.0,
+    'Natação': 6.0,
+    'Remo (ergômetro)': 7.0,
+    'Bicicleta ao ar livre': 7.5,
+  };
+  const CARDIO_MET_DEFAULT = 6.0; // pra qualquer opção nova que alguém adicionar na biblioteca e não esteja na lista acima
+
+  function cardioKcalPerMinute(exerciseName){
+    const met = (exerciseName in CARDIO_MET) ? CARDIO_MET[exerciseName] : CARDIO_MET_DEFAULT;
+    const weight = (currentProfile && currentProfile.weight_kg) ? Number(currentProfile.weight_kg) : 70;
+    return (met * 3.5 * weight) / 200;
+  }
+
+  // Sessão de cardio ativa — null quando nenhuma está rodando. Guardada
+  // também no localStorage (saveCardioToStorage/restoreCardioFromStorage)
+  // pra sobreviver a um recarregamento de página, do mesmo jeito que os
+  // cronômetros de descanso se auto-corrigem ao voltar pro app; mas,
+  // diferente deles, continua contando por trás mesmo com a tela do
+  // cardio fechada — só não atualiza o número na tela até reabrir.
+  let activeCardio = null; // { name, startedAt, paused, pausedElapsed, interval }
+  const CARDIO_STORAGE_KEY = 'saber_active_cardio';
+
+  function saveCardioToStorage(){
+    try{
+      if(!activeCardio){ localStorage.removeItem(CARDIO_STORAGE_KEY); return; }
+      localStorage.setItem(CARDIO_STORAGE_KEY, JSON.stringify({
+        name: activeCardio.name, startedAt: activeCardio.startedAt,
+        paused: activeCardio.paused, pausedElapsed: activeCardio.pausedElapsed,
+      }));
+    }catch(e){}
+  }
+  function restoreCardioFromStorage(){
+    try{
+      const raw = localStorage.getItem(CARDIO_STORAGE_KEY);
+      if(!raw) return;
+      const saved = JSON.parse(raw);
+      if(!saved || !saved.name || !saved.startedAt) return;
+      activeCardio = { name: saved.name, startedAt: saved.startedAt, paused: !!saved.paused, pausedElapsed: saved.pausedElapsed || 0, interval: null };
+    }catch(e){}
+  }
+
+  function cardioElapsedSeconds(){
+    if(!activeCardio) return 0;
+    if(activeCardio.paused) return activeCardio.pausedElapsed;
+    return activeCardio.pausedElapsed + Math.floor((Date.now() - activeCardio.startedAt)/1000);
+  }
+
+  function openCardioModal(){
+    if(activeCardio){ renderCardioRunning(); return; }
+    const cardioOptions = (groupLibraryByMuscle()['Treino de Cardio'] || []);
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">🏃 Cardio</h3>
+      <p class="fr-hint" style="margin-bottom:14px;">Escolha o que você vai fazer — o cronômetro já inicia, e a estimativa de calorias vai subindo junto.</p>
+      <div id="fr-cardio-pick-list">
+        ${cardioOptions.length ? cardioOptions.map(e=>`
+          <div class="fr-cardio-pick-row" data-name="${esc(e.name)}" tabindex="0" role="button">
+            <span class="name">${esc(e.name)}</span>
+            <small>~${cardioKcalPerMinute(e.name).toFixed(1)} kcal/min</small>
+          </div>`).join('') : `<p class="fr-hint">Nenhuma opção de cardio cadastrada ainda na biblioteca.</p>`}
+      </div>
+      <button type="button" class="fr-btn-ghost" id="fr-cardio-history-toggle" style="width:100%;margin-top:10px;">Ver histórico de cardio</button>
+      <div id="fr-cardio-history-box"></div>
+    `);
+    overlay.querySelectorAll('.fr-cardio-pick-row').forEach(row=>{
+      const start = ()=> startCardio(row.getAttribute('data-name'));
+      row.addEventListener('click', start);
+      row.addEventListener('keydown', e=>{ if(e.key==='Enter') start(); });
+    });
+    overlay.querySelector('#fr-cardio-history-toggle').addEventListener('click', toggleCardioHistory);
+  }
+
+  function startCardio(name){
+    unlockAudio();
+    activeCardio = { name, startedAt: Date.now(), paused: false, pausedElapsed: 0, interval: null };
+    saveCardioToStorage();
+    renderCardioRunning();
+  }
+
+  function renderCardioRunning(){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">🏃 ${esc(activeCardio.name)}</h3>
+      <div class="fr-cardio-timer-box">
+        <div class="fr-cardio-timer-num" id="fr-cardio-timer-num">${formatTimer(cardioElapsedSeconds())}</div>
+        <div class="fr-cardio-timer-label" id="fr-cardio-timer-label">${activeCardio.paused ? 'pausado' : 'em andamento'}</div>
+        <div class="fr-cardio-kcal" id="fr-cardio-kcal">🔥 ~${Math.round(cardioElapsedSeconds()/60*cardioKcalPerMinute(activeCardio.name))} kcal</div>
+      </div>
+      <div class="fr-cardio-controls">
+        <button type="button" class="fr-timer-btn" id="fr-cardio-pause">${activeCardio.paused ? '▶ Continuar' : '⏸ Pausar'}</button>
+        <button type="button" class="fr-btn-primary" id="fr-cardio-finish">■ Finalizar e salvar</button>
+      </div>
+      <button type="button" class="fr-btn-ghost" id="fr-cardio-cancel" style="width:100%;margin-top:12px;">Cancelar sessão (não salvar)</button>
+    `);
+    if(activeCardio.interval) clearInterval(activeCardio.interval);
+    activeCardio.interval = setInterval(updateCardioTimerDisplay, 1000);
+    overlay.querySelector('#fr-cardio-pause').addEventListener('click', toggleCardioPause);
+    overlay.querySelector('#fr-cardio-finish').addEventListener('click', finishCardio);
+    overlay.querySelector('#fr-cardio-cancel').addEventListener('click', cancelCardio);
+  }
+
+  function updateCardioTimerDisplay(){
+    if(!activeCardio) return;
+    const numEl = document.getElementById('fr-cardio-timer-num');
+    if(!numEl) return; // tela do cardio não tá aberta agora — a sessão continua contando sozinha
+    if(activeCardio.paused) return;
+    const secs = cardioElapsedSeconds();
+    numEl.textContent = formatTimer(secs);
+    const kcalEl = document.getElementById('fr-cardio-kcal');
+    if(kcalEl) kcalEl.textContent = `🔥 ~${Math.round(secs/60*cardioKcalPerMinute(activeCardio.name))} kcal`;
+  }
+
+  // Mesma lógica dos cronômetros de descanso: ao voltar pro app depois
+  // de trocar de aba/aplicativo, recalcula na hora pra corrigir qualquer
+  // atraso do navegador pausando a contagem em segundo plano.
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState !== 'visible' || !activeCardio) return;
+    updateCardioTimerDisplay();
+  });
+
+  function toggleCardioPause(){
+    if(!activeCardio) return;
+    if(activeCardio.paused){
+      activeCardio.startedAt = Date.now();
+      activeCardio.paused = false;
+    } else {
+      activeCardio.pausedElapsed = cardioElapsedSeconds();
+      activeCardio.paused = true;
+    }
+    saveCardioToStorage();
+    renderCardioRunning();
+  }
+
+  async function finishCardio(){
+    if(!activeCardio) return;
+    const btn = document.getElementById('fr-cardio-finish');
+    if(btn){ btn.disabled = true; btn.textContent = 'Salvando...'; }
+    if(activeCardio.interval) clearInterval(activeCardio.interval);
+    const durationSeconds = cardioElapsedSeconds();
+    const name = activeCardio.name;
+    const kcal = Math.round((durationSeconds/60) * cardioKcalPerMinute(name));
+    const date = todayStr();
+    try{
+      const { error: insErr } = await sb.from('cardio_sessions').insert({
+        user_id: currentUser.id, exercise_name: name, duration_seconds: durationSeconds, calories: kcal, date,
+      });
+      if(insErr) throw insErr;
+      const { data: existing } = await sb.from('calories_burned_logs').select('amount').eq('user_id', currentUser.id).eq('date', date).maybeSingle();
+      const newAmount = (existing ? Number(existing.amount) : 0) + kcal;
+      const { error: upErr } = await sb.from('calories_burned_logs').upsert({ user_id: currentUser.id, date, amount: newAmount }, { onConflict: 'user_id,date' });
+      if(upErr) throw upErr;
+      if(date === currentDate){ currentDayCaloriesBurned = newAmount; if(currentView==='diary') renderSummary(); }
+      activeCardio = null;
+      saveCardioToStorage();
+      showToast(`Cardio registrado! ${formatTimer(durationSeconds)} · ~${kcal} kcal`, 'ok');
+      closeOverlay();
+    }catch(err){
+      console.error(err);
+      showToast('Não foi possível salvar o cardio agora. Tente novamente.', 'err');
+      if(btn){ btn.disabled = false; btn.textContent = '■ Finalizar e salvar'; }
+      if(activeCardio) activeCardio.interval = setInterval(updateCardioTimerDisplay, 1000);
+    }
+  }
+
+  function cancelCardio(){
+    if(activeCardio && activeCardio.interval) clearInterval(activeCardio.interval);
+    activeCardio = null;
+    saveCardioToStorage();
+    showToast('Sessão de cardio cancelada.', 'ok');
+    closeOverlay();
+  }
+
+  async function toggleCardioHistory(){
+    const box = document.getElementById('fr-cardio-history-box');
+    if(!box) return;
+    if(box.innerHTML){ box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="fr-loading" style="margin:10px 0;">Carregando histórico...</div>`;
+    const { data, error } = await sb.from('cardio_sessions').select('*').eq('user_id', currentUser.id).order('created_at', {ascending:false}).limit(20);
+    if(error || !data || data.length===0){ box.innerHTML = `<p class="fr-hint">Nenhuma sessão de cardio registrada ainda.</p>`; return; }
+    box.innerHTML = data.map(s=> `<div class="fr-session-hist-row"><span>${esc(formatDateLabel(s.date))} · ${esc(s.exercise_name)}</span><b>${formatTimer(s.duration_seconds||0)} · ${Math.round(s.calories||0)}kcal</b></div>`).join('');
   }
 
   function openSubmissionForm(exerciseId){
