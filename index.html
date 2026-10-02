@@ -568,6 +568,15 @@
   .fr-empty-diary{ max-width:520px; margin:50px auto; text-align:center; color:var(--ink-soft); }
   .fr-empty-diary h3{ font-family:'Fraunces',serif; color:var(--green-deep); font-size:19px; margin-bottom:6px; }
 
+  .fr-book-row{ max-width:1080px; margin:0 auto 10px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; }
+  .fr-book-row-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+  .fr-book-title{ font-family:'Fraunces',serif; font-weight:600; font-size:16px; line-height:1.3; }
+  .fr-book-author{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .fr-book-pages{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); white-space:nowrap; flex-shrink:0; }
+  .fr-book-done-badge{ display:inline-block; background:var(--green-deep); color:#fff; font-size:10px; font-family:'IBM Plex Mono',monospace; padding:2px 7px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  .fr-book-actions{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .fr-book-actions .fr-btn-ghost, .fr-book-actions .fr-btn-primary, .fr-book-actions .fr-btn-danger{ padding:7px 12px; font-size:12.5px; }
+
   .fr-log-subtabs{ display:flex; gap:8px; margin-bottom:16px; }
   .fr-log-subtab{ flex:1; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; padding:9px; border-radius:7px; border:1px solid var(--border); background:var(--paper-deep); color:var(--ink-soft); cursor:pointer; }
   .fr-log-subtab:disabled{ opacity:.5; cursor:default; }
@@ -696,6 +705,10 @@
 
   <div id="fr-view-workouts" style="display:none">
     <div id="fr-workouts-content"></div>
+  </div>
+
+  <div id="fr-view-leitura" style="display:none">
+    <div id="fr-leitura-content"></div>
   </div>
 
   <div id="fr-view-settings" style="display:none">
@@ -882,6 +895,12 @@
   let articles = [];
   let articlesLoaded = false;
   let activeArticleCat = 'todos';
+
+  let books = [];
+  let booksLoaded = false;
+  let readingTargets = {};
+  let readingTargetsLoaded = false;
+  let readingStats = { todayMinutes:0, weekMinutes:0, monthBooksFinished:0 };
 
   let currentUser = null;
   let currentProfile = null;
@@ -2290,7 +2309,7 @@
 
   /* ---------- View switching ---------- */
   function renderViewTabs(){
-    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['articles','Artigos'], ['settings','Configurações']];
+    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['leitura','Leitura'], ['articles','Artigos'], ['settings','Configurações']];
     document.getElementById('fr-view-tabs').innerHTML = tabs.map(t=>
       `<button class="fr-view-tab ${currentView===t[0]?'active':''}" data-view="${t[0]}">${t[1]}</button>`
     ).join('');
@@ -2316,6 +2335,10 @@
       btn.style.display='';
       btn.innerHTML = PLUS_SVG + ' Novo treino';
       btn.onclick = openWorkoutFormModal;
+    } else if(currentView==='leitura'){
+      btn.style.display='';
+      btn.innerHTML = PLUS_SVG + ' Novo livro';
+      btn.onclick = openBookFormModal;
     } else {
       btn.style.display='none';
     }
@@ -2328,6 +2351,7 @@
     document.getElementById('fr-view-shopping').style.display = view==='shopping' ? '' : 'none';
     document.getElementById('fr-view-workouts').style.display = view==='workouts' ? '' : 'none';
     document.getElementById('fr-view-articles').style.display = view==='articles' ? '' : 'none';
+    document.getElementById('fr-view-leitura').style.display = view==='leitura' ? '' : 'none';
     document.getElementById('fr-view-settings').style.display = view==='settings' ? '' : 'none';
     renderViewTabs();
     renderPrimaryAction();
@@ -2336,6 +2360,7 @@
     if(view==='shopping') renderShoppingView();
     if(view==='workouts') renderWorkoutsView();
     if(view==='articles') renderArticlesView();
+    if(view==='leitura') renderLeituraView();
     if(view==='settings') renderSettingsView();
   }
 
@@ -2467,6 +2492,302 @@
     el.innerHTML = `<div class="fr-loading">Carregando artigos...</div>`;
     await loadArticles();
     renderArticlesList();
+  }
+
+  /* ---------- Leitura (livros, sessões de leitura, metas) ---------- */
+  async function loadBooks(){
+    if(booksLoaded) return;
+    const { data, error } = await sb.from('books').select('*').eq('user_id', currentUser.id).order('created_at', { ascending:false });
+    if(error){ console.error('Erro ao carregar livros', error); books = []; booksLoaded = true; return; }
+    books = data || [];
+    booksLoaded = true;
+  }
+
+  async function loadReadingTargetsOnce(){
+    if(readingTargetsLoaded) return;
+    const { data } = await sb.from('reading_targets').select('*').eq('user_id', currentUser.id).maybeSingle();
+    readingTargets = data || {};
+    readingTargetsLoaded = true;
+  }
+
+  async function loadReadingStats(){
+    const today = todayStr();
+    const weekStart = shiftDateStr(today, -6);
+    const monthStart = today.slice(0,8) + '01';
+    const [{ data: todaySessions }, { data: weekSessions }, { data: finished }] = await Promise.all([
+      sb.from('reading_sessions').select('minutes').eq('user_id', currentUser.id).eq('date', today),
+      sb.from('reading_sessions').select('minutes').eq('user_id', currentUser.id).gte('date', weekStart).lte('date', today),
+      sb.from('books').select('id').eq('user_id', currentUser.id).eq('status','concluido').gte('finished_at', monthStart).lte('finished_at', today)
+    ]);
+    readingStats = {
+      todayMinutes: (todaySessions||[]).reduce((s,x)=> s+n0(x.minutes), 0),
+      weekMinutes: (weekSessions||[]).reduce((s,x)=> s+n0(x.minutes), 0),
+      monthBooksFinished: (finished||[]).length
+    };
+  }
+
+  async function renderLeituraView(){
+    const el = document.getElementById('fr-leitura-content');
+    el.innerHTML = `<div class="fr-loading">Carregando leitura...</div>`;
+    await Promise.all([loadBooks(), loadReadingTargetsOnce()]);
+    await loadReadingStats();
+    renderLeituraContent();
+  }
+
+  function readingGoalsHtml(){
+    const dailyGoal = Number(readingTargets.daily_minutes) || 0;
+    const weeklyGoal = Number(readingTargets.weekly_minutes) || 0;
+    const monthlyGoal = Number(readingTargets.monthly_books) || 0;
+    return `
+      <div class="fr-section-label" style="max-width:1080px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center;">
+        <span>Suas metas de leitura</span>
+        <button type="button" class="fr-btn-ghost" id="fr-reading-targets-btn" style="padding:6px 12px;font-size:12px;">Definir metas</button>
+      </div>
+      <div class="fr-weekly-goals-grid" style="margin-bottom:22px;">
+        <div class="fr-weekly-goal-card">
+          <div class="fr-weekly-goal-label">Hoje</div>
+          <div class="fr-weekly-goal-val">${readingStats.todayMinutes} <span>${dailyGoal ? 'min / '+dailyGoal+' min' : 'min'}</span></div>
+          ${dailyGoal ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,(readingStats.todayMinutes/dailyGoal)*100)}%;background:var(--green)"></div></div>` : ''}
+        </div>
+        <div class="fr-weekly-goal-card">
+          <div class="fr-weekly-goal-label">Essa semana</div>
+          <div class="fr-weekly-goal-val">${readingStats.weekMinutes} <span>${weeklyGoal ? 'min / '+weeklyGoal+' min' : 'min'}</span></div>
+          ${weeklyGoal ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,(readingStats.weekMinutes/weeklyGoal)*100)}%;background:var(--blue)"></div></div>` : ''}
+        </div>
+        <div class="fr-weekly-goal-card">
+          <div class="fr-weekly-goal-label">Livros esse mês</div>
+          <div class="fr-weekly-goal-val">${readingStats.monthBooksFinished} <span>${monthlyGoal ? '/ '+monthlyGoal : ''}</span></div>
+          ${monthlyGoal ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,(readingStats.monthBooksFinished/monthlyGoal)*100)}%;background:var(--mustard)"></div></div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function bookRowHtml(b){
+    const pct = (b.total_pages && b.total_pages>0) ? Math.min(100, Math.round((n0(b.current_page)/b.total_pages)*100)) : null;
+    return `
+      <div class="fr-book-row" data-id="${b.id}">
+        <div class="fr-book-row-top">
+          <div>
+            <div class="fr-book-title">${esc(b.title)}${b.status==='concluido' ? '<span class="fr-book-done-badge">concluído</span>' : (b.status==='pausado' ? '<span class="fr-book-done-badge" style="background:var(--ink-soft)">pausado</span>' : '')}</div>
+            ${b.author ? `<div class="fr-book-author">${esc(b.author)}</div>` : ''}
+          </div>
+          <div class="fr-book-pages">${b.total_pages ? `pág. ${n0(b.current_page)} / ${b.total_pages}` : (b.current_page ? `pág. ${n0(b.current_page)}` : '')}</div>
+        </div>
+        ${pct!==null ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${pct}%;background:var(--green-deep)"></div></div>` : ''}
+        <div class="fr-book-actions">
+          ${b.status!=='concluido' ? `<button type="button" class="fr-btn-primary" data-act="log" data-id="${b.id}">Registrar leitura</button>` : ''}
+          <button type="button" class="fr-btn-ghost" data-act="edit" data-id="${b.id}">Editar</button>
+          <button type="button" class="fr-btn-danger" data-act="delete" data-id="${b.id}">Excluir</button>
+        </div>
+      </div>`;
+  }
+
+  function renderLeituraContent(){
+    const el = document.getElementById('fr-leitura-content');
+    const activeBooks = books.filter(b=> b.status !== 'concluido');
+    const finishedBooks = books.filter(b=> b.status === 'concluido');
+    el.innerHTML = `
+      ${readingGoalsHtml()}
+      ${books.length===0
+        ? `<div class="fr-empty-diary"><h3>Nenhum livro cadastrado ainda</h3><p>Toque em "Novo livro" para começar a acompanhar sua leitura.</p></div>`
+        : `
+          ${activeBooks.length ? `<div class="fr-section-label" style="max-width:1080px;margin:20px auto 12px;">Lendo agora</div>${activeBooks.map(bookRowHtml).join('')}` : ''}
+          ${finishedBooks.length ? `<div class="fr-section-label" style="max-width:1080px;margin:20px auto 12px;">Concluídos</div>${finishedBooks.map(bookRowHtml).join('')}` : ''}
+        `}
+    `;
+    const targetsBtn = document.getElementById('fr-reading-targets-btn');
+    if(targetsBtn) targetsBtn.addEventListener('click', openReadingTargetsModal);
+    el.querySelectorAll('.fr-book-actions button[data-act]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-id');
+        const book = books.find(b=>b.id===id);
+        if(!book) return;
+        const act = btn.getAttribute('data-act');
+        if(act==='log') openReadingLogModal(book);
+        else if(act==='edit') openBookFormModal(book);
+        else if(act==='delete') confirmDeleteBook(book);
+      });
+    });
+  }
+
+  function openBookFormModal(existing){
+    const isEdit = !!existing;
+    const b = existing || { status:'lendo' };
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">${isEdit ? 'Editar livro' : 'Novo livro'}</h3>
+      <form id="fr-book-form">
+        <div class="fr-field"><label for="fr-book-title">Título</label><input type="text" id="fr-book-title" required value="${esc(b.title||'')}" placeholder="ex.: O Hobbit"></div>
+        <div class="fr-field"><label for="fr-book-author">Autor (opcional)</label><input type="text" id="fr-book-author" value="${esc(b.author||'')}"></div>
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-book-total">Total de páginas</label><input type="number" min="1" id="fr-book-total" value="${esc(b.total_pages ?? '')}"></div>
+          <div class="fr-field"><label for="fr-book-current">Página em que parou</label><input type="number" min="0" id="fr-book-current" value="${esc(b.current_page ?? 0)}"></div>
+        </div>
+        <div class="fr-field"><label for="fr-book-status">Status</label>
+          <select id="fr-book-status">
+            <option value="lendo" ${b.status==='lendo'?'selected':''}>Lendo</option>
+            <option value="pausado" ${b.status==='pausado'?'selected':''}>Pausado</option>
+            <option value="concluido" ${b.status==='concluido'?'selected':''}>Concluído</option>
+          </select>
+        </div>
+        <div class="fr-form-actions">
+          ${isEdit ? '<button type="button" class="fr-btn-danger" id="fr-book-delete">Excluir</button>' : '<button type="button" class="fr-btn-ghost" id="fr-book-cancel">Cancelar</button>'}
+          <button type="submit" class="fr-btn-primary">${isEdit ? 'Salvar alterações' : 'Salvar livro'}</button>
+        </div>
+      </form>
+    `);
+    const cancelBtn = overlay.querySelector('#fr-book-cancel');
+    if(cancelBtn) cancelBtn.addEventListener('click', closeOverlay);
+    const deleteBtn = overlay.querySelector('#fr-book-delete');
+    if(deleteBtn) deleteBtn.addEventListener('click', ()=>{ closeOverlay(); confirmDeleteBook(existing); });
+    overlay.querySelector('#fr-book-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const submitBtn = overlay.querySelector('button[type="submit"]');
+      const title = document.getElementById('fr-book-title').value.trim();
+      if(!title){ document.getElementById('fr-book-title').focus(); return; }
+      const status = document.getElementById('fr-book-status').value;
+      const wasFinished = isEdit && existing.status === 'concluido';
+      const payload = {
+        title,
+        author: document.getElementById('fr-book-author').value.trim() || null,
+        total_pages: numOrNull(document.getElementById('fr-book-total').value),
+        current_page: numOrNull(document.getElementById('fr-book-current').value) || 0,
+        status
+      };
+      if(status==='concluido' && !wasFinished){ payload.finished_at = todayStr(); }
+      if(status!=='concluido'){ payload.finished_at = null; }
+      submitBtn.disabled = true; submitBtn.textContent = 'Salvando...';
+      try{
+        if(isEdit){
+          const { error } = await sb.from('books').update(payload).eq('id', existing.id);
+          if(error) throw error;
+          books = books.map(x=> x.id===existing.id ? {...x, ...payload} : x);
+        } else {
+          payload.user_id = currentUser.id;
+          payload.started_at = todayStr();
+          const { data, error } = await sb.from('books').insert(payload).select().single();
+          if(error) throw error;
+          books.push(data);
+        }
+        showToast('Livro salvo.', 'ok');
+        closeOverlay();
+        await loadReadingStats();
+        renderLeituraContent();
+      }catch(err){
+        console.error(err);
+        showToast('Não foi possível salvar agora. Tente novamente.', 'err');
+        submitBtn.disabled = false;
+        submitBtn.textContent = isEdit ? 'Salvar alterações' : 'Salvar livro';
+      }
+    });
+    setTimeout(()=> document.getElementById('fr-book-title').focus(), 30);
+  }
+
+  function confirmDeleteBook(book){
+    if(!book) return;
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Excluir "${esc(book.title)}"?</h3>
+      <p class="fr-hint">Isso também remove o histórico de sessões de leitura desse livro. Não pode ser desfeito.</p>
+      <div class="fr-form-actions">
+        <button type="button" class="fr-btn-ghost" id="fr-book-del-cancel">Cancelar</button>
+        <button type="button" class="fr-btn-danger" id="fr-book-del-confirm">Confirmar exclusão</button>
+      </div>
+    `);
+    overlay.querySelector('#fr-book-del-cancel').addEventListener('click', closeOverlay);
+    overlay.querySelector('#fr-book-del-confirm').addEventListener('click', async function(){
+      const btn = this; btn.disabled = true; btn.textContent = 'Excluindo...';
+      const { error } = await sb.from('books').delete().eq('id', book.id);
+      if(error){ showToast('Não foi possível excluir. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Confirmar exclusão'; return; }
+      books = books.filter(x=>x.id!==book.id);
+      showToast('Livro excluído.', 'ok');
+      closeOverlay();
+      await loadReadingStats();
+      renderLeituraContent();
+    });
+  }
+
+  function openReadingLogModal(book){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Registrar leitura — ${esc(book.title)}</h3>
+      <form id="fr-reading-log-form">
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-rl-minutes">Quanto tempo você leu (minutos)</label><input type="number" min="1" id="fr-rl-minutes" required placeholder="ex.: 30"></div>
+          <div class="fr-field"><label for="fr-rl-date">Data</label><input type="date" id="fr-rl-date" value="${todayStr()}"></div>
+        </div>
+        <div class="fr-field"><label for="fr-rl-page">Em que página você parou agora${book.total_pages ? ` (de ${book.total_pages})` : ''}</label><input type="number" min="0" ${book.total_pages?`max="${book.total_pages}"`:''} id="fr-rl-page" value="${esc(book.current_page ?? 0)}"></div>
+        <div class="fr-form-actions">
+          <button type="button" class="fr-btn-ghost" id="fr-rl-cancel">Cancelar</button>
+          <button type="submit" class="fr-btn-primary">Registrar</button>
+        </div>
+      </form>
+    `);
+    overlay.querySelector('#fr-rl-cancel').addEventListener('click', closeOverlay);
+    overlay.querySelector('#fr-reading-log-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const submitBtn = overlay.querySelector('button[type="submit"]');
+      const minutes = numOrNull(document.getElementById('fr-rl-minutes').value);
+      if(!minutes || minutes<=0){ document.getElementById('fr-rl-minutes').focus(); return; }
+      const date = document.getElementById('fr-rl-date').value || todayStr();
+      const newPage = numOrNull(document.getElementById('fr-rl-page').value);
+      submitBtn.disabled = true; submitBtn.textContent = 'Salvando...';
+      try{
+        const { error: sessErr } = await sb.from('reading_sessions').insert({
+          user_id: currentUser.id, book_id: book.id, date, minutes
+        });
+        if(sessErr) throw sessErr;
+        const justFinished = newPage!=null && book.total_pages && newPage>=book.total_pages && book.status!=='concluido';
+        const bookPayload = {
+          current_page: newPage!=null ? Math.min(newPage, book.total_pages||newPage) : book.current_page
+        };
+        if(justFinished){ bookPayload.status = 'concluido'; bookPayload.finished_at = date; }
+        const { error: bookErr } = await sb.from('books').update(bookPayload).eq('id', book.id);
+        if(bookErr) throw bookErr;
+        books = books.map(x=> x.id===book.id ? {...x, ...bookPayload} : x);
+        showToast(justFinished ? 'Leitura registrada — livro concluído! 🎉' : 'Leitura registrada.', 'ok');
+        closeOverlay();
+        await loadReadingStats();
+        renderLeituraContent();
+      }catch(err){
+        console.error(err);
+        showToast('Não foi possível salvar agora. Tente novamente.', 'err');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Registrar';
+      }
+    });
+    setTimeout(()=> document.getElementById('fr-rl-minutes').focus(), 30);
+  }
+
+  function openReadingTargetsModal(){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Metas de leitura</h3>
+      <form id="fr-reading-targets-form">
+        <div class="fr-field"><label for="fr-rt-daily">Minutos por dia</label><input type="number" min="0" id="fr-rt-daily" value="${esc(readingTargets.daily_minutes ?? '')}"></div>
+        <div class="fr-field"><label for="fr-rt-weekly">Minutos por semana</label><input type="number" min="0" id="fr-rt-weekly" value="${esc(readingTargets.weekly_minutes ?? '')}"></div>
+        <div class="fr-field"><label for="fr-rt-monthly">Livros por mês</label><input type="number" min="0" id="fr-rt-monthly" value="${esc(readingTargets.monthly_books ?? '')}"></div>
+        <div class="fr-form-actions">
+          <button type="button" class="fr-btn-ghost" id="fr-rt-cancel">Cancelar</button>
+          <button type="submit" class="fr-btn-primary">Salvar metas</button>
+        </div>
+      </form>
+    `);
+    overlay.querySelector('#fr-rt-cancel').addEventListener('click', closeOverlay);
+    overlay.querySelector('#fr-reading-targets-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const btn = overlay.querySelector('button[type="submit"]');
+      const payload = {
+        user_id: currentUser.id,
+        daily_minutes: numOrNull(document.getElementById('fr-rt-daily').value),
+        weekly_minutes: numOrNull(document.getElementById('fr-rt-weekly').value),
+        monthly_books: numOrNull(document.getElementById('fr-rt-monthly').value)
+      };
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.from('reading_targets').upsert(payload);
+      if(error){ showToast('Não foi possível salvar agora. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Tentar salvar de novo'; return; }
+      readingTargets = payload;
+      showToast('Metas de leitura atualizadas.', 'ok');
+      closeOverlay();
+      renderLeituraContent();
+    });
   }
 
   // Fatores de rendimento (peso cozido ÷ peso cru) pros alimentos mais comuns que
