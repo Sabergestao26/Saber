@@ -2334,11 +2334,11 @@
       if(!canAdd){ btn.style.display='none'; return; }
       btn.style.display='';
       btn.innerHTML = PLUS_SVG + ' Novo treino';
-      btn.onclick = openWorkoutFormModal;
+      btn.onclick = ()=> openWorkoutFormModal();
     } else if(currentView==='leitura'){
       btn.style.display='';
       btn.innerHTML = PLUS_SVG + ' Novo livro';
-      btn.onclick = openBookFormModal;
+      btn.onclick = ()=> openBookFormModal();
     } else {
       btn.style.display='none';
     }
