@@ -568,14 +568,97 @@
   .fr-empty-diary{ max-width:520px; margin:50px auto; text-align:center; color:var(--ink-soft); }
   .fr-empty-diary h3{ font-family:'Fraunces',serif; color:var(--green-deep); font-size:19px; margin-bottom:6px; }
 
-  .fr-book-row{ max-width:1080px; margin:0 auto 10px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; }
+  .fr-book-row{ max-width:1080px; margin:0 auto 10px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; display:flex; gap:12px; }
+  .fr-book-spine{ width:7px; flex-shrink:0; border-radius:5px; align-self:stretch; min-height:52px; }
+  .fr-book-body{ flex:1; min-width:0; }
   .fr-book-row-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
   .fr-book-title{ font-family:'Fraunces',serif; font-weight:600; font-size:16px; line-height:1.3; }
-  .fr-book-author{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .fr-book-author{ font-size:12px; color:var(--ink-soft); margin-top:2px; font-style:italic; }
+  .fr-book-tag{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
   .fr-book-pages{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); white-space:nowrap; flex-shrink:0; }
   .fr-book-done-badge{ display:inline-block; background:var(--green-deep); color:#fff; font-size:10px; font-family:'IBM Plex Mono',monospace; padding:2px 7px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  .fr-book-done-badge.dropped{ background:var(--ink-soft); }
+  .fr-book-facts{ display:flex; gap:12px; margin-top:8px; font-size:11.5px; color:var(--ink-soft); flex-wrap:wrap; }
+  .fr-book-facts b{ color:var(--ink); font-weight:600; }
+  .fr-book-stars{ color:var(--mustard); letter-spacing:1px; font-size:13px; margin-top:4px; }
+  .fr-book-pgrow{ display:flex; align-items:center; gap:8px; margin-top:10px; }
+  .fr-book-pgrow input{ width:84px; border:1px solid var(--border); background:var(--paper); border-radius:7px; padding:6px 9px; font-size:13px; }
+  .fr-book-pgrow label{ font-size:11.5px; color:var(--ink-soft); }
   .fr-book-actions{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
   .fr-book-actions .fr-btn-ghost, .fr-book-actions .fr-btn-primary, .fr-book-actions .fr-btn-danger{ padding:7px 12px; font-size:12.5px; }
+
+  /* ---------- Leitura: cabeçalho, estante, sessão, painel ---------- */
+  .fr-leitura-head{ max-width:1080px; margin:0 auto 14px; display:flex; align-items:baseline; gap:10px; font-size:13px; color:var(--ink-soft); }
+  .fr-leitura-head b{ font-family:'Fraunces',serif; color:var(--green-deep); font-size:15px; }
+  .fr-read-shelf{ max-width:1080px; margin:0 auto 18px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px 14px 0; overflow-x:auto; }
+  .fr-read-spines{ display:flex; align-items:flex-end; gap:7px; min-height:120px; }
+  .fr-read-spine{ width:32px; height:108px; border-radius:4px 4px 0 0; position:relative; flex:none; display:flex; align-items:center; justify-content:center; box-shadow:inset -4px 0 8px rgba(0,0,0,.22), inset 2px 0 3px rgba(255,255,255,.15); cursor:pointer; border:none; padding:0; transition:transform .15s; }
+  .fr-read-spine:hover{ transform:translateY(-5px); }
+  .fr-read-spine span{ writing-mode:vertical-rl; color:#F6F1DF; font-size:10.5px; font-weight:700; letter-spacing:.02em; max-height:94px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-shadow:0 1px 2px rgba(0,0,0,.35); }
+  .fr-read-shelf-wood{ height:11px; background:linear-gradient(180deg, var(--green-deep) 0%, var(--green-deep-hover) 100%); border-radius:3px 3px 0 0; margin:0 -14px; opacity:.9; }
+  .fr-read-shelf-empty{ min-height:94px; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-family:'Fraunces',serif; font-style:italic; font-size:15px; width:100%; }
+
+  .fr-read-timercard{ max-width:1080px; margin:0 auto 14px; background:linear-gradient(150deg, var(--paper-deep), var(--card)); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; }
+  .fr-read-timercard.running{ border-color:var(--green-deep); }
+  .fr-read-clock{ font-family:'Fraunces',serif; font-size:48px; line-height:1; text-align:center; margin:14px 0; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .fr-read-timercard.running .fr-read-clock{ color:var(--green-deep); }
+  .fr-read-bookchips{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+  .fr-read-bookchip{ display:inline-flex; align-items:center; gap:6px; padding:5px 11px 5px 7px; border-radius:14px; border:1.5px solid var(--border); font-size:12px; font-weight:600; color:var(--ink-soft); background:var(--card); cursor:pointer; }
+  .fr-read-bookchip i{ width:9px; height:13px; border-radius:2px; display:inline-block; }
+  .fr-read-bookchip.on{ border-color:var(--green-deep); color:var(--ink); background:var(--ok-bg); }
+  .fr-read-timerbtns{ display:flex; gap:8px; justify-content:center; margin-top:4px; }
+
+  .fr-read-sess{ display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--border); font-size:13px; }
+  .fr-read-sess:first-child{ border-top:0; }
+  .fr-read-sess .fr-read-sess-sw{ width:7px; height:26px; border-radius:2px; flex:none; }
+  .fr-read-sess .fr-read-sess-t{ flex:1; min-width:0; }
+  .fr-read-sess .fr-read-sess-t b{ display:block; font-weight:600; }
+  .fr-read-sess .fr-read-sess-t span{ color:var(--ink-soft); font-size:11.5px; }
+  .fr-read-sess .fr-read-sess-min{ font-family:'Fraunces',serif; font-size:16px; white-space:nowrap; }
+  .fr-read-sess-del{ background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:17px; width:24px; height:24px; flex-shrink:0; }
+  .fr-read-sess-del:hover{ color:var(--rust); }
+
+  .fr-read-stats{ max-width:1080px; margin:0 auto 14px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .fr-read-stat{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:12px 14px; text-align:center; }
+  .fr-read-stat .n{ font-family:'Fraunces',serif; font-size:25px; color:var(--green-deep); line-height:1.1; }
+  .fr-read-stat .n small{ font-size:12px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; margin-left:2px; }
+  .fr-read-stat .lbl{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); margin-top:4px; }
+
+  .fr-read-cal-day{ position:relative; }
+  .fr-read-cal-day[data-l="0"]{ background:var(--paper-deep); }
+  .fr-read-cal-day[data-l="1"]{ background:#E9D3A8; color:#5a4a28; }
+  .fr-read-cal-day[data-l="2"]{ background:#D9B36A; color:#4a3b1f; }
+  .fr-read-cal-day[data-l="3"]{ background:var(--mustard); color:#fff; }
+  .fr-read-cal-day[data-l="4"]{ background:var(--green-deep); color:#F6F1DF; }
+  .fr-read-cal-day.fr-cal-day-future{ opacity:.4; }
+  .fr-read-cal-legend{ display:flex; gap:10px; margin-top:10px; font-size:11px; color:var(--ink-soft); flex-wrap:wrap; }
+  .fr-read-cal-legend i{ width:10px; height:10px; border-radius:3px; display:inline-block; vertical-align:-1px; margin-right:3px; }
+
+  .fr-read-weekbars{ display:grid; grid-template-columns:repeat(7,1fr); gap:8px; align-items:end; height:92px; max-width:1080px; margin:0 auto; }
+  .fr-read-wb{ display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:4px; font-size:11px; color:var(--ink-soft); font-weight:600; }
+  .fr-read-wb .v{ font-size:10px; color:var(--ink); }
+  .fr-read-wb .col{ width:100%; max-width:30px; background:var(--paper-deep); border-radius:6px 6px 3px 3px; flex:1; display:flex; align-items:flex-end; overflow:hidden; }
+  .fr-read-wb .col i{ display:block; width:100%; background:var(--mustard); border-radius:6px 6px 3px 3px; }
+  .fr-read-wb.today{ color:var(--green-deep); }
+  .fr-read-wb.future .col{ opacity:.4; }
+
+  .fr-read-pace-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; padding:6px 0; }
+  .fr-read-pace-row span:first-child{ min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fr-read-pace-row b{ font-family:'Fraunces',serif; font-size:14.5px; font-weight:500; white-space:nowrap; color:var(--ink); }
+
+  .fr-read-badges{ display:grid; grid-template-columns:repeat(auto-fill,minmax(116px,1fr)); gap:8px; }
+  .fr-read-badge{ border:1px solid var(--border); border-radius:10px; padding:10px; background:var(--card); text-align:center; font-size:11.5px; }
+  .fr-read-badge .ic{ font-size:19px; font-family:'Fraunces',serif; color:var(--mustard); }
+  .fr-read-badge.locked{ opacity:.4; filter:grayscale(1); }
+  .fr-read-badge b{ display:block; margin-top:2px; }
+  .fr-read-badge .hint{ margin-top:1px; }
+
+  .fr-read-swatches{ display:flex; gap:6px; flex-wrap:wrap; }
+  .fr-read-swatches button{ width:24px; height:34px; border-radius:4px; border:2px solid transparent; box-shadow:inset -3px 0 5px rgba(0,0,0,.25); cursor:pointer; padding:0; }
+  .fr-read-swatches button.on{ border-color:var(--ink); }
+  .fr-read-starpick{ display:flex; gap:6px; font-size:24px; color:var(--border); }
+  .fr-read-starpick button{ background:none; border:none; cursor:pointer; padding:0; color:inherit; }
+  .fr-read-starpick button.on{ color:var(--mustard); }
 
   .fr-log-subtabs{ display:flex; gap:8px; margin-bottom:16px; }
   .fr-log-subtab{ flex:1; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; padding:9px; border-radius:7px; border:1px solid var(--border); background:var(--paper-deep); color:var(--ink-soft); cursor:pointer; }
@@ -708,6 +791,8 @@
   </div>
 
   <div id="fr-view-leitura" style="display:none">
+    <div class="fr-leitura-head" id="fr-leitura-head"></div>
+    <div class="fr-tabs" id="fr-leitura-tabs"></div>
     <div id="fr-leitura-content"></div>
   </div>
 
@@ -898,9 +983,13 @@
 
   let books = [];
   let booksLoaded = false;
+  let readingSessions = [];
+  let readingSessionsLoaded = false;
   let readingTargets = {};
   let readingTargetsLoaded = false;
-  let readingStats = { todayMinutes:0, weekMinutes:0, monthBooksFinished:0 };
+  let leituraSubView = 'estante';
+  let leituraCalMonth = null;
+  let leituraTimerTick = null;
 
   let currentUser = null;
   let currentProfile = null;
@@ -2336,6 +2425,7 @@
       btn.innerHTML = PLUS_SVG + ' Novo treino';
       btn.onclick = ()=> openWorkoutFormModal();
     } else if(currentView==='leitura'){
+      if(leituraSubView!=='estante'){ btn.style.display='none'; return; }
       btn.style.display='';
       btn.innerHTML = PLUS_SVG + ' Novo livro';
       btn.onclick = ()=> openBookFormModal();
@@ -2345,6 +2435,7 @@
   }
   function switchView(view){
     if(view === 'settings' && currentView !== 'settings') settingsSubView = null;
+    if(view !== 'leitura') clearInterval(leituraTimerTick);
     currentView = view;
     document.getElementById('fr-view-recipes').style.display = view==='recipes' ? '' : 'none';
     document.getElementById('fr-view-diary').style.display = view==='diary' ? '' : 'none';
@@ -2494,7 +2585,22 @@
     renderArticlesList();
   }
 
-  /* ---------- Leitura (livros, sessões de leitura, metas) ---------- */
+  /* ---------- Leitura (estante, cronômetro de sessões, painel com metas/calendário/ritmo/conquistas) ---------- */
+  const LEITURA_COLORS = ['#3F6B4A','#2E4F37','#46687A','#5B3A52','#BF8A2E','#A8481F','#6B6A57','#7A8C5A'];
+  const LEITURA_RANKS = [[0,'Iniciante'],[300,'Leitora'],[1200,'Leitora Dedicada'],[3000,'Devoradora de Livros'],[8000,'Rato de Biblioteca'],[18000,'Bibliófila']];
+  const LEITURA_BADGES = [
+    { ic:'1',   name:'Primeira sessão',  desc:'1 sessão registrada',                 test:s=>s.sessions>=1 },
+    { ic:'✦',   name:'Primeiro livro',   desc:'1 livro concluído',                   test:s=>s.done>=1 },
+    { ic:'7',   name:'Semana fiel',      desc:'7 dias seguidos lendo',               test:s=>s.streak>=7 },
+    { ic:'30',  name:'Mês devorado',     desc:'30 dias seguidos lendo',              test:s=>s.streak>=30 },
+    { ic:'☾',   name:'Maratona',         desc:'60+ min numa sessão só',              test:s=>s.longest>=60 },
+    { ic:'1k',  name:'Mil minutos',      desc:'1.000 min de leitura no total',       test:s=>s.totalMin>=1000 },
+    { ic:'100', name:'Cem páginas',      desc:'100 páginas registradas',             test:s=>s.totalPages>=100 },
+    { ic:'500', name:'Quinhentas',       desc:'500 páginas registradas',             test:s=>s.totalPages>=500 },
+    { ic:'5',   name:'Cinco livros',     desc:'5 livros concluídos',                 test:s=>s.done>=5 },
+    { ic:'★',   name:'Meta do ano',      desc:'meta de livros do ano batida',        test:s=>s.goalBooks>0 && s.year>=s.goalBooks }
+  ];
+
   async function loadBooks(){
     if(booksLoaded) return;
     const { data, error } = await sb.from('books').select('*').eq('user_id', currentUser.id).order('created_at', { ascending:false });
@@ -2503,101 +2609,179 @@
     booksLoaded = true;
   }
 
+  async function loadReadingSessions(){
+    if(readingSessionsLoaded) return;
+    const { data, error } = await sb.from('reading_sessions').select('*').eq('user_id', currentUser.id).order('date', { ascending:true });
+    if(error){ console.error('Erro ao carregar sessões de leitura', error); readingSessions = []; readingSessionsLoaded = true; return; }
+    readingSessions = data || [];
+    readingSessionsLoaded = true;
+  }
+
   async function loadReadingTargetsOnce(){
     if(readingTargetsLoaded) return;
-    const { data } = await sb.from('reading_targets').select('*').eq('user_id', currentUser.id).maybeSingle();
+    const { data, error } = await sb.from('reading_targets').select('*').eq('user_id', currentUser.id).maybeSingle();
+    if(error) console.error('Erro ao carregar metas de leitura', error);
     readingTargets = data || {};
     readingTargetsLoaded = true;
   }
 
-  async function loadReadingStats(){
-    const today = todayStr();
-    const weekStart = shiftDateStr(today, -6);
-    const monthStart = today.slice(0,8) + '01';
-    const [{ data: todaySessions }, { data: weekSessions }, { data: finished }] = await Promise.all([
-      sb.from('reading_sessions').select('minutes').eq('user_id', currentUser.id).eq('date', today),
-      sb.from('reading_sessions').select('minutes').eq('user_id', currentUser.id).gte('date', weekStart).lte('date', today),
-      sb.from('books').select('id').eq('user_id', currentUser.id).eq('status','concluido').gte('finished_at', monthStart).lte('finished_at', today)
-    ]);
-    readingStats = {
-      todayMinutes: (todaySessions||[]).reduce((s,x)=> s+n0(x.minutes), 0),
-      weekMinutes: (weekSessions||[]).reduce((s,x)=> s+n0(x.minutes), 0),
-      monthBooksFinished: (finished||[]).length
+  function readingByStatus(st){ return books.filter(b=>b.status===st); }
+  function minOnDate(dateStr){ return readingSessions.filter(s=>s.date===dateStr).reduce((a,s)=>a+n0(s.minutes),0); }
+  function sessionsOfBook(bookId){ return readingSessions.filter(s=>s.book_id===bookId); }
+  function minutesOfBook(bookId){ return sessionsOfBook(bookId).reduce((a,s)=>a+n0(s.minutes),0); }
+  function pagesOfSession(s){ return (s.to_page!=null && s.from_page!=null && s.to_page>s.from_page) ? (s.to_page-s.from_page) : 0; }
+  function bookPace(book){
+    let pages=0, minutes=0;
+    sessionsOfBook(book.id).forEach(s=>{ const p=pagesOfSession(s); if(p>0){ pages+=p; minutes+=n0(s.minutes); } });
+    return minutes>0 ? pages/(minutes/60) : 0;
+  }
+  function avgMinutesPerDay(){
+    let total=0, days=0;
+    for(let i=0;i<14;i++){ const m=minOnDate(shiftDateStr(todayStr(), -i)); if(m>0){ total+=m; days++; } }
+    return days ? total/days : 0;
+  }
+  function bookEta(book){
+    if(!book.total_pages || !book.current_page || book.current_page>=book.total_pages) return null;
+    const pace = bookPace(book);
+    if(!pace) return null;
+    const minutesLeft = (book.total_pages - book.current_page) / pace * 60;
+    const daily = avgMinutesPerDay() || Number(readingTargets.daily_minutes) || 30;
+    return { minutesLeft: Math.round(minutesLeft), days: Math.max(1, Math.ceil(minutesLeft/daily)) };
+  }
+  function readingStreak(){
+    let n=0, d=todayStr();
+    if(minOnDate(d)===0) d=shiftDateStr(d,-1);
+    for(let i=0;i<800;i++){ if(minOnDate(d)>0){ n++; d=shiftDateStr(d,-1); } else break; }
+    return n;
+  }
+  function totalReadingMinutes(){ return readingSessions.reduce((a,s)=>a+n0(s.minutes),0); }
+  function totalReadingPages(){ return readingSessions.reduce((a,s)=>a+pagesOfSession(s),0); }
+  function booksFinishedThisYear(){ const y=todayStr().slice(0,4); return books.filter(b=>b.status==='concluido' && (b.finished_at||'').slice(0,4)===y).length; }
+  function readingRank(){ let r=LEITURA_RANKS[0][1]; const m=totalReadingMinutes(); LEITURA_RANKS.forEach(([t,name])=>{ if(m>=t) r=name; }); return r; }
+  function badgeStats(){
+    return {
+      sessions: readingSessions.length,
+      done: books.filter(b=>b.status==='concluido').length,
+      streak: readingStreak(),
+      longest: readingSessions.reduce((a,s)=>Math.max(a,n0(s.minutes)),0),
+      totalMin: totalReadingMinutes(),
+      totalPages: totalReadingPages(),
+      year: booksFinishedThisYear(),
+      goalBooks: Number(readingTargets.yearly_books)||0
     };
+  }
+  function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i))|0; } return Math.abs(h); }
+  function spineColorFor(book){ return book.color || LEITURA_COLORS[hashStr(book.id||book.title||'x')%LEITURA_COLORS.length]; }
+  function fmtDateBr(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y.slice(2)}`; }
+
+  /* ---------- Sub-abas: Estante / Sessão / Painel ---------- */
+  function renderLeituraTabs(){
+    const el = document.getElementById('fr-leitura-tabs');
+    const tabs = [['estante','Estante'], ['sessao','Sessão'], ['painel','Painel']];
+    el.innerHTML = tabs.map(t=>`<button class="fr-tab ${leituraSubView===t[0]?'active':''}" data-sub="${t[0]}">${t[1]}</button>`).join('');
+    el.querySelectorAll('.fr-tab').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        leituraSubView = btn.getAttribute('data-sub');
+        renderLeituraTabs();
+        renderPrimaryAction();
+        renderLeituraContent();
+      });
+    });
+  }
+  function renderLeituraHead(){
+    const el = document.getElementById('fr-leitura-head');
+    if(!el) return;
+    el.innerHTML = `<b>${esc(readingRank())}</b><span>· ${Math.round(totalReadingMinutes())} min lidos</span><span>· 🔥 ${readingStreak()} dias</span>`;
   }
 
   async function renderLeituraView(){
     const el = document.getElementById('fr-leitura-content');
     el.innerHTML = `<div class="fr-loading">Carregando leitura...</div>`;
-    await Promise.all([loadBooks(), loadReadingTargetsOnce()]);
-    await loadReadingStats();
+    await Promise.all([loadBooks(), loadReadingSessions(), loadReadingTargetsOnce()]);
+    renderLeituraTabs();
     renderLeituraContent();
   }
 
-  function readingGoalsHtml(){
-    const dailyGoal = Number(readingTargets.daily_minutes) || 0;
-    const weeklyGoal = Number(readingTargets.weekly_minutes) || 0;
-    const monthlyGoal = Number(readingTargets.monthly_books) || 0;
-    return `
-      <div class="fr-section-label" style="max-width:1080px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center;">
-        <span>Suas metas de leitura</span>
-        <button type="button" class="fr-btn-ghost" id="fr-reading-targets-btn" style="padding:6px 12px;font-size:12px;">Definir metas</button>
-      </div>
-      <div class="fr-weekly-goals-grid" style="margin-bottom:22px;">
-        <div class="fr-weekly-goal-card">
-          <div class="fr-weekly-goal-label">Hoje</div>
-          <div class="fr-weekly-goal-val">${readingStats.todayMinutes} <span>${dailyGoal ? 'min / '+dailyGoal+' min' : 'min'}</span></div>
-          ${dailyGoal ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,(readingStats.todayMinutes/dailyGoal)*100)}%;background:var(--green)"></div></div>` : ''}
-        </div>
-        <div class="fr-weekly-goal-card">
-          <div class="fr-weekly-goal-label">Essa semana</div>
-          <div class="fr-weekly-goal-val">${readingStats.weekMinutes} <span>${weeklyGoal ? 'min / '+weeklyGoal+' min' : 'min'}</span></div>
-          ${weeklyGoal ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,(readingStats.weekMinutes/weeklyGoal)*100)}%;background:var(--blue)"></div></div>` : ''}
-        </div>
-        <div class="fr-weekly-goal-card">
-          <div class="fr-weekly-goal-label">Livros esse mês</div>
-          <div class="fr-weekly-goal-val">${readingStats.monthBooksFinished} <span>${monthlyGoal ? '/ '+monthlyGoal : ''}</span></div>
-          ${monthlyGoal ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,(readingStats.monthBooksFinished/monthlyGoal)*100)}%;background:var(--mustard)"></div></div>` : ''}
-        </div>
-      </div>
-    `;
+  function renderLeituraContent(){
+    clearInterval(leituraTimerTick);
+    renderLeituraHead();
+    if(leituraSubView==='sessao') renderSessaoView();
+    else if(leituraSubView==='painel') renderPainelView();
+    else renderEstanteView();
   }
 
-  function bookRowHtml(b){
+  /* ---------- Estante ---------- */
+  function renderShelf(){
+    const reading = readingByStatus('lendo');
+    if(!reading.length){
+      return `<div class="fr-read-shelf"><div class="fr-read-spines"><div class="fr-read-shelf-empty">A estante espera o primeiro livro.</div></div><div class="fr-read-shelf-wood"></div></div>`;
+    }
+    const spines = reading.map(b=>{
+      const h = 92 + ((b.title.length*7)%26);
+      return `<button type="button" class="fr-read-spine" style="background:${spineColorFor(b)};height:${h}px" data-id="${b.id}" title="${esc(b.title)}${b.author?' — '+esc(b.author):''}"><span>${esc(b.title)}</span></button>`;
+    }).join('');
+    return `<div class="fr-read-shelf"><div class="fr-read-spines">${spines}</div><div class="fr-read-shelf-wood"></div></div>`;
+  }
+
+  function bookCardHtml(b){
+    const color = spineColorFor(b);
     const pct = (b.total_pages && b.total_pages>0) ? Math.min(100, Math.round((n0(b.current_page)/b.total_pages)*100)) : null;
+    const min = minutesOfBook(b.id);
+    const pace = bookPace(b);
+    const eta = bookEta(b);
+    let facts = '';
+    if(b.status==='lendo'){
+      facts = `<div class="fr-book-facts"><span>tempo <b>${min} min</b></span>${pace?`<span>ritmo <b>${pace.toFixed(0)} pág/h</b></span>`:''}${eta?`<span>termina em <b>~${eta.days} dia${eta.days>1?'s':''}</b></span>`:''}</div>`;
+    } else if(b.status==='concluido'){
+      facts = `<div class="fr-book-facts"><span>${fmtDateBr(b.started_at)} → <b>${fmtDateBr(b.finished_at)}</b></span><span>${min} min</span></div>`;
+    } else if(b.status==='abandonado'){
+      facts = `<div class="fr-book-facts"><span>abandonado em ${fmtDateBr(b.finished_at)}</span><span>${min} min</span></div>`;
+    } else if(min){
+      facts = `<div class="fr-book-facts"><span>${min} min lidos</span></div>`;
+    }
     return `
       <div class="fr-book-row" data-id="${b.id}">
-        <div class="fr-book-row-top">
-          <div>
-            <div class="fr-book-title">${esc(b.title)}${b.status==='concluido' ? '<span class="fr-book-done-badge">concluído</span>' : (b.status==='pausado' ? '<span class="fr-book-done-badge" style="background:var(--ink-soft)">pausado</span>' : '')}</div>
-            ${b.author ? `<div class="fr-book-author">${esc(b.author)}</div>` : ''}
+        <div class="fr-book-spine" style="background:${color}"></div>
+        <div class="fr-book-body">
+          <div class="fr-book-row-top">
+            <div>
+              <div class="fr-book-title">${esc(b.title)}${b.status==='concluido' ? '<span class="fr-book-done-badge">concluído</span>' : (b.status==='abandonado' ? '<span class="fr-book-done-badge dropped">abandonado</span>' : '')}</div>
+              ${b.author ? `<div class="fr-book-author">${esc(b.author)}</div>` : ''}
+              ${b.tag ? `<div class="fr-book-tag">${esc(b.tag)}</div>` : ''}
+            </div>
+            <div class="fr-book-pages">${b.total_pages ? `pág. ${n0(b.current_page)} / ${b.total_pages}` : (b.current_page ? `pág. ${n0(b.current_page)}` : '')}</div>
           </div>
-          <div class="fr-book-pages">${b.total_pages ? `pág. ${n0(b.current_page)} / ${b.total_pages}` : (b.current_page ? `pág. ${n0(b.current_page)}` : '')}</div>
-        </div>
-        ${pct!==null ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${pct}%;background:var(--green-deep)"></div></div>` : ''}
-        <div class="fr-book-actions">
-          ${b.status!=='concluido' ? `<button type="button" class="fr-btn-primary" data-act="log" data-id="${b.id}">Registrar leitura</button>` : ''}
-          <button type="button" class="fr-btn-ghost" data-act="edit" data-id="${b.id}">Editar</button>
-          <button type="button" class="fr-btn-danger" data-act="delete" data-id="${b.id}">Excluir</button>
+          ${pct!==null && b.status==='lendo' ? `<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${pct}%;background:${color}"></div></div>` : ''}
+          ${facts}
+          ${b.status==='concluido' && b.rating ? `<div class="fr-book-stars">${'★'.repeat(b.rating)}${'☆'.repeat(5-b.rating)}</div>` : ''}
+          <div class="fr-book-actions">
+            ${b.status!=='concluido' ? `<button type="button" class="fr-btn-primary" data-act="log" data-id="${b.id}">Registrar leitura</button>` : ''}
+            <button type="button" class="fr-btn-ghost" data-act="edit" data-id="${b.id}">Editar</button>
+            <button type="button" class="fr-btn-danger" data-act="delete" data-id="${b.id}">Excluir</button>
+          </div>
         </div>
       </div>`;
   }
 
-  function renderLeituraContent(){
+  function renderEstanteView(){
     const el = document.getElementById('fr-leitura-content');
-    const activeBooks = books.filter(b=> b.status !== 'concluido');
-    const finishedBooks = books.filter(b=> b.status === 'concluido');
-    el.innerHTML = `
-      ${readingGoalsHtml()}
-      ${books.length===0
-        ? `<div class="fr-empty-diary"><h3>Nenhum livro cadastrado ainda</h3><p>Toque em "Novo livro" para começar a acompanhar sua leitura.</p></div>`
-        : `
-          ${activeBooks.length ? `<div class="fr-section-label" style="max-width:1080px;margin:20px auto 12px;">Lendo agora</div>${activeBooks.map(bookRowHtml).join('')}` : ''}
-          ${finishedBooks.length ? `<div class="fr-section-label" style="max-width:1080px;margin:20px auto 12px;">Concluídos</div>${finishedBooks.map(bookRowHtml).join('')}` : ''}
-        `}
-    `;
-    const targetsBtn = document.getElementById('fr-reading-targets-btn');
-    if(targetsBtn) targetsBtn.addEventListener('click', openReadingTargetsModal);
+    const groups = [
+      ['lendo','Lendo','Nenhum livro em leitura agora.'],
+      ['quero_ler','Quero ler','Sua fila de próximos livros está vazia.'],
+      ['concluido','Concluídos','Ainda nenhum livro concluído.'],
+      ['abandonado','Abandonados','Nenhum livro abandonado — e que bom!']
+    ];
+    el.innerHTML = renderShelf() + groups.map(([st,label,emptyMsg])=>{
+      const arr = readingByStatus(st).sort((a,b)=> ((b.finished_at||b.started_at||'') < (a.finished_at||a.started_at||'')) ? -1 : 1);
+      return `<div class="fr-section-label" style="max-width:1080px;margin:20px auto 12px;">${label}${arr.length?` (${arr.length})`:''}</div>`
+        + (arr.length ? arr.map(bookCardHtml).join('') : `<div class="fr-empty-diary" style="margin:6px auto 26px;max-width:1080px;"><p>${emptyMsg}</p></div>`);
+    }).join('');
+    el.querySelectorAll('.fr-read-spine').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const book = books.find(b=>b.id===btn.getAttribute('data-id'));
+        if(book) openBookFormModal(book);
+      });
+    });
     el.querySelectorAll('.fr-book-actions button[data-act]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const id = btn.getAttribute('data-id');
@@ -2614,28 +2798,55 @@
   function openBookFormModal(existing){
     const isEdit = !!existing;
     const b = existing || { status:'lendo' };
+    let color = b.color || LEITURA_COLORS[books.length % LEITURA_COLORS.length];
+    let rating = b.rating || 0;
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">${isEdit ? 'Editar livro' : 'Novo livro'}</h3>
       <form id="fr-book-form">
         <div class="fr-field"><label for="fr-book-title">Título</label><input type="text" id="fr-book-title" required value="${esc(b.title||'')}" placeholder="ex.: O Hobbit"></div>
         <div class="fr-field"><label for="fr-book-author">Autor (opcional)</label><input type="text" id="fr-book-author" value="${esc(b.author||'')}"></div>
         <div class="fr-row">
+          <div class="fr-field"><label for="fr-book-tag">Gênero (opcional)</label><input type="text" id="fr-book-tag" value="${esc(b.tag||'')}" placeholder="ex.: romance, negócios"></div>
           <div class="fr-field"><label for="fr-book-total">Total de páginas</label><input type="number" min="1" id="fr-book-total" value="${esc(b.total_pages ?? '')}"></div>
+        </div>
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-book-status">Status</label>
+            <select id="fr-book-status">
+              <option value="lendo" ${b.status==='lendo'?'selected':''}>Lendo</option>
+              <option value="quero_ler" ${b.status==='quero_ler'?'selected':''}>Quero ler</option>
+              <option value="concluido" ${b.status==='concluido'?'selected':''}>Concluído</option>
+              <option value="abandonado" ${b.status==='abandonado'?'selected':''}>Abandonado</option>
+            </select>
+          </div>
           <div class="fr-field"><label for="fr-book-current">Página em que parou</label><input type="number" min="0" id="fr-book-current" value="${esc(b.current_page ?? 0)}"></div>
         </div>
-        <div class="fr-field"><label for="fr-book-status">Status</label>
-          <select id="fr-book-status">
-            <option value="lendo" ${b.status==='lendo'?'selected':''}>Lendo</option>
-            <option value="pausado" ${b.status==='pausado'?'selected':''}>Pausado</option>
-            <option value="concluido" ${b.status==='concluido'?'selected':''}>Concluído</option>
-          </select>
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-book-start">Início</label><input type="date" id="fr-book-start" value="${esc(b.started_at||'')}"></div>
+          <div class="fr-field"><label for="fr-book-end">Fim</label><input type="date" id="fr-book-end" value="${esc(b.finished_at||'')}"></div>
         </div>
+        <div class="fr-field"><label>Cor da lombada</label><div class="fr-read-swatches" id="fr-book-colors"></div></div>
+        <div class="fr-field" id="fr-book-ratewrap" style="${b.status==='concluido'?'':'display:none'}"><label>Sua avaliação</label><div class="fr-read-starpick" id="fr-book-stars"></div></div>
         <div class="fr-form-actions">
           ${isEdit ? '<button type="button" class="fr-btn-danger" id="fr-book-delete">Excluir</button>' : '<button type="button" class="fr-btn-ghost" id="fr-book-cancel">Cancelar</button>'}
           <button type="submit" class="fr-btn-primary">${isEdit ? 'Salvar alterações' : 'Salvar livro'}</button>
         </div>
       </form>
     `);
+    const colorsEl = overlay.querySelector('#fr-book-colors');
+    const drawColors = ()=>{ colorsEl.innerHTML=''; LEITURA_COLORS.forEach(c=>{ const el=document.createElement('button'); el.type='button'; el.style.background=c; el.className = c===color?'on':''; el.addEventListener('click', ()=>{ color=c; drawColors(); }); colorsEl.appendChild(el); }); };
+    drawColors();
+    const starsEl = overlay.querySelector('#fr-book-stars');
+    const drawStars = ()=>{ starsEl.innerHTML=''; for(let i=1;i<=5;i++){ const el=document.createElement('button'); el.type='button'; el.textContent='★'; el.className = i<=rating?'on':''; el.addEventListener('click', ()=>{ rating = rating===i?0:i; drawStars(); }); starsEl.appendChild(el); } };
+    drawStars();
+    const statusSel = overlay.querySelector('#fr-book-status');
+    const endInput = overlay.querySelector('#fr-book-end');
+    const rateWrap = overlay.querySelector('#fr-book-ratewrap');
+    statusSel.addEventListener('change', ()=>{
+      const v = statusSel.value;
+      if((v==='concluido'||v==='abandonado') && !endInput.value) endInput.value = todayStr();
+      if(v==='lendo'||v==='quero_ler') endInput.value = '';
+      rateWrap.style.display = v==='concluido' ? '' : 'none';
+    });
     const cancelBtn = overlay.querySelector('#fr-book-cancel');
     if(cancelBtn) cancelBtn.addEventListener('click', closeOverlay);
     const deleteBtn = overlay.querySelector('#fr-book-delete');
@@ -2645,17 +2856,19 @@
       const submitBtn = overlay.querySelector('button[type="submit"]');
       const title = document.getElementById('fr-book-title').value.trim();
       if(!title){ document.getElementById('fr-book-title').focus(); return; }
-      const status = document.getElementById('fr-book-status').value;
-      const wasFinished = isEdit && existing.status === 'concluido';
+      const status = statusSel.value;
       const payload = {
         title,
         author: document.getElementById('fr-book-author').value.trim() || null,
+        tag: document.getElementById('fr-book-tag').value.trim() || null,
         total_pages: numOrNull(document.getElementById('fr-book-total').value),
         current_page: numOrNull(document.getElementById('fr-book-current').value) || 0,
-        status
+        status,
+        color,
+        started_at: document.getElementById('fr-book-start').value || null,
+        finished_at: document.getElementById('fr-book-end').value || null,
+        rating: status==='concluido' ? (rating||null) : null
       };
-      if(status==='concluido' && !wasFinished){ payload.finished_at = todayStr(); }
-      if(status!=='concluido'){ payload.finished_at = null; }
       submitBtn.disabled = true; submitBtn.textContent = 'Salvando...';
       try{
         if(isEdit){
@@ -2664,14 +2877,13 @@
           books = books.map(x=> x.id===existing.id ? {...x, ...payload} : x);
         } else {
           payload.user_id = currentUser.id;
-          payload.started_at = todayStr();
+          payload.started_at = payload.started_at || todayStr();
           const { data, error } = await sb.from('books').insert(payload).select().single();
           if(error) throw error;
           books.push(data);
         }
         showToast('Livro salvo.', 'ok');
         closeOverlay();
-        await loadReadingStats();
         renderLeituraContent();
       }catch(err){
         console.error(err);
@@ -2696,12 +2908,14 @@
     overlay.querySelector('#fr-book-del-cancel').addEventListener('click', closeOverlay);
     overlay.querySelector('#fr-book-del-confirm').addEventListener('click', async function(){
       const btn = this; btn.disabled = true; btn.textContent = 'Excluindo...';
+      const { error: sessDelErr } = await sb.from('reading_sessions').delete().eq('book_id', book.id);
+      if(sessDelErr){ showToast('Não foi possível excluir. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Confirmar exclusão'; return; }
       const { error } = await sb.from('books').delete().eq('id', book.id);
       if(error){ showToast('Não foi possível excluir. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Confirmar exclusão'; return; }
       books = books.filter(x=>x.id!==book.id);
+      readingSessions = readingSessions.filter(s=>s.book_id!==book.id);
       showToast('Livro excluído.', 'ok');
       closeOverlay();
-      await loadReadingStats();
       renderLeituraContent();
     });
   }
@@ -2712,7 +2926,7 @@
       <form id="fr-reading-log-form">
         <div class="fr-row">
           <div class="fr-field"><label for="fr-rl-minutes">Quanto tempo você leu (minutos)</label><input type="number" min="1" id="fr-rl-minutes" required placeholder="ex.: 30"></div>
-          <div class="fr-field"><label for="fr-rl-date">Data</label><input type="date" id="fr-rl-date" value="${todayStr()}"></div>
+          <div class="fr-field"><label for="fr-rl-date">Data</label><input type="date" id="fr-rl-date" value="${todayStr()}" max="${todayStr()}"></div>
         </div>
         <div class="fr-field"><label for="fr-rl-page">Em que página você parou agora${book.total_pages ? ` (de ${book.total_pages})` : ''}</label><input type="number" min="0" ${book.total_pages?`max="${book.total_pages}"`:''} id="fr-rl-page" value="${esc(book.current_page ?? 0)}"></div>
         <div class="fr-form-actions">
@@ -2728,25 +2942,28 @@
       const minutes = numOrNull(document.getElementById('fr-rl-minutes').value);
       if(!minutes || minutes<=0){ document.getElementById('fr-rl-minutes').focus(); return; }
       const date = document.getElementById('fr-rl-date').value || todayStr();
-      const newPage = numOrNull(document.getElementById('fr-rl-page').value);
+      const fromPage = book.current_page || null;
+      const toPageRaw = numOrNull(document.getElementById('fr-rl-page').value);
+      const toPage = toPageRaw!=null ? Math.min(toPageRaw, book.total_pages||toPageRaw) : null;
       submitBtn.disabled = true; submitBtn.textContent = 'Salvando...';
       try{
-        const { error: sessErr } = await sb.from('reading_sessions').insert({
-          user_id: currentUser.id, book_id: book.id, date, minutes
-        });
+        const { data: sess, error: sessErr } = await sb.from('reading_sessions').insert({
+          user_id: currentUser.id, book_id: book.id, date, minutes, from_page: fromPage, to_page: toPage
+        }).select().single();
         if(sessErr) throw sessErr;
-        const justFinished = newPage!=null && book.total_pages && newPage>=book.total_pages && book.status!=='concluido';
-        const bookPayload = {
-          current_page: newPage!=null ? Math.min(newPage, book.total_pages||newPage) : book.current_page
-        };
-        if(justFinished){ bookPayload.status = 'concluido'; bookPayload.finished_at = date; }
+        readingSessions.push(sess);
+        const justFinished = toPage!=null && book.total_pages && toPage>=book.total_pages && book.status!=='concluido';
+        const bookPayload = { current_page: toPage!=null ? toPage : book.current_page };
         const { error: bookErr } = await sb.from('books').update(bookPayload).eq('id', book.id);
         if(bookErr) throw bookErr;
         books = books.map(x=> x.id===book.id ? {...x, ...bookPayload} : x);
-        showToast(justFinished ? 'Leitura registrada — livro concluído! 🎉' : 'Leitura registrada.', 'ok');
         closeOverlay();
-        await loadReadingStats();
-        renderLeituraContent();
+        if(justFinished){
+          finishBookPrompt({...book, ...bookPayload});
+        } else {
+          showToast(`+${minutes} min de leitura registrados.`, 'ok');
+          renderLeituraContent();
+        }
       }catch(err){
         console.error(err);
         showToast('Não foi possível salvar agora. Tente novamente.', 'err');
@@ -2757,38 +2974,462 @@
     setTimeout(()=> document.getElementById('fr-rl-minutes').focus(), 30);
   }
 
+  function finishBookPrompt(book){
+    let rating = 0;
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Terminou "${esc(book.title)}"?</h3>
+      <p class="fr-hint">Você chegou na última página registrada. Quer marcar como concluído?</p>
+      <div class="fr-field"><label>Sua avaliação</label><div class="fr-read-starpick" id="fb-stars"></div></div>
+      <div class="fr-form-actions">
+        <button type="button" class="fr-btn-ghost" id="fb-not">Ainda não</button>
+        <button type="button" class="fr-btn-primary" id="fb-yes">Concluir 🎉</button>
+      </div>
+    `);
+    const starsEl = overlay.querySelector('#fb-stars');
+    const draw = ()=>{ starsEl.innerHTML=''; for(let i=1;i<=5;i++){ const elx=document.createElement('button'); elx.type='button'; elx.textContent='★'; elx.className = i<=rating?'on':''; elx.addEventListener('click', ()=>{ rating = rating===i?0:i; draw(); }); starsEl.appendChild(elx); } };
+    draw();
+    overlay.querySelector('#fb-not').addEventListener('click', ()=>{ closeOverlay(); showToast('Página atualizada.', 'ok'); renderLeituraContent(); });
+    overlay.querySelector('#fb-yes').addEventListener('click', async ()=>{
+      const payload = { status:'concluido', finished_at: todayStr(), rating: rating||null };
+      const { error } = await sb.from('books').update(payload).eq('id', book.id);
+      if(error){ showToast('Não foi possível salvar agora.', 'err'); return; }
+      books = books.map(x=> x.id===book.id ? {...x, ...payload} : x);
+      closeOverlay();
+      showToast(`✦ ${book.title} concluído!`, 'ok');
+      renderLeituraContent();
+    });
+  }
+
+  /* ---------- Sessão: cronômetro + lista de sessões ---------- */
+  const LEITURA_TIMER_KEY = 'saber-leitura-timer-v1';
+  function timerState(){ try{ return JSON.parse(localStorage.getItem(LEITURA_TIMER_KEY)||'null'); }catch(e){ return null; } }
+  function setTimerState(t){ try{ t ? localStorage.setItem(LEITURA_TIMER_KEY, JSON.stringify(t)) : localStorage.removeItem(LEITURA_TIMER_KEY); }catch(e){} }
+  function timerElapsedMs(t){ return (t.acc||0) + (t.start ? Date.now()-t.start : 0); }
+  function fmtClock(ms){ const s=Math.floor(ms/1000); const h=Math.floor(s/3600); return (h?h+':':'')+pad(Math.floor(s/60)%60)+':'+pad(s%60); }
+
+  function renderSessaoView(){
+    const el = document.getElementById('fr-leitura-content');
+    el.innerHTML = `
+      <div class="fr-read-timercard" id="fr-read-timercard">
+        <div class="fr-section-label" style="margin-bottom:0;">Sessão de leitura</div>
+        <div class="fr-read-bookchips" id="fr-read-timer-books" style="margin-top:10px"></div>
+        <div class="fr-read-clock" id="fr-read-clock">00:00</div>
+        <div class="fr-read-timerbtns">
+          <button type="button" class="fr-btn-primary" id="fr-read-tstart">Começar a ler</button>
+          <button type="button" class="fr-btn-ghost" id="fr-read-tstop" style="display:none">Encerrar</button>
+        </div>
+        <div class="fr-hint" id="fr-read-thint" style="text-align:center;margin-top:10px">Escolha o livro e comece. O cronômetro continua mesmo se você sair da página.</div>
+      </div>
+      <div class="fr-cal-card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <h3 style="font-family:'Fraunces',serif;margin:0;font-size:18px;color:var(--green-deep);">Hoje</h3>
+          <span class="fr-hint" id="fr-read-today-sub" style="margin:0"></span>
+        </div>
+        <div id="fr-read-today-sessions"></div>
+        <div style="margin-top:12px;"><button type="button" class="fr-btn-ghost" id="fr-read-add-manual">+ Registrar sessão manualmente</button></div>
+      </div>
+      <div class="fr-cal-card">
+        <h3 style="font-family:'Fraunces',serif;margin:0 0 10px;font-size:18px;color:var(--green-deep);">Últimas sessões</h3>
+        <div id="fr-read-recent-sessions"></div>
+      </div>
+    `;
+    document.getElementById('fr-read-tstart').addEventListener('click', onTimerStartPause);
+    document.getElementById('fr-read-tstop').addEventListener('click', onTimerStop);
+    document.getElementById('fr-read-add-manual').addEventListener('click', openManualSessionModal);
+    renderTimerUI();
+    renderSessionsLists();
+  }
+
+  function renderTimerUI(){
+    const card = document.getElementById('fr-read-timercard');
+    const t = timerState();
+    const running = !!(t && t.start);
+    if(card) card.classList.toggle('running', running);
+    const clockEl = document.getElementById('fr-read-clock');
+    if(clockEl) clockEl.textContent = fmtClock(t ? timerElapsedMs(t) : 0);
+    const startBtn = document.getElementById('fr-read-tstart');
+    const stopBtn = document.getElementById('fr-read-tstop');
+    if(startBtn) startBtn.textContent = running ? 'Pausar' : (t && t.acc ? 'Continuar' : 'Começar a ler');
+    if(stopBtn) stopBtn.style.display = t ? '' : 'none';
+    const chipsEl = document.getElementById('fr-read-timer-books');
+    if(chipsEl){
+      const reading = readingByStatus('lendo');
+      if(!reading.length){
+        chipsEl.innerHTML = `<span class="fr-hint">Cadastre um livro na Estante para cronometrar.</span>`;
+      } else {
+        chipsEl.innerHTML = reading.map(b=>{
+          const on = t && t.bookId===b.id;
+          return `<button type="button" class="fr-read-bookchip${on?' on':''}" data-id="${b.id}"><i style="background:${spineColorFor(b)}"></i>${esc(b.title)}</button>`;
+        }).join('');
+        chipsEl.querySelectorAll('.fr-read-bookchip').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const cur = timerState() || {acc:0, start:null, bookId:null};
+            cur.bookId = cur.bookId===btn.getAttribute('data-id') ? null : btn.getAttribute('data-id');
+            setTimerState(cur);
+            renderTimerUI();
+          });
+        });
+      }
+    }
+    clearInterval(leituraTimerTick);
+    if(running){
+      leituraTimerTick = setInterval(()=>{
+        const x = timerState();
+        const c = document.getElementById('fr-read-clock');
+        if(x && c) c.textContent = fmtClock(timerElapsedMs(x));
+      }, 1000);
+    }
+  }
+  function onTimerStartPause(){
+    let t = timerState() || {acc:0, start:null, bookId:null};
+    if(t.start){ t.acc = timerElapsedMs(t); t.start = null; }
+    else t.start = Date.now();
+    setTimerState(t);
+    renderTimerUI();
+  }
+  function onTimerStop(){
+    const t = timerState();
+    if(!t) return;
+    const minutes = Math.round(timerElapsedMs(t)/60000);
+    if(minutes<1){ setTimerState(null); renderTimerUI(); showToast('Menos de 1 min — nada registrado.', 'err'); return; }
+    openEndSessionModal(minutes, t.bookId||null);
+  }
+  function openEndSessionModal(minutes, bookId){
+    const book = books.find(b=>b.id===bookId);
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Sessão de ${minutes} min</h3>
+      ${book ? `<p class="fr-hint" style="margin-bottom:10px">${esc(book.title)}${book.current_page?` · você estava na pág. ${book.current_page}`:''}</p>` : ''}
+      ${book ? `<div class="fr-field"><label for="es-to">Em que página parou? (opcional)</label><input type="number" id="es-to" min="0" ${book.total_pages?`max="${book.total_pages}"`:''} placeholder="${book.current_page||''}"></div>` : ''}
+      <div class="fr-form-actions">
+        <button type="button" class="fr-btn-danger" id="es-discard">Descartar</button>
+        <button type="button" class="fr-btn-primary" id="es-save">Registrar</button>
+      </div>
+    `);
+    overlay.querySelector('#es-discard').addEventListener('click', ()=>{ setTimerState(null); closeOverlay(); renderTimerUI(); });
+    overlay.querySelector('#es-save').addEventListener('click', async ()=>{
+      const btn = overlay.querySelector('#es-save'); btn.disabled = true; btn.textContent = 'Salvando...';
+      const fromPage = book ? (book.current_page || null) : null;
+      const inp = overlay.querySelector('#es-to');
+      let toPage = null;
+      if(inp && inp.value) toPage = Math.max(0, Number(inp.value)||0);
+      try{
+        const { data: sess, error } = await sb.from('reading_sessions').insert({
+          user_id: currentUser.id, book_id: bookId, date: todayStr(), minutes, from_page: fromPage, to_page: toPage
+        }).select().single();
+        if(error) throw error;
+        readingSessions.push(sess);
+        setTimerState(null);
+        if(book && toPage!=null){
+          const { error: bookErr } = await sb.from('books').update({ current_page: toPage }).eq('id', book.id);
+          if(bookErr) throw bookErr;
+          books = books.map(x=> x.id===book.id ? {...x, current_page: toPage} : x);
+        }
+        closeOverlay();
+        const justFinished = book && book.total_pages && toPage!=null && toPage>=book.total_pages;
+        if(justFinished){
+          finishBookPrompt({...book, current_page: toPage});
+        } else {
+          showToast(`+${minutes} min de leitura${book? ' · '+book.title:''}`, 'ok');
+          renderLeituraContent();
+        }
+      }catch(err){
+        console.error(err);
+        showToast('Não foi possível salvar agora. Tente novamente.', 'err');
+        btn.disabled = false; btn.textContent = 'Registrar';
+      }
+    });
+  }
+
+  function openManualSessionModal(){
+    const readingBooks = readingByStatus('lendo');
+    const t = timerState();
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Registrar sessão</h3>
+      <div class="fr-field"><label for="ms-book">Livro</label><select id="ms-book"><option value="">— sem livro —</option>${readingBooks.map(b=>`<option value="${b.id}">${esc(b.title)}</option>`).join('')}</select></div>
+      <div class="fr-row">
+        <div class="fr-field"><label for="ms-min">Minutos</label><input type="number" id="ms-min" min="1" value="30"></div>
+        <div class="fr-field"><label for="ms-date">Data</label><input type="date" id="ms-date" value="${todayStr()}" max="${todayStr()}"></div>
+      </div>
+      <div class="fr-row">
+        <div class="fr-field"><label for="ms-from">Da pág. (opc.)</label><input type="number" id="ms-from" min="0"></div>
+        <div class="fr-field"><label for="ms-to">Até a pág. (opc.)</label><input type="number" id="ms-to" min="0"></div>
+      </div>
+      <div class="fr-form-actions">
+        <button type="button" class="fr-btn-ghost" id="ms-cancel">Cancelar</button>
+        <button type="button" class="fr-btn-primary" id="ms-save">Registrar</button>
+      </div>
+    `);
+    const bookSel = overlay.querySelector('#ms-book');
+    if(t && t.bookId) bookSel.value = t.bookId;
+    bookSel.addEventListener('change', ()=>{
+      const b = books.find(x=>x.id===bookSel.value);
+      if(b && b.current_page) overlay.querySelector('#ms-from').value = b.current_page;
+    });
+    overlay.querySelector('#ms-cancel').addEventListener('click', closeOverlay);
+    overlay.querySelector('#ms-save').addEventListener('click', async function(){
+      const btn = this;
+      const minutes = Math.max(1, Number(overlay.querySelector('#ms-min').value)||0);
+      if(!minutes){ overlay.querySelector('#ms-min').focus(); return; }
+      const date = overlay.querySelector('#ms-date').value || todayStr();
+      const bookId = bookSel.value || null;
+      const fromPage = numOrNull(overlay.querySelector('#ms-from').value);
+      const toPage = numOrNull(overlay.querySelector('#ms-to').value);
+      const book = books.find(x=>x.id===bookId);
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      try{
+        const { data: sess, error } = await sb.from('reading_sessions').insert({
+          user_id: currentUser.id, book_id: bookId, date, minutes, from_page: fromPage, to_page: toPage
+        }).select().single();
+        if(error) throw error;
+        readingSessions.push(sess);
+        if(book && toPage!=null && date===todayStr()){
+          const newPage = Math.max(n0(book.current_page), toPage);
+          const { error: bookErr } = await sb.from('books').update({ current_page: newPage }).eq('id', book.id);
+          if(bookErr) throw bookErr;
+          books = books.map(x=> x.id===book.id ? {...x, current_page:newPage} : x);
+        }
+        closeOverlay();
+        const justFinished = book && book.total_pages && toPage!=null && toPage>=book.total_pages && date===todayStr();
+        if(justFinished){ finishBookPrompt({...book, current_page: toPage}); }
+        else { showToast('Sessão registrada.', 'ok'); renderLeituraContent(); }
+      }catch(err){
+        console.error(err);
+        showToast('Não foi possível salvar agora. Tente novamente.', 'err');
+        btn.disabled = false; btn.textContent = 'Registrar';
+      }
+    });
+  }
+
+  function sessionRowHtml(s, showDate){
+    const book = books.find(b=>b.id===s.book_id);
+    const pages = pagesOfSession(s);
+    return `
+      <div class="fr-read-sess" data-id="${s.id}">
+        <span class="fr-read-sess-sw" style="background:${book?spineColorFor(book):'var(--border)'}"></span>
+        <div class="fr-read-sess-t">
+          <b>${book ? esc(book.title) : '(livro removido)'}</b>
+          <span>${showDate?fmtDateBr(s.date)+' · ':''}${pages?`${pages} págs (pág ${s.from_page}→${s.to_page})`:'sem registro de páginas'}</span>
+        </div>
+        <span class="fr-read-sess-min">${s.minutes} min</span>
+        <button type="button" class="fr-read-sess-del" data-id="${s.id}" aria-label="Excluir">×</button>
+      </div>`;
+  }
+  function renderSessionsLists(){
+    const today = todayStr();
+    const todaySessions = readingSessions.filter(s=>s.date===today);
+    const todaySub = document.getElementById('fr-read-today-sub');
+    if(todaySub) todaySub.textContent = `${minOnDate(today)} min${readingTargets.daily_minutes ? ' · meta '+readingTargets.daily_minutes+' min' : ''}`;
+    const todayEl = document.getElementById('fr-read-today-sessions');
+    if(todayEl) todayEl.innerHTML = todaySessions.length ? todaySessions.slice().reverse().map(s=>sessionRowHtml(s,false)).join('') : `<div class="fr-hint">Nenhuma sessão hoje ainda.</div>`;
+    const recentEl = document.getElementById('fr-read-recent-sessions');
+    if(recentEl){
+      const recent = readingSessions.filter(s=>s.date!==today).slice(-8).reverse();
+      recentEl.innerHTML = recent.length ? recent.map(s=>sessionRowHtml(s,true)).join('') : `<div class="fr-hint">—</div>`;
+    }
+    document.querySelectorAll('.fr-read-sess-del').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-id');
+        const { error } = await sb.from('reading_sessions').delete().eq('id', id);
+        if(error){ showToast('Não foi possível excluir. Tente novamente.', 'err'); return; }
+        readingSessions = readingSessions.filter(s=>s.id!==id);
+        renderLeituraContent();
+      });
+    });
+  }
+
+  /* ---------- Painel: metas, calendário, semana, ritmo, conquistas ---------- */
+  function renderPainelView(){
+    const el = document.getElementById('fr-leitura-content');
+    if(!leituraCalMonth) leituraCalMonth = todayStr().slice(0,7);
+    const today = todayStr();
+    const dailyGoal = Number(readingTargets.daily_minutes) || 0;
+    const yearlyGoal = Number(readingTargets.yearly_books) || 0;
+    const todayMin = minOnDate(today);
+    const streak = readingStreak();
+    const yearBooks = booksFinishedThisYear();
+    el.innerHTML = `
+      <div class="fr-read-stats">
+        <div class="fr-read-stat"><div class="n">${todayMin}<small>min</small></div><div class="lbl">hoje</div></div>
+        <div class="fr-read-stat"><div class="n">${streak}<small>dias</small></div><div class="lbl">sequência</div></div>
+        <div class="fr-read-stat"><div class="n">${yearBooks}${yearlyGoal?`<small>/${yearlyGoal}</small>`:''}</div><div class="lbl">livros no ano</div></div>
+      </div>
+      <div class="fr-cal-card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <h3 style="font-family:'Fraunces',serif;margin:0;font-size:18px;color:var(--green-deep);">Metas</h3>
+          <button type="button" class="fr-btn-ghost" id="fr-read-edit-goals" style="padding:6px 12px;font-size:12px;">Ajustar</button>
+        </div>
+        <div class="fr-weekly-goals-grid" style="grid-template-columns:1fr 1fr;">
+          <div class="fr-weekly-goal-card">
+            <div class="fr-weekly-goal-label">Minutos por dia</div>
+            <div class="fr-weekly-goal-val">${todayMin} <span>${dailyGoal?'/ '+dailyGoal+' min':'min'}</span></div>
+            ${dailyGoal?`<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,todayMin/dailyGoal*100)}%;background:var(--green)"></div></div>`:''}
+          </div>
+          <div class="fr-weekly-goal-card">
+            <div class="fr-weekly-goal-label">Livros no ano</div>
+            <div class="fr-weekly-goal-val">${yearBooks} <span>${yearlyGoal?'/ '+yearlyGoal:''}</span></div>
+            ${yearlyGoal?`<div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,yearBooks/yearlyGoal*100)}%;background:var(--mustard)"></div></div>`:''}
+          </div>
+        </div>
+      </div>
+      <div class="fr-cal-card" style="margin-bottom:14px;">
+        <div class="fr-cal-nav">
+          <button class="fr-date-btn" id="fr-read-cal-prev" aria-label="Mês anterior">&lsaquo;</button>
+          <div class="fr-cal-month-label" id="fr-read-cal-month-label"></div>
+          <button class="fr-date-btn" id="fr-read-cal-next" aria-label="Próximo mês">&rsaquo;</button>
+        </div>
+        <div id="fr-read-cal-grid"></div>
+        <div class="fr-read-cal-legend">
+          <span><i style="background:#E9D3A8"></i>leu um pouco</span>
+          <span><i style="background:#D9B36A"></i>metade da meta</span>
+          <span><i style="background:var(--mustard)"></i>meta batida</span>
+          <span><i style="background:var(--green-deep)"></i>dia de devorar</span>
+        </div>
+      </div>
+      <div class="fr-cal-card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <h3 style="font-family:'Fraunces',serif;margin:0;font-size:18px;color:var(--green-deep);">Semana</h3>
+          <span class="fr-hint" id="fr-read-week-sub" style="margin:0"></span>
+        </div>
+        <div class="fr-read-weekbars" id="fr-read-weekbars"></div>
+      </div>
+      <div class="fr-cal-card" style="margin-bottom:14px;">
+        <h3 style="font-family:'Fraunces',serif;margin:0 0 2px;font-size:18px;color:var(--green-deep);">Ritmo por livro</h3>
+        <span class="fr-hint">pág/h e previsão de término</span>
+        <div id="fr-read-pace-list" style="margin-top:8px;"></div>
+      </div>
+      <div class="fr-cal-card">
+        <h3 style="font-family:'Fraunces',serif;margin:0 0 10px;font-size:18px;color:var(--green-deep);">Conquistas</h3>
+        <div class="fr-read-badges" id="fr-read-badges"></div>
+      </div>
+    `;
+    document.getElementById('fr-read-edit-goals').addEventListener('click', openReadingTargetsModal);
+    document.getElementById('fr-read-cal-prev').addEventListener('click', ()=>{
+      const [y,m] = leituraCalMonth.split('-').map(Number);
+      const d = new Date(y, m-2, 1);
+      leituraCalMonth = d.getFullYear()+'-'+pad(d.getMonth()+1);
+      renderPainelCalendar();
+    });
+    document.getElementById('fr-read-cal-next').addEventListener('click', ()=>{
+      const [y,m] = leituraCalMonth.split('-').map(Number);
+      const d = new Date(y, m, 1);
+      const nk = d.getFullYear()+'-'+pad(d.getMonth()+1);
+      if(nk <= todayStr().slice(0,7)){ leituraCalMonth = nk; renderPainelCalendar(); }
+    });
+    renderPainelCalendar();
+    renderPainelWeek();
+    renderPainelPace();
+    renderPainelBadges();
+  }
+
+  function renderPainelCalendar(){
+    const labelEl = document.getElementById('fr-read-cal-month-label');
+    const gridEl = document.getElementById('fr-read-cal-grid');
+    if(!labelEl || !gridEl) return;
+    const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const [y,m] = leituraCalMonth.split('-').map(Number);
+    labelEl.textContent = `${monthNames[m-1]} ${y}`;
+    const goal = Number(readingTargets.daily_minutes) || 30;
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const firstDow = new Date(y, m-1, 1).getDay();
+    const today = todayStr();
+    let html = `<div class="fr-cal-weekdays">${['D','S','T','Q','Q','S','S'].map(d=>`<span>${d}</span>`).join('')}</div><div class="fr-cal-days">`;
+    for(let i=0;i<firstDow;i++) html += `<div class="fr-cal-day fr-cal-day-empty"></div>`;
+    for(let d=1; d<=daysInMonth; d++){
+      const dateStr = `${y}-${pad(m)}-${pad(d)}`;
+      const mins = minOnDate(dateStr);
+      const isFuture = dateStr > today;
+      const isToday = dateStr === today;
+      let level = 0;
+      if(!isFuture) level = mins===0 ? 0 : (mins<goal/2 ? 1 : (mins<goal ? 2 : (mins<goal*2 ? 3 : 4)));
+      html += `<div class="fr-cal-day fr-read-cal-day ${isToday?'fr-cal-day-today':''} ${isFuture?'fr-cal-day-future':''}" data-l="${level}" title="${dateStr} · ${mins} min">
+        <span class="fr-cal-day-num">${d}</span>${(!isFuture && mins) ? `<span class="fr-cal-metric">${mins}m</span>` : ''}
+      </div>`;
+    }
+    html += `</div>`;
+    gridEl.innerHTML = html;
+  }
+
+  function renderPainelWeek(){
+    const today = todayStr();
+    const dow = new Date(today+'T00:00:00').getDay();
+    const weekStart = shiftDateStr(today, -dow);
+    const DOW = ['dom','seg','ter','qua','qui','sex','sáb'];
+    const goal = Number(readingTargets.daily_minutes) || 30;
+    let max = goal, total = 0;
+    const days = [];
+    for(let i=0;i<7;i++){
+      const k = shiftDateStr(weekStart, i);
+      const mins = minOnDate(k);
+      days.push({k, mins, future: k>today});
+      total += mins;
+      max = Math.max(max, mins);
+    }
+    const wbEl = document.getElementById('fr-read-weekbars');
+    if(wbEl){
+      wbEl.innerHTML = days.map(({k,mins,future})=>{
+        const h = mins ? Math.max(8, Math.round(mins/max*100)) : 0;
+        const dowIdx = new Date(k+'T00:00:00').getDay();
+        return `<div class="fr-read-wb ${k===today?'today':''} ${future?'future':''}">
+          <span class="v">${mins||''}</span>
+          <div class="col"><i style="height:${h}%;${mins>=goal?'':'opacity:.55'}"></i></div>
+          <span>${DOW[dowIdx]}</span>
+        </div>`;
+      }).join('');
+    }
+    const sub = document.getElementById('fr-read-week-sub');
+    if(sub) sub.textContent = `${total} min na semana`;
+  }
+
+  function renderPainelPace(){
+    const el = document.getElementById('fr-read-pace-list');
+    if(!el) return;
+    const reading = readingByStatus('lendo');
+    if(!reading.length){ el.innerHTML = `<div class="fr-hint">Registre sessões com páginas para ver seu ritmo.</div>`; return; }
+    el.innerHTML = reading.map(b=>{
+      const pace = bookPace(b);
+      const eta = bookEta(b);
+      return `<div class="fr-read-pace-row"><span>${esc(b.title)}</span><b>${pace? pace.toFixed(0)+' pág/h' : '—'}${eta? ' · ~'+eta.days+'d' : ''}</b></div>`;
+    }).join('');
+  }
+
+  function renderPainelBadges(){
+    const el = document.getElementById('fr-read-badges');
+    if(!el) return;
+    const stats = badgeStats();
+    el.innerHTML = LEITURA_BADGES.map(b=>{
+      const ok = b.test(stats);
+      return `<div class="fr-read-badge${ok?'':' locked'}"><div class="ic">${b.ic}</div><b>${esc(b.name)}</b><div class="fr-hint" style="margin-top:1px">${esc(b.desc)}</div></div>`;
+    }).join('');
+  }
+
   function openReadingTargetsModal(){
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Metas de leitura</h3>
-      <form id="fr-reading-targets-form">
-        <div class="fr-field"><label for="fr-rt-daily">Minutos por dia</label><input type="number" min="0" id="fr-rt-daily" value="${esc(readingTargets.daily_minutes ?? '')}"></div>
-        <div class="fr-field"><label for="fr-rt-weekly">Minutos por semana</label><input type="number" min="0" id="fr-rt-weekly" value="${esc(readingTargets.weekly_minutes ?? '')}"></div>
-        <div class="fr-field"><label for="fr-rt-monthly">Livros por mês</label><input type="number" min="0" id="fr-rt-monthly" value="${esc(readingTargets.monthly_books ?? '')}"></div>
-        <div class="fr-form-actions">
-          <button type="button" class="fr-btn-ghost" id="fr-rt-cancel">Cancelar</button>
-          <button type="submit" class="fr-btn-primary">Salvar metas</button>
-        </div>
-      </form>
+      <div class="fr-field"><label for="fr-rt-daily">Minutos por dia</label><input type="number" min="0" id="fr-rt-daily" value="${esc(readingTargets.daily_minutes ?? '')}"></div>
+      <div class="fr-field"><label for="fr-rt-yearly">Livros no ano</label><input type="number" min="0" id="fr-rt-yearly" value="${esc(readingTargets.yearly_books ?? '')}"></div>
+      <div class="fr-form-actions">
+        <button type="button" class="fr-btn-ghost" id="fr-rt-cancel">Cancelar</button>
+        <button type="button" class="fr-btn-primary" id="fr-rt-save">Salvar metas</button>
+      </div>
     `);
     overlay.querySelector('#fr-rt-cancel').addEventListener('click', closeOverlay);
-    overlay.querySelector('#fr-reading-targets-form').addEventListener('submit', async function(e){
-      e.preventDefault();
-      const btn = overlay.querySelector('button[type="submit"]');
+    overlay.querySelector('#fr-rt-save').addEventListener('click', async function(){
+      const btn = this;
       const payload = {
         user_id: currentUser.id,
         daily_minutes: numOrNull(document.getElementById('fr-rt-daily').value),
-        weekly_minutes: numOrNull(document.getElementById('fr-rt-weekly').value),
-        monthly_books: numOrNull(document.getElementById('fr-rt-monthly').value)
+        yearly_books: numOrNull(document.getElementById('fr-rt-yearly').value)
       };
       btn.disabled = true; btn.textContent = 'Salvando...';
       const { error } = await sb.from('reading_targets').upsert(payload);
-      if(error){ showToast('Não foi possível salvar agora. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Tentar salvar de novo'; return; }
-      readingTargets = payload;
+      if(error){ showToast('Não foi possível salvar agora. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Salvar metas'; return; }
+      readingTargets = {...readingTargets, ...payload};
       showToast('Metas de leitura atualizadas.', 'ok');
       closeOverlay();
       renderLeituraContent();
     });
   }
+
 
   // Fatores de rendimento (peso cozido ÷ peso cru) pros alimentos mais comuns que
   // aparecem "já cozidos" nas receitas. Usado só pra converter de volta pra uma
