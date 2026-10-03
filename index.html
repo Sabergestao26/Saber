@@ -2398,7 +2398,7 @@
 
   /* ---------- View switching ---------- */
   function renderViewTabs(){
-    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['leitura','Leitura'], ['articles','Artigos'], ['settings','Configurações']];
+    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['articles','Artigos'], ['leitura','Leitura'], ['settings','Configurações']];
     document.getElementById('fr-view-tabs').innerHTML = tabs.map(t=>
       `<button class="fr-view-tab ${currentView===t[0]?'active':''}" data-view="${t[0]}">${t[1]}</button>`
     ).join('');
@@ -2586,7 +2586,10 @@
   }
 
   /* ---------- Leitura (estante, cronômetro de sessões, painel com metas/calendário/ritmo/conquistas) ---------- */
-  const LEITURA_COLORS = ['#3F6B4A','#2E4F37','#46687A','#5B3A52','#BF8A2E','#A8481F','#6B6A57','#7A8C5A'];
+  // Mesmas cores de --green, --green-deep, --blue, --plum, --mustard, --rust e
+  // --ink-soft do app (ver :root no topo do arquivo) — nenhuma cor nova, só
+  // reaproveitando a paleta do Saber pras lombadas dos livros.
+  const LEITURA_COLORS = ['#3F6B4A','#2E4F37','#46687A','#5B3A52','#BF8A2E','#A8481F','#6B6A57'];
   const LEITURA_RANKS = [[0,'Iniciante'],[300,'Leitora'],[1200,'Leitora Dedicada'],[3000,'Devoradora de Livros'],[8000,'Rato de Biblioteca'],[18000,'Bibliófila']];
   const LEITURA_BADGES = [
     { ic:'1',   name:'Primeira sessão',  desc:'1 sessão registrada',                 test:s=>s.sessions>=1 },
