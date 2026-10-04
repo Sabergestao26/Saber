@@ -2041,9 +2041,18 @@
         <p class="fr-hint" style="margin-bottom:10px;">Nenhuma balança conectada ainda.</p>
         <button class="fr-btn-primary" id="fr-withings-connect" style="width:100%;">Conectar balança Withings</button>
       `;
-      el.querySelector('#fr-withings-connect').addEventListener('click', ()=>{
+      el.querySelector('#fr-withings-connect').addEventListener('click', async ()=>{
+        // O "state" não é mais o id da pessoa em texto puro (qualquer um
+        // podia mandar outro id ali e linkar a balança de outra conta -
+        // ver nota de segurança). Agora é o próprio token de sessão: a
+        // withings-callback confirma quem é de verdade chamando
+        // auth.getUser(token), do mesmo jeito que toda Edge Function do
+        // Saber já confirma identidade.
+        const { data: sessionData } = await sb.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+        if(!accessToken){ showToast('Sessão expirada — entre de novo e tente conectar a balança outra vez.', 'err'); return; }
         const redirectUri = encodeURIComponent(`${SUPABASE_URL}/functions/v1/withings-callback`);
-        const state = encodeURIComponent(currentUser.id);
+        const state = encodeURIComponent(accessToken);
         const authUrl = `https://account.withings.com/oauth2_user/authorize2?response_type=code&client_id=${WITHINGS_CLIENT_ID}&redirect_uri=${redirectUri}&scope=user.metrics&state=${state}`;
         window.location.href = authUrl;
       });
