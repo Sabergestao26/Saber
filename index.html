@@ -522,6 +522,16 @@
     font-family:'IBM Plex Mono',monospace; background:var(--surface); color:var(--ink);
   }
 
+  .fr-weight-card{
+    max-width:1080px; margin:0 auto 24px; background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 20px;
+  }
+  .fr-weight-card-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  .fr-weight-card-title{ font-family:'Fraunces',serif; font-weight:700; font-size:16px; color:var(--ink); }
+  .fr-weight-card-main{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .fr-weight-val{ font-family:'Fraunces',serif; font-weight:700; font-size:32px; color:var(--green-deep); }
+  .fr-weight-unit{ font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--ink-soft); }
+
   .fr-cal-card{
     max-width:1080px; margin:0 auto; background:var(--card); border:1px solid var(--border);
     border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 20px;
@@ -772,6 +782,7 @@
   <div id="fr-view-diary">
     <div class="fr-date-nav" id="fr-date-nav"></div>
     <div class="fr-summary" id="fr-summary"></div>
+    <div id="fr-weight-section"></div>
     <div id="fr-diary-content"></div>
     <div id="fr-weekly-goals-section"></div>
     <div id="fr-calendar-section"></div>
@@ -1413,6 +1424,11 @@
           <h4>Balança (Withings)</h4>
           <div id="fr-withings-area"><div class="fr-loading">Carregando...</div></div>
         </div>
+        <div class="fr-settings-section">
+          <h4>Importar medições de outra balança</h4>
+          <p class="fr-hint" style="margin-bottom:10px;">Sua balança não conecta direto com o Saber? Exporte o arquivo que ela gera (PDF, Excel ou CSV) e importe aqui — peso, IMC, % de gordura, massa muscular, massa óssea e água corporal, do mesmo jeito que funciona a importação de treino.</p>
+          <button class="fr-btn-ghost" id="fr-import-measurements-btn" style="width:100%;">📄 Importar arquivo da balança</button>
+        </div>
         ${isPro ? `
         <div class="fr-settings-section">
           <h4>Verificação profissional</h4>
@@ -1639,6 +1655,7 @@
       }
       renderLinkedArea(container);
       renderWithingsArea(container);
+      container.querySelector('#fr-import-measurements-btn').addEventListener('click', openImportMeasurementsModal);
 
       container.querySelector('#fr-redeem-btn').addEventListener('click', async function(){
         const btn = this;
@@ -2102,6 +2119,162 @@
       <div class="fr-evo-title">Histórico recente</div>
       ${data.map(m=>`<div class="fr-session-hist-row"><span>${esc(formatDateLabel(m.date))}</span><b>${m.weight_kg!=null ? m.weight_kg.toFixed(1)+'kg' : '—'}</b></div>`).join('')}
     `;
+  }
+
+  /* ---------- Importar medições de balança (arquivo) ---------- */
+  // Mesmo princípio da importação de treino: a Edge Function só lê e
+  // devolve o que entendeu, a pessoa confere e ajusta cada linha numa
+  // tela de revisão, e só o app salva — nunca a função sozinha.
+  // Cada item é { tmpId, date, weight_kg, bmi, fat_percent,
+  // fat_free_mass_kg, muscle_mass_kg, bone_mass_kg, hydration_kg }.
+  let importedMeasurementsDraft = [];
+
+  function openImportMeasurementsModal(){
+    importedMeasurementsDraft = [];
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Importar medições da balança</h3>
+      <p class="fr-hint" style="margin-bottom:14px;">Envie o PDF, Excel ou CSV exportado da sua balança ou do app dela. O Saber tenta identificar data, peso e os outros dados de bioimpedância automaticamente — você confere e ajusta antes de salvar.</p>
+      <div class="fr-field"><label for="fr-import-meas-file-input">Arquivo (PDF, XLSX, XLS ou CSV — até 4MB)</label><input type="file" id="fr-import-meas-file-input" accept=".pdf,.xlsx,.xls,.csv"></div>
+      <button class="fr-btn-primary" id="fr-import-meas-analyze" style="width:100%;margin-top:10px;">Analisar arquivo</button>
+      <div id="fr-import-meas-result"></div>
+    `);
+    overlay.querySelector('#fr-import-meas-analyze').addEventListener('click', analyzeImportMeasurementsFile);
+  }
+
+  async function analyzeImportMeasurementsFile(){
+    const btn = document.getElementById('fr-import-meas-analyze');
+    const fileInput = document.getElementById('fr-import-meas-file-input');
+    const resultEl = document.getElementById('fr-import-meas-result');
+    const file = fileInput.files && fileInput.files[0];
+    if(!file){ showToast('Escolha um arquivo primeiro.', 'err'); return; }
+    const MAX_BYTES = 4 * 1024 * 1024;
+    if(file.size > MAX_BYTES){ showToast('Arquivo muito grande (máximo 4MB).', 'err'); return; }
+    btn.disabled = true; btn.textContent = 'Analisando...';
+    resultEl.innerHTML = `<div class="fr-loading" style="margin-top:10px;">Lendo o arquivo...</div>`;
+    try{
+      const base64 = await fileToBase64(file);
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/import-body-measurements-file`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, content_base64: base64 })
+      });
+      const result = await res.json();
+      if(!res.ok || result.error){
+        console.error('Não foi possível importar o arquivo:', result);
+        resultEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:8px;">Não consegui ler esse arquivo. Tente outro formato, ou registre o peso manualmente na aba Diário.</p>`;
+        btn.disabled = false; btn.textContent = 'Analisar arquivo';
+        return;
+      }
+      importedMeasurementsDraft = (result.measurements || []).map((m,i)=> ({ tmpId: 'bm'+i+'_'+Date.now(), ...m }));
+      renderImportMeasurementsReview(resultEl, result.warnings || []);
+      btn.style.display = 'none';
+    }catch(err){
+      console.error(err);
+      resultEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:8px;">Não consegui analisar o arquivo agora. Tente novamente.</p>`;
+      btn.disabled = false; btn.textContent = 'Analisar arquivo';
+    }
+  }
+
+  function renderImportMeasurementsReview(container, warnings){
+    const warnHtml = warnings.length ? `<div class="fr-hint" style="margin:10px 0;color:var(--ink-soft);">${warnings.map(w=>esc(w)).join('<br>')}</div>` : '';
+    container.innerHTML = `
+      ${warnHtml}
+      <div class="fr-section-label" style="padding-top:0;">Medições encontradas — confira a data e os valores antes de salvar</div>
+      <div id="fr-import-meas-list"></div>
+      <button type="button" class="fr-btn-ghost" id="fr-import-meas-add" style="width:100%;margin-top:8px;">${PLUS_SVG} Adicionar medição</button>
+      <button class="fr-btn-primary" id="fr-import-meas-save" style="width:100%;margin-top:14px;">Salvar medição(ões)</button>
+    `;
+    renderImportMeasurementsRows();
+    container.querySelector('#fr-import-meas-add').addEventListener('click', ()=>{
+      importedMeasurementsDraft.push({ tmpId:'bm_new_'+Date.now(), date: todayStr(), weight_kg:null, bmi:null, fat_percent:null, fat_free_mass_kg:null, muscle_mass_kg:null, bone_mass_kg:null, hydration_kg:null });
+      renderImportMeasurementsRows();
+    });
+    container.querySelector('#fr-import-meas-save').addEventListener('click', saveImportedMeasurements);
+  }
+
+  function renderImportMeasurementsRows(){
+    const listEl = document.getElementById('fr-import-meas-list');
+    if(!listEl) return;
+    if(importedMeasurementsDraft.length===0){
+      listEl.innerHTML = `<p class="fr-hint">Nenhuma medição ainda — adicione manualmente abaixo.</p>`;
+      return;
+    }
+    listEl.innerHTML = importedMeasurementsDraft.map(m=>`
+      <div class="fr-import-meas-row" data-tmp="${m.tmpId}" style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;">
+        <div class="fr-row">
+          <div class="fr-field"><label>Data</label><input type="date" class="fr-im-date" max="${todayStr()}" value="${escAttr(m.date || todayStr())}"></div>
+          <div class="fr-field"><label>Peso (kg)</label><input type="number" min="0" step="0.1" class="fr-im-weight" value="${m.weight_kg==null?'':m.weight_kg}"></div>
+        </div>
+        <div class="fr-row">
+          <div class="fr-field"><label>IMC</label><input type="number" min="0" step="0.1" class="fr-im-bmi" value="${m.bmi==null?'':m.bmi}"></div>
+          <div class="fr-field"><label>Gordura corporal (%)</label><input type="number" min="0" max="100" step="0.1" class="fr-im-fat" value="${m.fat_percent==null?'':m.fat_percent}"></div>
+        </div>
+        <div class="fr-row">
+          <div class="fr-field"><label>Massa muscular (kg)</label><input type="number" min="0" step="0.1" class="fr-im-muscle" value="${m.muscle_mass_kg==null?'':m.muscle_mass_kg}"></div>
+          <div class="fr-field"><label>Massa óssea (kg)</label><input type="number" min="0" step="0.01" class="fr-im-bone" value="${m.bone_mass_kg==null?'':m.bone_mass_kg}"></div>
+        </div>
+        <div class="fr-row">
+          <div class="fr-field"><label>Água corporal (kg)</label><input type="number" min="0" step="0.1" class="fr-im-water" value="${m.hydration_kg==null?'':m.hydration_kg}"></div>
+          <div class="fr-field"><label>Massa magra (kg)</label><input type="number" min="0" step="0.1" class="fr-im-lean" value="${m.fat_free_mass_kg==null?'':m.fat_free_mass_kg}"></div>
+        </div>
+        <button type="button" class="fr-btn-ghost fr-im-remove" style="width:100%;margin-top:4px;color:var(--rust);">Remover</button>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('.fr-import-meas-row').forEach(row=>{
+      const tmpId = row.getAttribute('data-tmp');
+      row.querySelector('.fr-im-remove').addEventListener('click', ()=>{
+        importedMeasurementsDraft = importedMeasurementsDraft.filter(x=> x.tmpId!==tmpId);
+        renderImportMeasurementsRows();
+      });
+    });
+  }
+
+  async function saveImportedMeasurements(){
+    const btn = document.getElementById('fr-import-meas-save');
+    const rows = Array.from(document.querySelectorAll('.fr-import-meas-row'));
+    const toSave = [];
+    for(const row of rows){
+      const date = row.querySelector('.fr-im-date').value;
+      const weight = numOrNull(row.querySelector('.fr-im-weight').value);
+      if(!date){ continue; } // sem data não salva (precisa pra não sobrescrever outro dia por engano)
+      toSave.push({
+        user_id: currentUser.id,
+        date,
+        source: 'import',
+        weight_kg: weight,
+        bmi: numOrNull(row.querySelector('.fr-im-bmi').value),
+        fat_percent: numOrNull(row.querySelector('.fr-im-fat').value),
+        muscle_mass_kg: numOrNull(row.querySelector('.fr-im-muscle').value),
+        bone_mass_kg: numOrNull(row.querySelector('.fr-im-bone').value),
+        hydration_kg: numOrNull(row.querySelector('.fr-im-water').value),
+        fat_free_mass_kg: numOrNull(row.querySelector('.fr-im-lean').value)
+      });
+    }
+    if(toSave.length===0){ showToast('Preencha ao menos a data de uma medição.', 'err'); return; }
+    if(toSave.length < rows.length){ showToast('Alguma linha sem data foi ignorada.', 'err'); }
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    const { error } = await sb.from('body_measurements').upsert(toSave, { onConflict: 'user_id,date,source' });
+    btn.disabled = false; btn.textContent = 'Salvar medição(ões)';
+    if(error){ console.error(error); showToast('Não foi possível salvar agora. Tente novamente.', 'err'); return; }
+    // Sincroniza profiles.weight_kg com o registro mais recente de TODOS
+    // os registros (não só os que acabaram de ser importados) — pode ser
+    // que o arquivo importado seja só histórico antigo e já exista um
+    // peso mais recente registrado por outro caminho.
+    if(currentProfile){
+      const { data: mostRecent } = await sb.from('body_measurements').select('date, weight_kg').eq('user_id', currentUser.id).not('weight_kg', 'is', null).order('date', {ascending:false}).limit(1).maybeSingle();
+      if(mostRecent && mostRecent.weight_kg!=null){
+        const { error: profErr } = await sb.from('profiles').update({ weight_kg: mostRecent.weight_kg }).eq('id', currentUser.id);
+        if(!profErr) currentProfile = { ...currentProfile, weight_kg: mostRecent.weight_kg };
+      }
+    }
+    showToast(toSave.length===1 ? 'Medição importada e salva!' : `${toSave.length} medições importadas e salvas!`, 'ok');
+    importedMeasurementsDraft = [];
+    closeOverlay();
+    const withingsArea = document.getElementById('fr-withings-area');
+    if(withingsArea) renderWithingsHistory(withingsArea);
+    if(currentView==='diary') renderWeightSection();
   }
 
   async function renderSubscriptionArea(container){
@@ -2759,6 +2932,7 @@
           ${b.status==='concluido' && b.rating ? `<div class="fr-book-stars">${'★'.repeat(b.rating)}${'☆'.repeat(5-b.rating)}</div>` : ''}
           <div class="fr-book-actions">
             ${b.status!=='concluido' ? `<button type="button" class="fr-btn-primary" data-act="log" data-id="${b.id}">Registrar leitura</button>` : ''}
+            ${b.pdf_url ? `<a class="fr-btn-ghost" style="display:inline-block;text-decoration:none;" href="${esc(b.pdf_url)}" target="_blank" rel="noopener">📄 Abrir PDF</a>` : ''}
             <button type="button" class="fr-btn-ghost" data-act="edit" data-id="${b.id}">Editar</button>
             <button type="button" class="fr-btn-danger" data-act="delete" data-id="${b.id}">Excluir</button>
           </div>
@@ -2827,6 +3001,7 @@
           <div class="fr-field"><label for="fr-book-start">Início</label><input type="date" id="fr-book-start" value="${esc(b.started_at||'')}"></div>
           <div class="fr-field"><label for="fr-book-end">Fim</label><input type="date" id="fr-book-end" value="${esc(b.finished_at||'')}"></div>
         </div>
+        <div class="fr-field"><label for="fr-book-pdf">Link do PDF (opcional)</label><input type="url" id="fr-book-pdf" value="${esc(b.pdf_url||'')}" placeholder="ex.: link do Google Drive onde você já guarda o PDF"></div>
         <div class="fr-field"><label>Cor da lombada</label><div class="fr-read-swatches" id="fr-book-colors"></div></div>
         <div class="fr-field" id="fr-book-ratewrap" style="${b.status==='concluido'?'':'display:none'}"><label>Sua avaliação</label><div class="fr-read-starpick" id="fr-book-stars"></div></div>
         <div class="fr-form-actions">
@@ -2864,6 +3039,7 @@
         title,
         author: document.getElementById('fr-book-author').value.trim() || null,
         tag: document.getElementById('fr-book-tag').value.trim() || null,
+        pdf_url: document.getElementById('fr-book-pdf').value.trim() || null,
         total_pages: numOrNull(document.getElementById('fr-book-total').value),
         current_page: numOrNull(document.getElementById('fr-book-current').value) || 0,
         status,
@@ -6085,6 +6261,7 @@
     renderDateNav();
     renderSummary();
     renderDiaryList();
+    renderWeightSection();
     renderWeeklyGoalsProgress();
     renderInlineCalendar();
     maybeShowWeeklyReport();
@@ -6219,6 +6396,110 @@
     showToast('Removido do diário.', 'ok');
     renderSummary();
     renderDiaryList();
+  }
+
+  /* ---------- Peso (registro manual + meta) ---------- */
+  async function renderWeightSection(){
+    const el = document.getElementById('fr-weight-section');
+    if(!el) return;
+    el.innerHTML = `<div class="fr-loading">Carregando peso...</div>`;
+    const { data, error } = await sb.from('body_measurements').select('date, weight_kg').eq('user_id', currentUser.id).order('date', {ascending:false}).limit(2);
+    const goal = targets ? numOrNull(targets.target_weight_kg) : null;
+    if(error || !data || data.length===0 || data[0].weight_kg==null){
+      el.innerHTML = `
+        <div class="fr-weight-card">
+          <div class="fr-weight-card-head">
+            <span class="fr-weight-card-title">⚖️ Peso</span>
+            <button type="button" class="fr-btn-ghost" id="fr-weight-log-btn">Registrar peso</button>
+          </div>
+          <p class="fr-hint" style="margin:0;">Nenhum peso registrado ainda.${goal!=null ? ` Meta: ${esc(goal)}kg.` : ''}</p>
+        </div>`;
+      el.querySelector('#fr-weight-log-btn').addEventListener('click', openWeightLogModal);
+      return;
+    }
+    const latest = data[0];
+    const prev = data[1];
+    let deltaHtml = '';
+    if(prev && prev.weight_kg!=null && latest.weight_kg!=null){
+      const diff = latest.weight_kg - prev.weight_kg;
+      const arrow = diff>0 ? '▲' : (diff<0 ? '▼' : '—');
+      const color = diff>0 ? 'var(--rust)' : (diff<0 ? 'var(--green-deep)' : 'var(--ink-soft)');
+      deltaHtml = `<span style="color:${color};font-weight:600;font-size:13px;">${arrow} ${Math.abs(diff).toFixed(1)}kg</span> <span class="fr-hint" style="display:inline;">desde ${esc(formatDateLabel(prev.date))}</span>`;
+    }
+    const goalHtml = goal!=null ? `<div class="fr-hint" style="margin-top:4px;">Meta: ${esc(goal)}kg ${latest.weight_kg!=null ? `(diferença: ${Math.abs(latest.weight_kg-goal).toFixed(1)}kg)` : ''}</div>` : '';
+    el.innerHTML = `
+      <div class="fr-weight-card">
+        <div class="fr-weight-card-head">
+          <span class="fr-weight-card-title">⚖️ Peso</span>
+          <button type="button" class="fr-btn-ghost" id="fr-weight-log-btn">Registrar peso</button>
+        </div>
+        <div class="fr-weight-card-main">
+          <span class="fr-weight-val">${latest.weight_kg.toFixed(1)}</span><span class="fr-weight-unit">kg</span>
+          ${deltaHtml}
+        </div>
+        <div class="fr-hint" style="margin-top:2px;">Último registro: ${esc(formatDateLabel(latest.date))}</div>
+        ${goalHtml}
+      </div>`;
+    el.querySelector('#fr-weight-log-btn').addEventListener('click', openWeightLogModal);
+  }
+
+  function openWeightLogModal(){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Registrar peso</h3>
+      <form id="fr-weight-form">
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-w-date">Data</label><input type="date" id="fr-w-date" value="${todayStr()}" max="${todayStr()}" required></div>
+          <div class="fr-field"><label for="fr-w-weight">Peso (kg)</label><input type="number" min="1" step="0.1" id="fr-w-weight" required></div>
+        </div>
+        <details style="margin:10px 0;">
+          <summary class="fr-hint" style="cursor:pointer;">+ Dados da balança de bioimpedância (opcional)</summary>
+          <div class="fr-row" style="margin-top:10px;">
+            <div class="fr-field"><label for="fr-w-fat">Gordura corporal (%)</label><input type="number" min="0" max="100" step="0.1" id="fr-w-fat"></div>
+            <div class="fr-field"><label for="fr-w-muscle">Massa muscular (kg)</label><input type="number" min="0" step="0.1" id="fr-w-muscle"></div>
+          </div>
+          <div class="fr-row">
+            <div class="fr-field"><label for="fr-w-bone">Massa óssea (kg)</label><input type="number" min="0" step="0.01" id="fr-w-bone"></div>
+            <div class="fr-field"><label for="fr-w-water">Água corporal (kg)</label><input type="number" min="0" step="0.1" id="fr-w-water"></div>
+          </div>
+          <p class="fr-hint">Se sua balança exporta um arquivo (PDF, Excel ou CSV) em vez de mostrar esses números na hora, dá pra importar o arquivo direto nas Configurações.</p>
+        </details>
+        <div class="fr-form-actions">
+          <button type="button" class="fr-btn-ghost" id="fr-weight-cancel">Cancelar</button>
+          <button type="submit" class="fr-btn-primary">Salvar</button>
+        </div>
+      </form>
+    `);
+    overlay.querySelector('#fr-weight-cancel').addEventListener('click', closeOverlay);
+    overlay.querySelector('#fr-weight-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const btn = overlay.querySelector('button[type="submit"]');
+      const date = document.getElementById('fr-w-date').value;
+      const weight = numOrNull(document.getElementById('fr-w-weight').value);
+      if(!date || weight===null){ showToast('Preencha a data e o peso.', 'err'); return; }
+      const heightM = currentProfile && currentProfile.height_cm ? Number(currentProfile.height_cm)/100 : null;
+      const bmi = heightM ? +(weight/(heightM*heightM)).toFixed(1) : null;
+      const payload = {
+        user_id: currentUser.id,
+        date,
+        source: 'manual',
+        weight_kg: weight,
+        fat_percent: numOrNull(document.getElementById('fr-w-fat').value),
+        muscle_mass_kg: numOrNull(document.getElementById('fr-w-muscle').value),
+        bone_mass_kg: numOrNull(document.getElementById('fr-w-bone').value),
+        hydration_kg: numOrNull(document.getElementById('fr-w-water').value),
+        bmi
+      };
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.from('body_measurements').upsert(payload, { onConflict: 'user_id,date,source' });
+      if(error){ showToast('Não foi possível salvar. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Salvar'; return; }
+      if(currentProfile){
+        const { error: profErr } = await sb.from('profiles').update({ weight_kg: weight }).eq('id', currentUser.id);
+        if(!profErr) currentProfile = { ...currentProfile, weight_kg: weight };
+      }
+      showToast('Peso registrado.', 'ok');
+      closeOverlay();
+      renderWeightSection();
+    });
   }
 
   /* ---------- Calendário de desempenho ---------- */
@@ -6509,6 +6790,7 @@
         </div>
         <div class="fr-field"><label for="fr-t-fiber">Fibra (g)</label><input type="number" min="0" id="fr-t-fiber" value="${esc(targets.fiber ?? '')}"></div>
         <div class="fr-field"><label for="fr-t-water">Meta de água (ml)</label><input type="number" min="0" id="fr-t-water" value="${esc(targets.water_goal_ml ?? '')}"></div>
+        <div class="fr-field"><label for="fr-t-weight">Meta de peso (kg)</label><input type="number" min="0" step="0.1" id="fr-t-weight" value="${esc(targets.target_weight_kg ?? '')}"></div>
         <div class="fr-hint" style="margin:10px 0 8px;font-weight:600;color:var(--green-deep);">Metas semanais</div>
         <div class="fr-row">
           <div class="fr-field"><label for="fr-t-wk-workout">Dias de treino/semana</label><input type="number" min="0" max="7" id="fr-t-wk-workout" value="${esc(targets.weekly_workout_days ?? '')}"></div>
@@ -6540,6 +6822,7 @@
         fat: numOrNull(document.getElementById('fr-t-fat').value),
         fiber: numOrNull(document.getElementById('fr-t-fiber').value),
         water_goal_ml: numOrNull(document.getElementById('fr-t-water').value),
+        target_weight_kg: numOrNull(document.getElementById('fr-t-weight').value),
         weekly_workout_days: numOrNull(document.getElementById('fr-t-wk-workout').value),
         weekly_water_days: numOrNull(document.getElementById('fr-t-wk-water').value),
         weekly_protein_days: numOrNull(document.getElementById('fr-t-wk-protein').value),
@@ -6552,6 +6835,7 @@
       showToast('Metas atualizadas.', 'ok');
       closeOverlay();
       renderSummary();
+      renderWeightSection();
     });
   }
 
