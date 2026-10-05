@@ -798,6 +798,7 @@
     <div class="fr-summary" id="fr-summary"></div>
     <div id="fr-meal-suggestion"></div>
     <div id="fr-weight-section"></div>
+    <div id="fr-tape-section"></div>
     <div id="fr-diary-content"></div>
     <div id="fr-weekly-goals-section"></div>
     <div id="fr-calendar-section"></div>
@@ -1961,6 +1962,7 @@
           <span style="display:flex;gap:6px;flex-wrap:wrap;">
             <button type="button" class="fr-chip" data-chat="${c.client_id}">💬 Chat</button>
             <button type="button" class="fr-chip fr-chip-video" data-report="${c.client_id}">📊 Relatório</button>
+            <button type="button" class="fr-chip" data-tape="${c.client_id}">📏 Medidas</button>
             <button type="button" class="fr-chip fr-chip-upload" data-recipes="${c.client_id}">Receitas ›</button>
           </span>
         </div>`).join('');
@@ -1977,6 +1979,12 @@
         const client = myClients.find(c=>c.client_id===clientId);
         closeOverlay();
         openClientRecipesModal(client);
+      });
+    });
+    el.querySelectorAll('[data-tape]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const client = myClients.find(c=>c.client_id===btn.getAttribute('data-tape'));
+        openClientTapeMeasurements(client);
       });
     });
     el.querySelectorAll('[data-report]').forEach(btn=>{
@@ -3978,7 +3986,7 @@
       <div class="fr-section-label" style="padding-top:0;">Treinos encontrados — confira nome, exercícios e ajuste antes de salvar</div>
       <div id="fr-import-workout-list"></div>
       <button type="button" class="fr-btn-ghost" id="fr-import-add-workout" style="width:100%;margin-top:8px;">${PLUS_SVG} Adicionar treino</button>
-      <button class="fr-btn-primary" id="fr-import-save" style="width:100%;margin-top:14px;">Salvar treino(s)</button>
+      <button class="fr-btn-primary" id="fr-import-save" style="width:100%;margin-top:14px;">Salvar treinos</button>
     `;
     renderImportWorkoutGroups();
     container.querySelector('#fr-import-add-workout').addEventListener('click', ()=>{
@@ -4088,7 +4096,7 @@
       const ok = await saveNewPersonalWorkout(w.name, w.exercises);
       if(ok) okCount++;
     }
-    btn.disabled = false; btn.textContent = 'Salvar treino(s)';
+    btn.disabled = false; btn.textContent = 'Salvar treinos';
     if(okCount===0){ return; } // saveNewPersonalWorkout já mostra o erro
     showToast(okCount===1 ? 'Treino importado e salvo!' : `${okCount} treinos importados e salvos!`, 'ok');
     importedWorkoutsDraft = [];
@@ -4315,7 +4323,7 @@
         if(!ok) allOk = false;
       }
       if(!allOk){ btn.disabled=false; btn.textContent='Gerar meu treino'; return; }
-      showToast(`${plan.length} treino(s) gerado(s) com base na sua avaliação.`, 'ok');
+      showToast(`${plan.length} ${plural(plan.length,'treino gerado','treinos gerados')} com base na sua avaliação.`, 'ok');
       closeOverlay();
       loadWorkouts();
     });
@@ -6323,6 +6331,7 @@
     renderMealSuggestion();
     renderDiaryList();
     renderWeightSection();
+    renderTapeSection();
     renderWeeklyGoalsProgress();
     renderInlineCalendar();
     maybeShowWeeklyReport();
@@ -6456,12 +6465,12 @@
       return;
     }
     if(candidates.length === 0){
-      el.innerHTML = `<div class="fr-suggestion-box"><p class="fr-hint">Ainda não achei uma receita que caiba nos ${esc(remainingCalories)} kcal que faltam hoje — dá uma olhada nas receitas disponíveis pra ver outras opções.</p></div>`;
+      el.innerHTML = `<div class="fr-suggestion-box"><p class="fr-hint">Ainda não achei uma receita que caiba nos ${esc(remainingCalories)} kcal que ${remainingCalories===1?'falta':'faltam'} hoje — dá uma olhada nas receitas disponíveis pra ver outras opções.</p></div>`;
       return;
     }
     el.innerHTML = `
       <div class="fr-suggestion-box">
-        <div class="fr-suggestion-title">💡 Sugestão pra ${esc((CATS[mealType]||CATS.almoco).label.toLowerCase())} · faltam ${esc(remainingCalories)} kcal hoje</div>
+        <div class="fr-suggestion-title">💡 Sugestão pra ${esc((CATS[mealType]||CATS.almoco).label.toLowerCase())} · ${remainingCalories===1?'falta':'faltam'} ${esc(remainingCalories)} kcal hoje</div>
         <div class="fr-suggestion-list">
           ${candidates.map(r=>`
             <div class="fr-suggestion-card">
@@ -6626,6 +6635,175 @@
       closeOverlay();
       renderWeightSection();
     });
+  }
+
+  /* ---------- Medidas com fita métrica ---------- */
+  // Circunferências em cm, como nutricionistas e educadores físicos medem
+  // na avaliação antropométrica. Cada campo é opcional — a pessoa registra
+  // só o que mediu. "hint" diz onde posicionar a fita.
+  const TAPE_FIELDS = [
+    { key:'neck_cm',        label:'Pescoço',                  group:'Tronco',   hint:'Logo abaixo do pomo de adão, com a fita na horizontal.' },
+    { key:'shoulders_cm',   label:'Ombros',                   group:'Tronco',   hint:'Ao redor dos ombros, na parte mais larga, passando pelos deltoides.' },
+    { key:'chest_cm',       label:'Tórax',                    group:'Tronco',   hint:'Na altura dos mamilos, com os braços relaxados e após expirar normalmente.' },
+    { key:'waist_cm',       label:'Cintura',                  group:'Tronco',   hint:'No ponto mais estreito do tronco, entre as costelas e o umbigo (geralmente dois dedos acima do umbigo).' },
+    { key:'abdomen_cm',     label:'Abdômen',                  group:'Tronco',   hint:'Na altura do umbigo, sem encolher a barriga.' },
+    { key:'hip_cm',         label:'Quadril',                  group:'Tronco',   hint:'Na parte mais larga dos glúteos, com os pés juntos.' },
+    { key:'arm_right_cm',   label:'Braço direito (relaxado)', group:'Braços',   hint:'No ponto médio entre o ombro e o cotovelo, com o braço solto ao lado do corpo.' },
+    { key:'arm_left_cm',    label:'Braço esquerdo (relaxado)',group:'Braços',   hint:'Mesmo ponto do braço direito.' },
+    { key:'forearm_right_cm',label:'Antebraço direito',       group:'Braços',   hint:'Na parte mais grossa do antebraço, logo abaixo do cotovelo.' },
+    { key:'forearm_left_cm',label:'Antebraço esquerdo',       group:'Braços',   hint:'Mesmo ponto do antebraço direito.' },
+    { key:'wrist_cm',       label:'Punho',                    group:'Braços',   hint:'Logo acima do osso saliente do punho.' },
+    { key:'thigh_right_cm', label:'Coxa direita',             group:'Pernas',   hint:'No ponto médio entre a dobra da virilha e o joelho, em pé e com o peso distribuído nas duas pernas.' },
+    { key:'thigh_left_cm',  label:'Coxa esquerda',            group:'Pernas',   hint:'Mesmo ponto da coxa direita.' },
+    { key:'calf_right_cm',  label:'Panturrilha direita',      group:'Pernas',   hint:'Na parte mais grossa da panturrilha, em pé.' },
+    { key:'calf_left_cm',   label:'Panturrilha esquerda',     group:'Pernas',   hint:'Mesmo ponto da panturrilha direita.' }
+  ];
+
+  function plural(n, singular, pluralForm){ return n===1 ? singular : pluralForm; }
+
+  // Razões de risco usadas na avaliação nutricional (referências da OMS).
+  // São só uma referência — quem interpreta é o profissional de saúde.
+  function tapeRatios(row, sex, heightCm){
+    const out = [];
+    const waist = numOrNull(row.waist_cm), hip = numOrNull(row.hip_cm);
+    if(waist && hip){
+      const rcq = waist/hip;
+      const limit = sex==='masculino' ? 0.90 : 0.85;
+      out.push({ label:'Relação cintura/quadril', value:rcq.toFixed(2), alert: rcq>limit, ref:`referência: até ${limit.toFixed(2).replace('.',',')}` });
+    }
+    if(waist && heightCm){
+      const rce = waist/Number(heightCm);
+      out.push({ label:'Relação cintura/altura', value:rce.toFixed(2), alert: rce>=0.5, ref:'referência: abaixo de 0,50' });
+    }
+    if(waist){
+      const [attn, high] = sex==='masculino' ? [94,102] : [80,88];
+      out.push({ label:'Circunferência da cintura', value:`${waist} cm`, alert: waist>=attn, ref:`referência: abaixo de ${attn} cm` + (waist>=high ? ' (acima de '+high+' cm, vale conversar com um profissional)' : '') });
+    }
+    return out;
+  }
+
+  function tapeRatiosHtml(row, sex, heightCm){
+    const ratios = tapeRatios(row, sex, heightCm);
+    if(ratios.length===0) return '';
+    return `<div class="fr-weekly-goals-grid" style="margin:10px 0;">${ratios.map(r=>`
+      <div class="fr-weekly-goal-card">
+        <div class="fr-weekly-goal-label">${esc(r.label)}</div>
+        <div class="fr-weekly-goal-val" style="color:${r.alert?'var(--rust)':'var(--ink)'};">${esc(r.value)}</div>
+        <div class="fr-hint" style="margin:0;">${esc(r.ref)}</div>
+      </div>`).join('')}</div>`;
+  }
+
+  function tapeValuesHtml(row, prev){
+    return TAPE_FIELDS.filter(f=> row[f.key]!=null).map(f=>{
+      let delta = '';
+      if(prev && prev[f.key]!=null){
+        const d = Number(row[f.key]) - Number(prev[f.key]);
+        if(Math.abs(d) >= 0.05){
+          const color = d>0 ? 'var(--rust)' : 'var(--green-deep)';
+          delta = ` <span style="color:${color};font-size:11px;">${d>0?'▲':'▼'} ${Math.abs(d).toFixed(1).replace('.',',')}</span>`;
+        }
+      }
+      return `<div class="fr-session-hist-row"><span>${esc(f.label)}</span><b>${Number(row[f.key]).toString().replace('.',',')} cm${delta}</b></div>`;
+    }).join('');
+  }
+
+  async function renderTapeSection(){
+    const el = document.getElementById('fr-tape-section');
+    if(!el) return;
+    const { data, error } = await sb.from('tape_measurements').select('*').eq('user_id', currentUser.id).order('date', {ascending:false}).limit(2);
+    const latest = (!error && data && data.length) ? data[0] : null;
+    const heightCm = currentProfile && currentProfile.height_cm;
+    const sex = currentProfile && currentProfile.sex;
+    el.innerHTML = `
+      <div class="fr-weight-card">
+        <div class="fr-weight-card-head">
+          <span class="fr-weight-card-title">📏 Medidas com fita</span>
+          <button type="button" class="fr-btn-ghost" id="fr-tape-log-btn">Registrar medidas</button>
+        </div>
+        ${latest ? `
+          <div class="fr-hint" style="margin:0 0 6px;">Último registro: ${esc(formatDateLabel(latest.date))}</div>
+          ${tapeRatiosHtml(latest, sex, heightCm)}
+          ${tapeValuesHtml(latest, data[1])}
+          ${data[1] ? `<p class="fr-hint" style="margin:8px 0 0;">As setas comparam com o registro de ${esc(formatDateLabel(data[1].date))}.</p>` : ''}
+          <button type="button" class="fr-btn-ghost" id="fr-tape-history-btn" style="width:100%;margin-top:10px;">Ver histórico</button>
+        ` : `<p class="fr-hint" style="margin:0;">Nenhuma medida registrada ainda. Use uma fita métrica flexível e meça sempre nos mesmos pontos, de preferência pela manhã.</p>`}
+      </div>`;
+    el.querySelector('#fr-tape-log-btn').addEventListener('click', ()=> openTapeLogModal(latest));
+    const hb = el.querySelector('#fr-tape-history-btn');
+    if(hb) hb.addEventListener('click', ()=> openTapeHistoryModal(currentUser.id, 'Meu histórico de medidas', sex, heightCm));
+  }
+
+  function openTapeLogModal(latest){
+    const groups = ['Tronco','Braços','Pernas'];
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Registrar medidas com fita</h3>
+      <p class="fr-hint" style="margin-bottom:12px;">Preencha só o que você mediu. Use as medidas em centímetros, com a fita justa, mas sem apertar a pele.</p>
+      <form id="fr-tape-form">
+        <div class="fr-field"><label for="fr-tape-date">Data</label><input type="date" id="fr-tape-date" value="${todayStr()}" max="${todayStr()}" required></div>
+        ${groups.map(g=>`
+          <div class="fr-evo-title" style="margin-top:12px;">${g}</div>
+          ${TAPE_FIELDS.filter(f=>f.group===g).map(f=>`
+            <div class="fr-field">
+              <label for="fr-tape-${f.key}">${esc(f.label)} (cm)</label>
+              <input type="number" min="1" max="300" step="0.1" id="fr-tape-${f.key}" inputmode="decimal" placeholder="${latest && latest[f.key]!=null ? 'último: '+latest[f.key] : ''}">
+              <p class="fr-hint" style="margin:2px 0 0;">${esc(f.hint)}</p>
+            </div>`).join('')}
+        `).join('')}
+        <div class="fr-field"><label for="fr-tape-notes">Observações (opcional)</label><textarea id="fr-tape-notes" style="min-height:50px" placeholder="ex.: medido em jejum, de manhã"></textarea></div>
+        <div class="fr-form-actions">
+          <button type="button" class="fr-btn-ghost" id="fr-tape-cancel">Cancelar</button>
+          <button type="submit" class="fr-btn-primary">Salvar</button>
+        </div>
+      </form>
+    `);
+    overlay.querySelector('#fr-tape-cancel').addEventListener('click', closeOverlay);
+    overlay.querySelector('#fr-tape-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const btn = overlay.querySelector('button[type="submit"]');
+      const date = document.getElementById('fr-tape-date').value;
+      const payload = { user_id: currentUser.id, date, notes: document.getElementById('fr-tape-notes').value.trim() || null };
+      let filled = 0;
+      TAPE_FIELDS.forEach(f=>{
+        const v = numOrNull(document.getElementById('fr-tape-'+f.key).value);
+        if(v!==null){ payload[f.key] = v; filled++; }
+      });
+      if(!date || filled===0){ showToast('Preencha a data e ao menos uma medida.', 'err'); return; }
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      // Se já existe registro nesse dia, mescla: medidas que ficaram
+      // em branco não apagam o que já estava salvo.
+      const { error } = await sb.from('tape_measurements').upsert(payload, { onConflict: 'user_id,date' });
+      if(error){ showToast('Não foi possível salvar. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Salvar'; return; }
+      showToast(`${filled} ${plural(filled,'medida registrada','medidas registradas')}.`, 'ok');
+      closeOverlay();
+      renderTapeSection();
+    });
+  }
+
+  // Histórico de medidas — usado pela própria pessoa e, só para leitura,
+  // pelo profissional vinculado (a regra de acesso fica no banco).
+  async function openTapeHistoryModal(userId, title, sex, heightCm){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">${esc(title)}</h3>
+      <div id="fr-tape-hist-content"><div class="fr-loading">Carregando...</div></div>
+    `);
+    const box = overlay.querySelector('#fr-tape-hist-content');
+    const { data, error } = await sb.from('tape_measurements').select('*').eq('user_id', userId).order('date', {ascending:false}).limit(24);
+    if(error){ box.innerHTML = `<p class="fr-hint">Não foi possível carregar as medidas agora.</p>`; return; }
+    if(!data || data.length===0){ box.innerHTML = `<p class="fr-hint">Nenhuma medida registrada ainda.</p>`; return; }
+    box.innerHTML = data.map((row,i)=>`
+      <div class="fr-meal-group" style="margin-bottom:16px;">
+        <div class="fr-evo-title">${esc(formatDateLabel(row.date))}</div>
+        ${tapeRatiosHtml(row, sex, heightCm)}
+        ${tapeValuesHtml(row, data[i+1])}
+        ${row.notes ? `<p class="fr-hint" style="margin:6px 0 0;">${esc(row.notes)}</p>` : ''}
+      </div>`).join('');
+  }
+
+  async function openClientTapeMeasurements(client){
+    let sex = null, heightCm = null;
+    const { data: prof } = await sb.from('profiles').select('sex, height_cm').eq('id', client.client_id).maybeSingle();
+    if(prof){ sex = prof.sex; heightCm = prof.height_cm; }
+    openTapeHistoryModal(client.client_id, `Medidas — ${client.email}`, sex, heightCm);
   }
 
   /* ---------- Calendário de desempenho ---------- */
