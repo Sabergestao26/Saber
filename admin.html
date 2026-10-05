@@ -702,6 +702,14 @@
     const { data: { session } } = await sb.auth.getSession();
     if(session){
       currentUser = session.user;
+      const { data: me } = await sb.from('profiles').select('is_admin').eq('id', currentUser.id).maybeSingle();
+      if(!me || !me.is_admin){
+        document.getElementById('login-screen').innerHTML = '<h2>Acesso restrito</h2><p style="margin:10px 0 16px;color:#555;">Esta área é só para administradores do Saber. Sua conta não tem essa permissão.</p><button id="denied-logout">Sair</button>';
+        document.getElementById('login-screen').style.display = '';
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('denied-logout').addEventListener('click', async ()=>{ await sb.auth.signOut(); location.reload(); });
+        return;
+      }
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('dashboard').style.display = '';
       loadDashboard();

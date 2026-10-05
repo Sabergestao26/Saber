@@ -1029,6 +1029,7 @@
   let currentUser = null;
   let currentProfile = null;
   let isAdmin = false;
+  let profVerified = false; // verificação de documento (CRN/CREF) aprovada por um admin
 
   let recipes = [];
   let recipesLoaded = false;
@@ -1767,6 +1768,9 @@
     if(error){ el.innerHTML = `<p class="fr-hint">Não foi possível carregar.</p>`; return; }
 
     const status = verif ? verif.status : 'none';
+    const wasVerified = profVerified;
+    profVerified = (status === 'approved');
+    if(wasVerified !== profVerified && typeof renderUserBar === 'function') renderUserBar();
 
     function uploadFormHtml(intro){
       return `
@@ -2528,6 +2532,11 @@
     }
     currentProfile = data;
     isAdmin = !!(data && data.is_admin);
+    profVerified = false;
+    if(data && data.is_professional){
+      const { data: pv } = await sb.from('professional_verifications').select('status').eq('user_id', currentUser.id).maybeSingle();
+      profVerified = !!(pv && pv.status === 'approved');
+    }
 
     const pendingKey = 'saber_pending_role_' + currentUser.email.toLowerCase();
     const pendingRole = localStorage.getItem(pendingKey);
@@ -2567,7 +2576,11 @@
     const label = document.getElementById('fr-user-label');
     const badges = [];
     if(isAdmin) badges.push('<span class="fr-admin-badge">admin</span>');
-    if(currentProfile && currentProfile.is_professional) badges.push(`<span class="fr-admin-badge" style="background:var(--blue)">${esc(currentProfile.professional_label || 'Profissional')}</span>`);
+    if(currentProfile && currentProfile.is_professional){
+      badges.push(profVerified
+        ? `<span class="fr-admin-badge" style="background:var(--blue)">${esc(currentProfile.professional_label || 'Profissional')}</span>`
+        : `<span class="fr-admin-badge" style="background:var(--ink-soft)">Verificação pendente</span>`);
+    }
     label.innerHTML = `${esc(currentUser.email)} ${badges.join(' ')}`;
   }
 
