@@ -392,7 +392,7 @@
       const isComplaint = f.kind === 'reclamacao';
       return `
         <div class="review-item" data-id="${f.id}" ${isComplaint ? 'style="border-color:var(--rust);"' : ''}>
-          <div class="review-name">${isComplaint ? '⚠️ Reclamação' : '⭐ Avaliação'} sobre ${esc(prof.email || 'profissional')} ${prof.professional_label ? '· ' + esc(prof.professional_label) : ''}</div>
+          <div class="review-name">${isComplaint ? 'Reclamação' : 'Avaliação'} sobre ${esc(prof.email || 'profissional')} ${prof.professional_label ? '· ' + esc(prof.professional_label) : ''}</div>
           <div class="review-meta">
             ${f.rating ? 'Nota: ' + '★'.repeat(f.rating) + '☆'.repeat(5-f.rating) + '<br>' : ''}
             ${new Date(f.created_at).toLocaleString('pt-BR')}

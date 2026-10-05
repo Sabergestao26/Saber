@@ -536,6 +536,13 @@
   .fr-suggestion-macros{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); margin-bottom:10px; }
   .fr-suggestion-log-btn{ width:100%; }
 
+  .fr-parq-q{ padding:10px 0; border-bottom:1px solid var(--border); }
+  .fr-parq-q p{ margin:0 0 8px; font-size:13px; line-height:1.4; color:var(--ink); }
+  .fr-parq-opts{ display:flex; gap:22px; font-size:13px; color:var(--ink-soft); }
+  .fr-parq-opts label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
+
+  .fr-ico{ width:17px; height:17px; vertical-align:-3px; margin-right:7px; color:var(--green-deep); flex-shrink:0; }
+
   .fr-weight-card{
     max-width:1080px; margin:0 auto 24px; background:var(--card); border:1px solid var(--border);
     border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 20px;
@@ -876,7 +883,7 @@
     { title: 'Treinos', items: [
       { q: 'Fiz a avaliação, mas meu treino não apareceu na hora.', a: 'Se você marcou alguma limitação física (coluna, joelho, ombro, etc.), o treino passa por revisão manual antes de ser liberado — pode levar um tempo até aparecer.' },
       { q: 'Posso editar um treino que a avaliação gerou pra mim?', a: 'Sim — abra o treino, toque em "Gerenciar exercícios / editar treino". Dá pra adicionar, editar, remover exercícios e até renomear o treino.' },
-      { q: 'O som do cronômetro de descanso não toca quando saio do app.', a: 'Isso é uma limitação do próprio celular (economia de bateria), não só do Saber — nenhum site consegue continuar contando som em segundo plano depois que a tela apaga ou o app é fechado de verdade. Ative as notificações push (Configurações > Notificações > 🔔 Ativar notificações) pra ainda receber um aviso mesmo com o app fechado.' },
+      { q: 'O som do cronômetro de descanso não toca quando saio do app.', a: 'Isso é uma limitação do próprio celular (economia de bateria), não só do Saber — nenhum site consegue continuar contando som em segundo plano depois que a tela apaga ou o app é fechado de verdade. Ative as notificações push (Configurações > Notificações > Ativar notificações) pra ainda receber um aviso mesmo com o app fechado.' },
       { q: 'Como funciona a avaliação com limitação física?', a: 'Excluímos os exercícios mais arriscados pra aquela área e reduzimos a quantidade de exercícios ali, como precaução extra. Isso não substitui uma avaliação médica ou fisioterapêutica — é só uma camada de segurança dentro do que um aplicativo consegue oferecer.' },
     ]},
     { title: 'Balança e notificações', items: [
@@ -885,7 +892,7 @@
     ]},
     { title: 'Para profissionais', items: [
       { q: 'Como vinculo um cliente?', a: 'Compartilhe seu código de profissional (Configurações > Seu código) — a pessoa digita esse código do lado dela pra se vincular.' },
-      { q: 'Como vejo o relatório semanal de um cliente?', a: 'Configurações > Meus clientes > toque em "📊 Relatório" ao lado do nome dele.' },
+      { q: 'Como vejo o relatório semanal de um cliente?', a: 'Configurações > Meus clientes > toque em "Relatório" ao lado do nome dele.' },
     ]},
   ];
 
@@ -1085,6 +1092,22 @@
     toastEl.className = 'fr-toast ' + (type==='err' ? 'fr-toast-err' : 'fr-toast-ok');
     toastEl.hidden = false;
     toastTimer = setTimeout(()=>{ toastEl.hidden = true; }, 3800);
+  }
+
+  // Ícones de traço fino, monocromáticos (herdam a cor do texto), usados só
+  // nos títulos de cartões onde ajudam a identificar a seção. Nos botões o
+  // texto fala por si, sem desenho.
+  const ICON_PATHS = {
+    scale:     '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10a4 4 0 0 1 8 0"/><path d="M12 10l2-2"/>',
+    ruler:     '<path d="M3 17 17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>',
+    clipboard: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/>',
+    drop:      '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+    flame:     '<path d="M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 .3 1.5 1.2 2 2 2 0-3-1-5 1-8z"/>',
+    bulb:      '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+    pulse:     '<path d="M3 12h4l3-7 4 14 3-7h4"/>'
+  };
+  function ico(name){
+    return `<svg class="fr-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]||''}</svg>`;
   }
 
   function esc(str){
@@ -1366,7 +1389,7 @@
             <option value="urgente" ${getSoundPref()==='urgente'?'selected':''}>Urgente (4 beeps rápidos)</option>
             <option value="sino" ${getSoundPref()==='sino'?'selected':''}>Sino</option>
           </select>
-          <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;">🔊 Testar som</button>
+          <button class="fr-btn-ghost" id="fr-test-sound" style="width:100%;">Testar som</button>
         </div>
         <div class="fr-settings-section">
           <h4>Notificações push</h4>
@@ -1444,7 +1467,7 @@
         <div class="fr-settings-section">
           <h4>Importar medições de outra balança</h4>
           <p class="fr-hint" style="margin-bottom:10px;">Sua balança não conecta direto com o Saber? Exporte o arquivo que ela gera (PDF, Excel ou CSV) e importe aqui — peso, IMC, % de gordura, massa muscular, massa óssea e água corporal, do mesmo jeito que funciona a importação de treino.</p>
-          <button class="fr-btn-ghost" id="fr-import-measurements-btn" style="width:100%;">📄 Importar arquivo da balança</button>
+          <button class="fr-btn-ghost" id="fr-import-measurements-btn" style="width:100%;">Importar arquivo da balança</button>
         </div>
         ${isPro ? `
         <div class="fr-settings-section">
@@ -1756,11 +1779,11 @@
     }
 
     if(status === 'approved'){
-      el.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);">✅ Documento aprovado. Você já pode vincular clientes e passar treino ou dieta pra eles.</p>`;
+      el.innerHTML = `<p class="fr-hint" style="color:var(--green-deep);">Documento aprovado. Você já pode vincular clientes e passar treino ou dieta pra eles.</p>`;
       return;
     }
     if(status === 'pending'){
-      el.innerHTML = `<p class="fr-hint">📄 Documento enviado, em revisão. Assim que for analisado, você recebe um aviso aqui. Enquanto isso, vincular clientes e atribuir treino/dieta fica bloqueado.</p>`;
+      el.innerHTML = `<p class="fr-hint">Documento enviado, em revisão. Assim que for analisado, você recebe um aviso aqui. Enquanto isso, vincular clientes e atribuir treino/dieta fica bloqueado.</p>`;
       return;
     }
     if(status === 'rejected'){
@@ -1826,7 +1849,7 @@
   /* ---------- Chat profissional-cliente ---------- */
   async function openChatModal(professionalId, clientId, otherLabel){
     const overlay = buildOverlay(`
-      <h3 class="fr-form-title">💬 ${esc(otherLabel)}</h3>
+      <h3 class="fr-form-title">${esc(otherLabel)}</h3>
       <div id="fr-chat-messages" style="max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;"><div class="fr-loading">Carregando...</div></div>
       <form id="fr-chat-form" style="display:flex;gap:8px;">
         <input type="text" id="fr-chat-input" placeholder="Escreva uma mensagem..." style="flex:1;" autocomplete="off" maxlength="2000">
@@ -1889,7 +1912,7 @@
       existing = data;
     }
     const overlay = buildOverlay(`
-      <h3 class="fr-form-title">${isRate ? '⭐ Avaliar profissional' : '⚠️ Abrir reclamação'}</h3>
+      <h3 class="fr-form-title">${isRate ? 'Avaliar profissional' : 'Abrir reclamação'}</h3>
       ${isRate ? `
         <div class="fr-field">
           <label>Nota</label>
@@ -1961,10 +1984,10 @@
         <div class="fr-client-row" data-client="${c.client_id}" style="cursor:default;">
           <span class="fr-client-name">${esc(c.email)}</span>
           <span style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button type="button" class="fr-chip" data-chat="${c.client_id}">💬 Chat</button>
-            <button type="button" class="fr-chip fr-chip-video" data-report="${c.client_id}">📊 Relatório</button>
-            <button type="button" class="fr-chip" data-tape="${c.client_id}">📏 Medidas</button>
-            <button type="button" class="fr-chip" data-health="${c.client_id}">📋 Ficha</button>
+            <button type="button" class="fr-chip" data-chat="${c.client_id}">Chat</button>
+            <button type="button" class="fr-chip fr-chip-video" data-report="${c.client_id}">Relatório</button>
+            <button type="button" class="fr-chip" data-tape="${c.client_id}">Medidas</button>
+            <button type="button" class="fr-chip" data-health="${c.client_id}">Ficha</button>
             <button type="button" class="fr-chip fr-chip-upload" data-recipes="${c.client_id}">Receitas ›</button>
           </span>
         </div>`).join('');
@@ -2098,7 +2121,7 @@
         </div>
         <button class="fr-btn-ghost" id="fr-withings-disconnect">Desconectar</button>
       </div>
-      <button class="fr-btn-ghost" id="fr-withings-sync" style="width:100%;margin-top:10px;">🔄 Sincronizar agora</button>
+      <button class="fr-btn-ghost" id="fr-withings-sync" style="width:100%;margin-top:10px;">Sincronizar agora</button>
       <div id="fr-withings-msg"></div>
       <div id="fr-withings-history" style="margin-top:14px;"></div>
     `;
@@ -2134,7 +2157,7 @@
         console.error(err);
         msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Não foi possível sincronizar agora.</p>`;
       }
-      btn.disabled = false; btn.textContent = '🔄 Sincronizar agora';
+      btn.disabled = false; btn.textContent = 'Sincronizar agora';
     });
 
     renderWithingsHistory(el);
@@ -2384,9 +2407,9 @@
           <button class="fr-btn-ghost" id="fr-unlink-btn">Desvincular</button>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
-          <button type="button" class="fr-chip" id="fr-linked-chat-btn">💬 Chat</button>
-          <button type="button" class="fr-chip" id="fr-linked-rate-btn">⭐ Avaliar</button>
-          <button type="button" class="fr-chip" id="fr-linked-complain-btn">⚠️ Reclamação</button>
+          <button type="button" class="fr-chip" id="fr-linked-chat-btn">Chat</button>
+          <button type="button" class="fr-chip" id="fr-linked-rate-btn">Avaliar</button>
+          <button type="button" class="fr-chip" id="fr-linked-complain-btn">Reclamação</button>
         </div>`;
       el.querySelector('#fr-unlink-btn').addEventListener('click', async function(){
         const btn = this; btn.disabled = true; btn.textContent = 'Desvinculando...';
@@ -2907,7 +2930,7 @@
   function renderLeituraHead(){
     const el = document.getElementById('fr-leitura-head');
     if(!el) return;
-    el.innerHTML = `<b>${esc(readingRank())}</b><span>· ${Math.round(totalReadingMinutes())} min lidos</span><span>· 🔥 ${readingStreak()} dias</span>`;
+    el.innerHTML = `<b>${esc(readingRank())}</b><span>· ${Math.round(totalReadingMinutes())} min lidos</span><span>· ${readingStreak()} ${plural(readingStreak(),'dia seguido','dias seguidos')}</span>`;
   }
 
   async function renderLeituraView(){
@@ -2972,7 +2995,7 @@
           ${b.status==='concluido' && b.rating ? `<div class="fr-book-stars">${'★'.repeat(b.rating)}${'☆'.repeat(5-b.rating)}</div>` : ''}
           <div class="fr-book-actions">
             ${b.status!=='concluido' ? `<button type="button" class="fr-btn-primary" data-act="log" data-id="${b.id}">Registrar leitura</button>` : ''}
-            ${b.pdf_url ? `<a class="fr-btn-ghost" style="display:inline-block;text-decoration:none;" href="${esc(b.pdf_url)}" target="_blank" rel="noopener">📄 Abrir PDF</a>` : ''}
+            ${b.pdf_url ? `<a class="fr-btn-ghost" style="display:inline-block;text-decoration:none;" href="${esc(b.pdf_url)}" target="_blank" rel="noopener">Abrir PDF</a>` : ''}
             <button type="button" class="fr-btn-ghost" data-act="edit" data-id="${b.id}">Editar</button>
             <button type="button" class="fr-btn-danger" data-act="delete" data-id="${b.id}">Excluir</button>
           </div>
@@ -3201,7 +3224,7 @@
       <div class="fr-field"><label>Sua avaliação</label><div class="fr-read-starpick" id="fb-stars"></div></div>
       <div class="fr-form-actions">
         <button type="button" class="fr-btn-ghost" id="fb-not">Ainda não</button>
-        <button type="button" class="fr-btn-primary" id="fb-yes">Concluir 🎉</button>
+        <button type="button" class="fr-btn-primary" id="fb-yes">Concluir</button>
       </div>
     `);
     const starsEl = overlay.querySelector('#fb-stars');
@@ -3740,8 +3763,8 @@
       <div class="fr-workout-actions">
         <button class="fr-btn-primary" id="fr-build-own" style="flex:1;">${PLUS_SVG} Montar meu treino</button>
         <button class="fr-btn-ghost" id="fr-take-assessment" style="flex:1;">Fazer avaliação</button>
-        <button class="fr-btn-ghost" id="fr-import-file" style="flex:1;">📄 Importar de arquivo</button>
-        <button class="fr-btn-ghost" id="fr-open-cardio" style="flex:1;">${activeCardio ? '🏃 Cardio em andamento...' : '🏃 Cardio'}</button>
+        <button class="fr-btn-ghost" id="fr-import-file" style="flex:1;">Importar de arquivo</button>
+        <button class="fr-btn-ghost" id="fr-open-cardio" style="flex:1;">${activeCardio ? 'Cardio em andamento...' : 'Cardio'}</button>
       </div>
       <div class="fr-section-label">Meus treinos</div>
     `;
@@ -3824,8 +3847,8 @@
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Montar meu treino</h3>
       <div class="fr-field"><label for="fr-pick-name">Nome do treino</label><input type="text" id="fr-pick-name" placeholder="ex.: Treino de hoje" value="Meu treino"></div>
-      <label class="fr-pick-row" style="margin-bottom:8px;"><input type="checkbox" id="fr-pick-home-only"><span>🏠 Mostrar só exercícios pra treinar em casa (sem equipamento)</span></label>
-      <button type="button" class="fr-btn-ghost" id="fr-pick-only-cardio" style="width:100%;margin-bottom:12px;">🏃 Só cardio hoje (marca só as opções de cardio)</button>
+      <label class="fr-pick-row" style="margin-bottom:8px;"><input type="checkbox" id="fr-pick-home-only"><span>Mostrar só exercícios pra treinar em casa (sem equipamento)</span></label>
+      <button type="button" class="fr-btn-ghost" id="fr-pick-only-cardio" style="width:100%;margin-bottom:12px;">Só cardio hoje (marca só as opções de cardio)</button>
       <div id="fr-pick-list"><div class="fr-loading">Carregando exercícios...</div></div>
       <button class="fr-btn-primary" id="fr-pick-save" style="width:100%;margin-top:16px;">Salvar meu treino</button>
     `);
@@ -4430,7 +4453,7 @@
       ${w.notes ? `<p class="fr-hint" style="margin-bottom:14px;">${esc(w.notes)}</p>` : ''}
       <div id="fr-session-box"></div>
       <div id="fr-workout-exercises"><div class="fr-loading">Carregando exercícios...</div></div>
-      <button type="button" class="fr-btn-ghost" id="fr-session-history-toggle" style="width:100%;margin-top:14px;">📅 Ver histórico de sessões deste treino</button>
+      <button type="button" class="fr-btn-ghost" id="fr-session-history-toggle" style="width:100%;margin-top:14px;">Ver histórico de sessões deste treino</button>
       <div id="fr-session-history-box"></div>
       ${canEdit ? `<button class="fr-btn-ghost" id="fr-workout-edit" style="width:100%;margin-top:10px;">Gerenciar exercícios / editar treino</button>` : ''}
       ${canDelete ? `
@@ -4539,11 +4562,11 @@
     const box = overlay.querySelector('#fr-session-box');
     if(!box) return;
     if(!activeSessionId){
-      box.innerHTML = `<button class="fr-btn-primary" id="fr-start-session" style="width:100%;margin-bottom:14px;">▶ Iniciar treino</button>`;
+      box.innerHTML = `<button class="fr-btn-primary" id="fr-start-session" style="width:100%;margin-bottom:14px;">Iniciar treino</button>`;
       box.querySelector('#fr-start-session').addEventListener('click', async function(){
         this.disabled = true; this.textContent = 'Iniciando...';
         const { data, error } = await sb.from('workout_sessions').insert({ user_id: currentUser.id, workout_id: workoutId, workout_name: workoutName }).select().single();
-        if(error){ showToast('Não foi possível iniciar. Tente novamente.', 'err'); this.disabled=false; this.textContent='▶ Iniciar treino'; return; }
+        if(error){ showToast('Não foi possível iniciar. Tente novamente.', 'err'); this.disabled=false; this.textContent='Iniciar treino'; return; }
         activeSessionId = data.id; activeSessionWorkoutId = workoutId; sessionStartTime = new Date(data.started_at).getTime();
         showToast('Treino iniciado. Bom treino!', 'ok');
         closeOverlay();
@@ -4762,7 +4785,7 @@
           </div>
           <input type="number" step="0.5" min="0" class="fr-load-weight" placeholder="kg feito">
           <input type="number" min="0" class="fr-load-reps" placeholder="reps feitas">
-          ${restSec ? `<button type="button" class="fr-chip fr-chip-timer fr-set-timer-btn" data-rest="${restSec}">⏱ ${esc(formatTimer(restSec))}</button>` : ''}
+          ${restSec ? `<button type="button" class="fr-chip fr-chip-timer fr-set-timer-btn" data-rest="${restSec}">${esc(formatTimer(restSec))}</button>` : ''}
         </div>`;
       }).join('');
     } else {
@@ -4784,10 +4807,10 @@
         ${metaParts.length ? `<div class="fr-exercise-meta">${metaParts.join(' · ')}</div>` : ''}
         ${ex.notes ? `<div class="fr-hint" style="margin-bottom:10px;">${esc(ex.notes)}</div>` : ''}
         <div class="fr-exercise-actions">
-          ${ex.video_url ? `<button type="button" class="fr-chip fr-chip-video" id="fr-ex-video-${ex.id}">▶ Ver vídeo</button>` : ''}
-          ${(!hasDetail && ex.rest_seconds) ? `<button type="button" class="fr-chip fr-chip-timer" id="fr-ex-timer-${ex.id}">⏱ Iniciar descanso</button>` : ''}
-          <button type="button" class="fr-chip fr-chip-upload" id="fr-ex-upload-${ex.id}">📎 Enviar meu vídeo</button>
-          ${!hasDetail ? `<button type="button" class="fr-chip fr-chip-load" id="fr-ex-load-toggle-${ex.id}">🏋 Registrar carga</button>` : ''}
+          ${ex.video_url ? `<button type="button" class="fr-chip fr-chip-video" id="fr-ex-video-${ex.id}">Ver vídeo</button>` : ''}
+          ${(!hasDetail && ex.rest_seconds) ? `<button type="button" class="fr-chip fr-chip-timer" id="fr-ex-timer-${ex.id}">Iniciar descanso</button>` : ''}
+          <button type="button" class="fr-chip fr-chip-upload" id="fr-ex-upload-${ex.id}">Enviar meu vídeo</button>
+          ${!hasDetail ? `<button type="button" class="fr-chip fr-chip-load" id="fr-ex-load-toggle-${ex.id}">Registrar carga</button>` : ''}
         </div>
         ${sessionActive ? `<label class="fr-ex-check"><input type="checkbox" id="fr-ex-done-${ex.id}" ${isCompleted?'checked':''}> Concluí esse exercício</label>` : ''}
         <div id="fr-ex-timer-box-${ex.id}"></div>
@@ -4915,7 +4938,7 @@
         <div class="fr-timer-num" id="fr-timer-num-${exerciseId}">${formatTimer(remaining)}</div>
         <div class="fr-timer-label">${state.paused ? 'pausado' : 'descansando'}</div>
         <div class="fr-timer-controls">
-          <button type="button" class="fr-timer-btn" id="fr-timer-pause-${exerciseId}">${state.paused ? '▶ Continuar' : '⏸ Pausar'}</button>
+          <button type="button" class="fr-timer-btn" id="fr-timer-pause-${exerciseId}">${state.paused ? 'Continuar' : 'Pausar'}</button>
           <button type="button" class="fr-timer-btn" id="fr-timer-restart-${exerciseId}">↺ Reiniciar</button>
         </div>
       </div>`;
@@ -5107,7 +5130,7 @@
     if(activeCardio){ renderCardioRunning(); return; }
     const cardioOptions = (groupLibraryByMuscle()['Treino de Cardio'] || []);
     const overlay = buildOverlay(`
-      <h3 class="fr-form-title">🏃 Cardio</h3>
+      <h3 class="fr-form-title">${ico('pulse')}Cardio</h3>
       <p class="fr-hint" style="margin-bottom:14px;">Escolha o que você vai fazer — o cronômetro já inicia, e a estimativa de calorias vai subindo junto.</p>
       <div id="fr-cardio-pick-list">
         ${cardioOptions.length ? cardioOptions.map(e=>`
@@ -5135,9 +5158,9 @@
   function openCardioModeChooser(name){
     const kcalMin = cardioKcalPerMinute(name);
     const overlay = buildOverlay(`
-      <h3 class="fr-form-title">🏃 ${esc(name)}</h3>
+      <h3 class="fr-form-title">${ico('pulse')}${esc(name)}</h3>
       <p class="fr-hint" style="margin-bottom:14px;">~${kcalMin.toFixed(1)} kcal/min estimado.</p>
-      <button type="button" class="fr-btn-primary" id="fr-cardio-start-free" style="width:100%;margin-bottom:14px;">⏱ Iniciar cronômetro livre</button>
+      <button type="button" class="fr-btn-primary" id="fr-cardio-start-free" style="width:100%;margin-bottom:14px;">Iniciar cronômetro livre</button>
       <div class="fr-field">
         <label for="fr-cardio-minutes">Ou treinar por um tempo específico (minutos)</label>
         <div style="display:flex;gap:8px;">
@@ -5176,14 +5199,14 @@
     const isCountdown = activeCardio.targetSeconds != null;
     const displaySecs = isCountdown ? cardioRemainingSeconds() : cardioElapsedSeconds();
     const overlay = buildOverlay(`
-      <h3 class="fr-form-title">🏃 ${esc(activeCardio.name)}</h3>
+      <h3 class="fr-form-title">${ico('pulse')}${esc(activeCardio.name)}</h3>
       <div class="fr-cardio-timer-box">
         <div class="fr-cardio-timer-num" id="fr-cardio-timer-num">${formatTimer(displaySecs)}</div>
         <div class="fr-cardio-timer-label" id="fr-cardio-timer-label">${cardioTimerLabel()}</div>
-        <div class="fr-cardio-kcal" id="fr-cardio-kcal">🔥 ~${Math.round(cardioElapsedSeconds()/60*cardioKcalPerMinute(activeCardio.name))} kcal</div>
+        <div class="fr-cardio-kcal" id="fr-cardio-kcal">~${Math.round(cardioElapsedSeconds()/60*cardioKcalPerMinute(activeCardio.name))} kcal</div>
       </div>
       <div class="fr-cardio-controls">
-        <button type="button" class="fr-timer-btn" id="fr-cardio-pause">${activeCardio.paused ? '▶ Continuar' : '⏸ Pausar'}</button>
+        <button type="button" class="fr-timer-btn" id="fr-cardio-pause">${activeCardio.paused ? 'Continuar' : 'Pausar'}</button>
         <button type="button" class="fr-btn-primary" id="fr-cardio-finish">■ Finalizar e salvar</button>
       </div>
       <button type="button" class="fr-btn-ghost" id="fr-cardio-cancel" style="width:100%;margin-top:12px;">Cancelar sessão (não salvar)</button>
@@ -5213,7 +5236,7 @@
     const labelEl = document.getElementById('fr-cardio-timer-label');
     if(labelEl) labelEl.textContent = cardioTimerLabel();
     const kcalEl = document.getElementById('fr-cardio-kcal');
-    if(kcalEl) kcalEl.textContent = `🔥 ~${Math.round(secs/60*cardioKcalPerMinute(activeCardio.name))} kcal`;
+    if(kcalEl) kcalEl.textContent = `~${Math.round(secs/60*cardioKcalPerMinute(activeCardio.name))} kcal`;
   }
 
   // Mesma lógica dos cronômetros de descanso: ao voltar pro app depois
@@ -5386,7 +5409,7 @@
         </div>
       </div>
       <button class="fr-btn-primary" id="fr-wkex-add" style="width:100%;margin-bottom:10px;">${PLUS_SVG} Adicionar exercício</button>
-      ${cardioOptions.length ? `<button class="fr-btn-ghost" id="fr-wkex-add-cardio-toggle" style="width:100%;margin-bottom:16px;">🏃 Adicionar cardio no final (10-15min)</button>
+      ${cardioOptions.length ? `<button class="fr-btn-ghost" id="fr-wkex-add-cardio-toggle" style="width:100%;margin-bottom:16px;">Adicionar cardio no final (10-15min)</button>
       <div id="fr-wkex-cardio-picker" style="display:none;margin-bottom:16px;">
         <select id="fr-wkex-cardio-select">
           ${cardioOptions.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}
@@ -5552,7 +5575,7 @@
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">${isEdit ? 'Editar' : 'Novo'} exercício</h3>
       ${!isEdit ? `
-      <button type="button" class="fr-btn-ghost" id="fr-ex-ocr-btn" style="width:100%;margin-bottom:6px;">📷 Preencher tirando uma foto (beta)</button>
+      <button type="button" class="fr-btn-ghost" id="fr-ex-ocr-btn" style="width:100%;margin-bottom:6px;">Preencher tirando uma foto (beta)</button>
       <input type="file" id="fr-ex-ocr-file" accept="image/*" capture="environment" style="display:none;">
       <div id="fr-ex-ocr-status" class="fr-hint" style="display:none;margin-bottom:12px;"></div>
       ` : ''}
@@ -5581,7 +5604,7 @@
           <button type="button" class="fr-btn-ghost" id="fr-ex-detail-add" style="width:100%;margin-top:4px;">+ Adicionar série</button>
         </div>
         <div class="fr-field">
-          <label class="fr-pick-row"><input type="checkbox" id="fr-ex-home" ${exIsHome ? 'checked' : ''}><span>🏠 Também serve pra treinar em casa (sem equipamento de academia)</span></label>
+          <label class="fr-pick-row"><input type="checkbox" id="fr-ex-home" ${exIsHome ? 'checked' : ''}><span>Também serve pra treinar em casa (sem equipamento de academia)</span></label>
         </div>
         <div class="fr-field"><label for="fr-ex-video">Link do vídeo de demonstração</label><input type="url" id="fr-ex-video" placeholder="https://..." value="${esc(ex.video_url||'')}"></div>
         <div class="fr-field"><label for="fr-ex-notes">Observações</label><textarea id="fr-ex-notes" style="min-height:50px">${esc(ex.notes||'')}</textarea></div>
@@ -6377,7 +6400,7 @@
     const waterHtml = `
       <div class="fr-water-section">
         <div class="fr-bar-row">
-          <div class="fr-bar-label"><span>💧 Água</span><span>${Math.round(currentDayWater)}${waterGoal?` / ${waterGoal}ml`:'ml'}</span></div>
+          <div class="fr-bar-label"><span>${ico('drop')}Água</span><span>${Math.round(currentDayWater)}${waterGoal?` / ${waterGoal}ml`:'ml'}</span></div>
           <div class="fr-bar-track"><div class="fr-bar-fill" style="width:${waterGoal?Math.min(100,(currentDayWater/waterGoal)*100):0}%;background:var(--blue)"></div></div>
         </div>
         <div class="fr-water-buttons">
@@ -6387,7 +6410,7 @@
         </div>
       </div>
       <div class="fr-water-section">
-        <div class="fr-bar-label" style="margin-bottom:8px;"><span>🔥 Calorias gastas hoje</span></div>
+        <div class="fr-bar-label" style="margin-bottom:8px;"><span>${ico('flame')}Calorias gastas hoje</span></div>
         <div class="fr-cal-burn-row">
           <input type="number" min="0" id="fr-cal-burn-input" placeholder="ex.: 350" value="${currentDayCaloriesBurned ?? ''}">
           <button type="button" class="fr-water-btn" id="fr-cal-burn-save" style="flex:0 0 auto;">Salvar</button>
@@ -6470,7 +6493,7 @@
     if(!targets || !targets.calories){ el.innerHTML = ''; return; }
     const { mealType, remainingCalories, candidates, goalReached } = suggestMealsForToday();
     if(goalReached){
-      el.innerHTML = `<div class="fr-suggestion-box"><p class="fr-hint">🎉 Você já bateu sua meta de calorias hoje. Se ainda quiser comer algo, fique de olho pra não passar muito da meta.</p></div>`;
+      el.innerHTML = `<div class="fr-suggestion-box"><p class="fr-hint">Você já bateu sua meta de calorias hoje. Se ainda quiser comer algo, fique de olho pra não passar muito da meta.</p></div>`;
       return;
     }
     if(candidates.length === 0){
@@ -6479,7 +6502,7 @@
     }
     el.innerHTML = `
       <div class="fr-suggestion-box">
-        <div class="fr-suggestion-title">💡 Sugestão pra ${esc((CATS[mealType]||CATS.almoco).label.toLowerCase())} · ${remainingCalories===1?'falta':'faltam'} ${esc(remainingCalories)} kcal hoje</div>
+        <div class="fr-suggestion-title">${ico('bulb')}Sugestão pra ${esc((CATS[mealType]||CATS.almoco).label.toLowerCase())} · ${remainingCalories===1?'falta':'faltam'} ${esc(remainingCalories)} kcal hoje</div>
         <div class="fr-suggestion-list">
           ${candidates.map(r=>`
             <div class="fr-suggestion-card">
@@ -6553,7 +6576,7 @@
       el.innerHTML = `
         <div class="fr-weight-card">
           <div class="fr-weight-card-head">
-            <span class="fr-weight-card-title">⚖️ Peso</span>
+            <span class="fr-weight-card-title">${ico('scale')}Peso</span>
             <button type="button" class="fr-btn-ghost" id="fr-weight-log-btn">Registrar peso</button>
           </div>
           <p class="fr-hint" style="margin:0;">Nenhum peso registrado ainda.${goal!=null ? ` Meta: ${esc(goal)}kg.` : ''}</p>
@@ -6574,7 +6597,7 @@
     el.innerHTML = `
       <div class="fr-weight-card">
         <div class="fr-weight-card-head">
-          <span class="fr-weight-card-title">⚖️ Peso</span>
+          <span class="fr-weight-card-title">${ico('scale')}Peso</span>
           <button type="button" class="fr-btn-ghost" id="fr-weight-log-btn">Registrar peso</button>
         </div>
         <div class="fr-weight-card-main">
@@ -6733,7 +6756,7 @@
     el.innerHTML = `
       <div class="fr-weight-card">
         <div class="fr-weight-card-head">
-          <span class="fr-weight-card-title">📏 Medidas com fita</span>
+          <span class="fr-weight-card-title">${ico('ruler')}Medidas com fita</span>
           <button type="button" class="fr-btn-ghost" id="fr-tape-log-btn">Registrar medidas</button>
         </div>
         ${latest ? `
@@ -6863,7 +6886,7 @@
 
   function healthValuesHtml(row){
     const filled = HEALTH_FIELDS.filter(f=> row && row[f.key]!=null && String(row[f.key]).trim()!=='');
-    const answered = Array.isArray(row && row.parq);
+    const answered = Array.isArray(row && row.parq) && row.parq.some(v=>v!==null);
     if(filled.length===0 && !answered) return `<p class="fr-hint" style="margin:0;">Nenhuma informação preenchida ainda.</p>`;
     const yes = parqYesCount(row);
     const parqHtml = answered ? `<div class="fr-session-hist-row"><span>Questionário de prontidão (PAR-Q)</span><b style="text-align:right;max-width:60%;color:${yes>0?'var(--rust)':'var(--green-deep)'};">${yes===0 ? 'Nenhuma resposta "sim"' : `${yes} ${plural(yes,'resposta "sim"','respostas "sim"')} — recomenda-se liberação médica antes de treinar`}</b></div>` : '';
@@ -6877,7 +6900,7 @@
     el.innerHTML = `
       <div class="fr-weight-card">
         <div class="fr-weight-card-head">
-          <span class="fr-weight-card-title">📋 Ficha de saúde</span>
+          <span class="fr-weight-card-title">${ico('clipboard')}Ficha de saúde</span>
           <button type="button" class="fr-btn-ghost" id="fr-health-edit-btn">${data ? 'Editar' : 'Preencher'}</button>
         </div>
         ${data ? healthValuesHtml(data) : `<p class="fr-hint" style="margin:0;">Alergias, restrições, condições de saúde e outras informações que nutricionistas e educadores físicos costumam pedir. Só você e o profissional vinculado enxergam essa ficha.</p>`}
@@ -6899,8 +6922,17 @@
               : `<input type="${f.type==='number'?'number':'text'}" id="fr-health-${f.key}" placeholder="${esc(f.ph)}" value="${esc(current[f.key]??'')}" ${f.type==='number'?`step="${f.step}" min="${f.min}" max="${f.max}"`:''}>`}
           </div>`).join('')}
         <div class="fr-evo-title" style="margin-top:14px;">Questionário de prontidão para atividade física (PAR-Q)</div>
-        <p class="fr-hint" style="margin-bottom:6px;">Marque as perguntas que você responde com "sim".</p>
-        ${PARQ_QUESTIONS.map((q,i)=>`<label class="fr-pick-row"><input type="checkbox" class="fr-parq-box" data-i="${i}" ${Array.isArray(current.parq) && current.parq[i]===true ? 'checked' : ''}><span>${esc(q)}</span></label>`).join('')}
+        <p class="fr-hint" style="margin-bottom:6px;">Responda cada pergunta com "Sim" ou "Não".</p>
+        ${PARQ_QUESTIONS.map((q,i)=>{
+          const v = Array.isArray(current.parq) ? current.parq[i] : null;
+          return `<div class="fr-parq-q">
+            <p>${esc(q)}</p>
+            <div class="fr-parq-opts">
+              <label><input type="radio" name="fr-parq-${i}" value="sim" ${v===true?'checked':''}> Sim</label>
+              <label><input type="radio" name="fr-parq-${i}" value="nao" ${v===false?'checked':''}> Não</label>
+            </div>
+          </div>`;
+        }).join('')}
         <div class="fr-form-actions">
           <button type="button" class="fr-btn-ghost" id="fr-health-cancel">Cancelar</button>
           <button type="submit" class="fr-btn-primary">Salvar</button>
@@ -6916,7 +6948,11 @@
         const v = document.getElementById('fr-health-'+f.key).value.trim();
         payload[f.key] = v==='' ? null : (f.type==='number' ? Number(v) : v);
       });
-      payload.parq = Array.from(overlay.querySelectorAll('.fr-parq-box')).map(b=> b.checked);
+      payload.parq = PARQ_QUESTIONS.map((q,i)=>{
+        const picked = overlay.querySelector(`input[name="fr-parq-${i}"]:checked`);
+        return picked ? picked.value==='sim' : null;
+      });
+      if(payload.parq.every(v=>v===null)) payload.parq = null;
       btn.disabled = true; btn.textContent = 'Salvando...';
       const { error } = await sb.from('health_profiles').upsert(payload, { onConflict: 'user_id' });
       if(error){ showToast('Não foi possível salvar. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Salvar'; return; }
@@ -7000,7 +7036,7 @@
       <div class="fr-section-label" style="max-width:1080px;margin:24px auto 12px;">Calendário de desempenho</div>
       <div class="fr-cal-card">
         <div class="fr-cal-legend">
-          <span><i style="background:var(--blue)"></i> 🏋 Treino</span>
+          <span><i style="background:var(--blue)"></i> Treino</span>
           <span><i style="background:var(--green)"></i> Água (litros)</span>
           <span><i style="background:var(--mustard)"></i> Proteína (g)</span>
           <span><i style="background:var(--rust)"></i> Calorias consumidas</span>
