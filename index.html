@@ -799,6 +799,7 @@
     <div id="fr-meal-suggestion"></div>
     <div id="fr-weight-section"></div>
     <div id="fr-tape-section"></div>
+    <div id="fr-health-section"></div>
     <div id="fr-diary-content"></div>
     <div id="fr-weekly-goals-section"></div>
     <div id="fr-calendar-section"></div>
@@ -1963,6 +1964,7 @@
             <button type="button" class="fr-chip" data-chat="${c.client_id}">💬 Chat</button>
             <button type="button" class="fr-chip fr-chip-video" data-report="${c.client_id}">📊 Relatório</button>
             <button type="button" class="fr-chip" data-tape="${c.client_id}">📏 Medidas</button>
+            <button type="button" class="fr-chip" data-health="${c.client_id}">📋 Ficha</button>
             <button type="button" class="fr-chip fr-chip-upload" data-recipes="${c.client_id}">Receitas ›</button>
           </span>
         </div>`).join('');
@@ -1979,6 +1981,12 @@
         const client = myClients.find(c=>c.client_id===clientId);
         closeOverlay();
         openClientRecipesModal(client);
+      });
+    });
+    el.querySelectorAll('[data-health]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const client = myClients.find(c=>c.client_id===btn.getAttribute('data-health'));
+        openClientHealthProfile(client);
       });
     });
     el.querySelectorAll('[data-tape]').forEach(btn=>{
@@ -6332,6 +6340,7 @@
     renderDiaryList();
     renderWeightSection();
     renderTapeSection();
+    renderHealthSection();
     renderWeeklyGoalsProgress();
     renderInlineCalendar();
     maybeShowWeeklyReport();
@@ -6656,7 +6665,14 @@
     { key:'thigh_right_cm', label:'Coxa direita',             group:'Pernas',   hint:'No ponto médio entre a dobra da virilha e o joelho, em pé e com o peso distribuído nas duas pernas.' },
     { key:'thigh_left_cm',  label:'Coxa esquerda',            group:'Pernas',   hint:'Mesmo ponto da coxa direita.' },
     { key:'calf_right_cm',  label:'Panturrilha direita',      group:'Pernas',   hint:'Na parte mais grossa da panturrilha, em pé.' },
-    { key:'calf_left_cm',   label:'Panturrilha esquerda',     group:'Pernas',   hint:'Mesmo ponto da panturrilha direita.' }
+    { key:'calf_left_cm',   label:'Panturrilha esquerda',     group:'Pernas',   hint:'Mesmo ponto da panturrilha direita.' },
+    { key:'skin_triceps_mm',    label:'Dobra do tríceps',   group:'Dobras cutâneas', unit:'mm', hint:'Parte de trás do braço, no ponto médio entre o ombro e o cotovelo, dobra vertical.' },
+    { key:'skin_subscapular_mm',label:'Dobra subescapular', group:'Dobras cutâneas', unit:'mm', hint:'Logo abaixo da ponta da escápula (omoplata), dobra levemente inclinada.' },
+    { key:'skin_chest_mm',      label:'Dobra peitoral',     group:'Dobras cutâneas', unit:'mm', hint:'Entre a axila e o mamilo (nos homens, na metade dessa distância), dobra diagonal.' },
+    { key:'skin_midaxillary_mm',label:'Dobra axilar média', group:'Dobras cutâneas', unit:'mm', hint:'Linha do meio da axila, na altura do osso do esterno, dobra vertical.' },
+    { key:'skin_suprailiac_mm', label:'Dobra suprailíaca',  group:'Dobras cutâneas', unit:'mm', hint:'Logo acima do osso do quadril, na linha do meio da axila, dobra diagonal.' },
+    { key:'skin_abdominal_mm',  label:'Dobra abdominal',    group:'Dobras cutâneas', unit:'mm', hint:'Dois dedos ao lado do umbigo, dobra vertical.' },
+    { key:'skin_thigh_mm',      label:'Dobra da coxa',      group:'Dobras cutâneas', unit:'mm', hint:'Frente da coxa, no ponto médio entre a virilha e o joelho, dobra vertical.' }
   ];
 
   function plural(n, singular, pluralForm){ return n===1 ? singular : pluralForm; }
@@ -6703,7 +6719,7 @@
           delta = ` <span style="color:${color};font-size:11px;">${d>0?'▲':'▼'} ${Math.abs(d).toFixed(1).replace('.',',')}</span>`;
         }
       }
-      return `<div class="fr-session-hist-row"><span>${esc(f.label)}</span><b>${Number(row[f.key]).toString().replace('.',',')} cm${delta}</b></div>`;
+      return `<div class="fr-session-hist-row"><span>${esc(f.label)}</span><b>${Number(row[f.key]).toString().replace('.',',')} ${f.unit||'cm'}${delta}</b></div>`;
     }).join('');
   }
 
@@ -6734,18 +6750,18 @@
   }
 
   function openTapeLogModal(latest){
-    const groups = ['Tronco','Braços','Pernas'];
+    const groups = ['Tronco','Braços','Pernas','Dobras cutâneas'];
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Registrar medidas com fita</h3>
-      <p class="fr-hint" style="margin-bottom:12px;">Preencha só o que você mediu. Use as medidas em centímetros, com a fita justa, mas sem apertar a pele.</p>
+      <p class="fr-hint" style="margin-bottom:12px;">Preencha só o que você mediu. As circunferências são em centímetros (fita justa, sem apertar a pele) e as dobras cutâneas em milímetros — essas só entram se você tiver um adipômetro ou fizer a avaliação com um profissional.</p>
       <form id="fr-tape-form">
         <div class="fr-field"><label for="fr-tape-date">Data</label><input type="date" id="fr-tape-date" value="${todayStr()}" max="${todayStr()}" required></div>
         ${groups.map(g=>`
           <div class="fr-evo-title" style="margin-top:12px;">${g}</div>
           ${TAPE_FIELDS.filter(f=>f.group===g).map(f=>`
             <div class="fr-field">
-              <label for="fr-tape-${f.key}">${esc(f.label)} (cm)</label>
-              <input type="number" min="1" max="300" step="0.1" id="fr-tape-${f.key}" inputmode="decimal" placeholder="${latest && latest[f.key]!=null ? 'último: '+latest[f.key] : ''}">
+              <label for="fr-tape-${f.key}">${esc(f.label)} (${f.unit||'cm'})</label>
+              <input type="number" min="0.1" max="300" step="0.1" id="fr-tape-${f.key}" inputmode="decimal" placeholder="${latest && latest[f.key]!=null ? 'último: '+latest[f.key] : ''}">
               <p class="fr-hint" style="margin:2px 0 0;">${esc(f.hint)}</p>
             </div>`).join('')}
         `).join('')}
@@ -6804,6 +6820,121 @@
     const { data: prof } = await sb.from('profiles').select('sex, height_cm').eq('id', client.client_id).maybeSingle();
     if(prof){ sex = prof.sex; heightCm = prof.height_cm; }
     openTapeHistoryModal(client.client_id, `Medidas — ${client.email}`, sex, heightCm);
+  }
+
+  /* ---------- Ficha de saúde (anamnese) ---------- */
+  // Informações que nutricionistas e educadores físicos pedem antes de
+  // montar plano alimentar ou treino. São dados sensíveis: só a própria
+  // pessoa edita e só o profissional vinculado lê (regra no banco).
+  const HEALTH_FIELDS = [
+    { key:'allergies',            label:'Alergias alimentares',         type:'text',   ph:'ex.: amendoim, camarão' },
+    { key:'intolerances',         label:'Intolerâncias',                type:'text',   ph:'ex.: lactose, glúten' },
+    { key:'dietary_restrictions', label:'Restrições alimentares',       type:'text',   ph:'ex.: vegetariana, não come carne vermelha' },
+    { key:'health_conditions',    label:'Condições de saúde',           type:'area',   ph:'ex.: diabetes, hipertensão, tireoide, gastrite' },
+    { key:'medications',          label:'Medicamentos de uso contínuo', type:'area',   ph:'Nome e, se souber, a dose' },
+    { key:'supplements',          label:'Suplementos que usa',          type:'text',   ph:'ex.: whey protein, creatina' },
+    { key:'sleep_hours',          label:'Horas de sono por noite',      type:'number', ph:'ex.: 7', step:'0.5', min:'0', max:'24' },
+    { key:'meals_per_day',        label:'Refeições por dia',            type:'number', ph:'ex.: 4', step:'1', min:'0', max:'12' },
+    { key:'surgeries',            label:'Cirurgias anteriores',         type:'area',   ph:'ex.: cirurgia no joelho em 2022' },
+    { key:'family_history',       label:'Histórico familiar de doenças', type:'area',  ph:'ex.: infarto, diabetes ou hipertensão na família' },
+    { key:'smoking',              label:'Tabagismo',                    type:'text',   ph:'ex.: não fuma / fuma 5 cigarros por dia' },
+    { key:'alcohol',              label:'Consumo de álcool',            type:'text',   ph:'ex.: socialmente, 1 vez por semana' },
+    { key:'blood_pressure',       label:'Pressão arterial (última medida)', type:'text', ph:'ex.: 120/80' },
+    { key:'resting_hr',           label:'Frequência cardíaca de repouso (bpm)', type:'number', ph:'ex.: 70', step:'1', min:'20', max:'220' },
+    { key:'available_days',       label:'Dias da semana disponíveis para treinar', type:'text', ph:'ex.: segunda, quarta e sexta' },
+    { key:'available_time',       label:'Horário e tempo disponível por treino', type:'text', ph:'ex.: de manhã, 1 hora' },
+    { key:'training_history',     label:'Histórico de treino',          type:'area',   ph:'Há quanto tempo treina, quais modalidades pratica' },
+    { key:'injuries',             label:'Lesões e dores',               type:'area',   ph:'ex.: dor no joelho direito, cirurgia no ombro em 2023' },
+    { key:'notes',                label:'Outras observações',           type:'area',   ph:'Qualquer informação que ajude o profissional' }
+  ];
+
+  // PAR-Q: questionário padrão de prontidão para atividade física, que
+  // educadores físicos aplicam antes de montar o treino.
+  const PARQ_QUESTIONS = [
+    'Algum médico já disse que você tem algum problema de coração e que só deveria praticar atividade física com supervisão?',
+    'Você sente dor no peito quando pratica atividade física?',
+    'No último mês, você sentiu dor no peito sem estar praticando atividade física?',
+    'Você perde o equilíbrio por causa de tontura ou já perdeu a consciência?',
+    'Você tem algum problema ósseo ou articular que poderia piorar com a atividade física?',
+    'Você toma atualmente algum medicamento para pressão arterial ou para o coração?',
+    'Você conhece alguma outra razão pela qual não deveria praticar atividade física?'
+  ];
+  function parqYesCount(row){ return Array.isArray(row && row.parq) ? row.parq.filter(v=>v===true).length : 0; }
+
+  function healthValuesHtml(row){
+    const filled = HEALTH_FIELDS.filter(f=> row && row[f.key]!=null && String(row[f.key]).trim()!=='');
+    const answered = Array.isArray(row && row.parq);
+    if(filled.length===0 && !answered) return `<p class="fr-hint" style="margin:0;">Nenhuma informação preenchida ainda.</p>`;
+    const yes = parqYesCount(row);
+    const parqHtml = answered ? `<div class="fr-session-hist-row"><span>Questionário de prontidão (PAR-Q)</span><b style="text-align:right;max-width:60%;color:${yes>0?'var(--rust)':'var(--green-deep)'};">${yes===0 ? 'Nenhuma resposta "sim"' : `${yes} ${plural(yes,'resposta "sim"','respostas "sim"')} — recomenda-se liberação médica antes de treinar`}</b></div>` : '';
+    return parqHtml + filled.map(f=>`<div class="fr-session-hist-row"><span>${esc(f.label)}</span><b style="text-align:right;max-width:60%;">${esc(row[f.key])}</b></div>`).join('');
+  }
+
+  async function renderHealthSection(){
+    const el = document.getElementById('fr-health-section');
+    if(!el) return;
+    const { data } = await sb.from('health_profiles').select('*').eq('user_id', currentUser.id).maybeSingle();
+    el.innerHTML = `
+      <div class="fr-weight-card">
+        <div class="fr-weight-card-head">
+          <span class="fr-weight-card-title">📋 Ficha de saúde</span>
+          <button type="button" class="fr-btn-ghost" id="fr-health-edit-btn">${data ? 'Editar' : 'Preencher'}</button>
+        </div>
+        ${data ? healthValuesHtml(data) : `<p class="fr-hint" style="margin:0;">Alergias, restrições, condições de saúde e outras informações que nutricionistas e educadores físicos costumam pedir. Só você e o profissional vinculado enxergam essa ficha.</p>`}
+      </div>`;
+    el.querySelector('#fr-health-edit-btn').addEventListener('click', ()=> openHealthModal(data));
+  }
+
+  function openHealthModal(current){
+    current = current || {};
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Ficha de saúde</h3>
+      <p class="fr-hint" style="margin-bottom:12px;">Preencha só o que quiser compartilhar. Essas informações são sensíveis: só você e o profissional vinculado a você conseguem ler. Elas não substituem uma consulta.</p>
+      <form id="fr-health-form">
+        ${HEALTH_FIELDS.map(f=>`
+          <div class="fr-field">
+            <label for="fr-health-${f.key}">${esc(f.label)}</label>
+            ${f.type==='area'
+              ? `<textarea id="fr-health-${f.key}" style="min-height:56px" placeholder="${esc(f.ph)}">${esc(current[f.key]||'')}</textarea>`
+              : `<input type="${f.type==='number'?'number':'text'}" id="fr-health-${f.key}" placeholder="${esc(f.ph)}" value="${esc(current[f.key]??'')}" ${f.type==='number'?`step="${f.step}" min="${f.min}" max="${f.max}"`:''}>`}
+          </div>`).join('')}
+        <div class="fr-evo-title" style="margin-top:14px;">Questionário de prontidão para atividade física (PAR-Q)</div>
+        <p class="fr-hint" style="margin-bottom:6px;">Marque as perguntas que você responde com "sim".</p>
+        ${PARQ_QUESTIONS.map((q,i)=>`<label class="fr-pick-row"><input type="checkbox" class="fr-parq-box" data-i="${i}" ${Array.isArray(current.parq) && current.parq[i]===true ? 'checked' : ''}><span>${esc(q)}</span></label>`).join('')}
+        <div class="fr-form-actions">
+          <button type="button" class="fr-btn-ghost" id="fr-health-cancel">Cancelar</button>
+          <button type="submit" class="fr-btn-primary">Salvar</button>
+        </div>
+      </form>
+    `);
+    overlay.querySelector('#fr-health-cancel').addEventListener('click', closeOverlay);
+    overlay.querySelector('#fr-health-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const btn = overlay.querySelector('button[type="submit"]');
+      const payload = { user_id: currentUser.id, updated_at: new Date().toISOString() };
+      HEALTH_FIELDS.forEach(f=>{
+        const v = document.getElementById('fr-health-'+f.key).value.trim();
+        payload[f.key] = v==='' ? null : (f.type==='number' ? Number(v) : v);
+      });
+      payload.parq = Array.from(overlay.querySelectorAll('.fr-parq-box')).map(b=> b.checked);
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.from('health_profiles').upsert(payload, { onConflict: 'user_id' });
+      if(error){ showToast('Não foi possível salvar. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Salvar'; return; }
+      showToast('Ficha de saúde salva.', 'ok');
+      closeOverlay();
+      renderHealthSection();
+    });
+  }
+
+  async function openClientHealthProfile(client){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Ficha de saúde — ${esc(client.email)}</h3>
+      <div id="fr-client-health-content"><div class="fr-loading">Carregando...</div></div>
+    `);
+    const box = overlay.querySelector('#fr-client-health-content');
+    const { data, error } = await sb.from('health_profiles').select('*').eq('user_id', client.client_id).maybeSingle();
+    if(error){ box.innerHTML = `<p class="fr-hint">Não foi possível carregar a ficha agora.</p>`; return; }
+    box.innerHTML = data ? healthValuesHtml(data) : `<p class="fr-hint">Esse cliente ainda não preencheu a ficha de saúde.</p>`;
   }
 
   /* ---------- Calendário de desempenho ---------- */
