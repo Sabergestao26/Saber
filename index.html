@@ -522,6 +522,20 @@
     font-family:'IBM Plex Mono',monospace; background:var(--surface); color:var(--ink);
   }
 
+  .fr-suggestion-box{
+    max-width:1080px; margin:0 auto 24px; background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); box-shadow:var(--shadow); padding:16px 20px;
+  }
+  .fr-suggestion-title{ font-family:'Fraunces',serif; font-weight:600; font-size:15px; color:var(--green-deep); margin-bottom:12px; }
+  .fr-suggestion-list{ display:flex; gap:12px; flex-wrap:wrap; }
+  .fr-suggestion-card{
+    flex:1 1 180px; min-width:160px; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:12px 14px;
+  }
+  .fr-suggestion-name{ font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; color:var(--ink); margin-bottom:4px; }
+  .fr-suggestion-macros{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); margin-bottom:10px; }
+  .fr-suggestion-log-btn{ width:100%; }
+
   .fr-weight-card{
     max-width:1080px; margin:0 auto 24px; background:var(--card); border:1px solid var(--border);
     border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 20px;
@@ -782,6 +796,7 @@
   <div id="fr-view-diary">
     <div class="fr-date-nav" id="fr-date-nav"></div>
     <div class="fr-summary" id="fr-summary"></div>
+    <div id="fr-meal-suggestion"></div>
     <div id="fr-weight-section"></div>
     <div id="fr-diary-content"></div>
     <div id="fr-weekly-goals-section"></div>
@@ -3793,6 +3808,7 @@
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Montar meu treino</h3>
       <div class="fr-field"><label for="fr-pick-name">Nome do treino</label><input type="text" id="fr-pick-name" placeholder="ex.: Treino de hoje" value="Meu treino"></div>
+      <label class="fr-pick-row" style="margin-bottom:8px;"><input type="checkbox" id="fr-pick-home-only"><span>🏠 Mostrar só exercícios pra treinar em casa (sem equipamento)</span></label>
       <button type="button" class="fr-btn-ghost" id="fr-pick-only-cardio" style="width:100%;margin-bottom:12px;">🏃 Só cardio hoje (marca só as opções de cardio)</button>
       <div id="fr-pick-list"><div class="fr-loading">Carregando exercícios...</div></div>
       <button class="fr-btn-primary" id="fr-pick-save" style="width:100%;margin-top:16px;">Salvar meu treino</button>
@@ -3808,11 +3824,24 @@
       <div class="fr-pick-group">
         <div class="fr-pick-group-title">${esc(gName)}</div>
         ${groups[gName].map(e=>`
-          <label class="fr-pick-row">
+          <label class="fr-pick-row" data-home="${Array.isArray(e.locations) && e.locations.includes('casa') ? '1' : '0'}">
             <input type="checkbox" class="fr-pick-checkbox" value="${e.id}">
             <span>${esc(e.name)} <small>${e.sets||'?'}x${esc(e.reps||'?')}</small></span>
           </label>`).join('')}
       </div>`).join('');
+
+    overlay.querySelector('#fr-pick-home-only').addEventListener('change', function(){
+      const homeOnly = this.checked;
+      overlay.querySelectorAll('.fr-pick-row[data-home]').forEach(row=>{
+        const isHome = row.getAttribute('data-home') === '1';
+        row.style.display = (homeOnly && !isHome) ? 'none' : '';
+        if(homeOnly && !isHome) row.querySelector('.fr-pick-checkbox').checked = false;
+      });
+      overlay.querySelectorAll('.fr-pick-group').forEach(group=>{
+        const anyVisible = Array.from(group.querySelectorAll('.fr-pick-row[data-home]')).some(row=> row.style.display !== 'none');
+        group.style.display = anyVisible ? '' : 'none';
+      });
+    });
 
     overlay.querySelector('#fr-pick-only-cardio').addEventListener('click', function(){
       overlay.querySelectorAll('.fr-pick-checkbox').forEach(cb=>{ cb.checked = false; });
@@ -3854,7 +3883,7 @@
       const rows = exercisesToCopy.map((e,i)=> ({
         workout_id: w.id, position: i+1, name: e.name, sets: e.sets, reps: e.reps,
         rest_seconds: e.rest_seconds, video_url: e.video_url, notes: e.notes,
-        sets_detail: e.sets_detail || null
+        sets_detail: e.sets_detail || null, locations: e.locations || ['academia']
       }));
       const { error: exErr } = await sb.from('workout_exercises').insert(rows);
       if(exErr) throw exErr;
@@ -4127,6 +4156,12 @@
             <option value="geral">Condicionamento geral</option>
           </select>
         </div>
+        <div class="fr-field"><label for="fr-as-location">Onde você vai treinar?</label>
+          <select id="fr-as-location">
+            <option value="academia">Na academia</option>
+            <option value="casa">Em casa (sem equipamento)</option>
+          </select>
+        </div>
         <div class="fr-field"><label for="fr-as-level">Nível de experiência</label>
           <select id="fr-as-level">
             <option value="iniciante">Iniciante</option>
@@ -4249,6 +4284,7 @@
         goal: document.getElementById('fr-as-goal').value,
         level: document.getElementById('fr-as-level').value,
         days: parseInt(document.getElementById('fr-as-days').value, 10),
+        location: document.getElementById('fr-as-location').value,
         medical, limitations, focusAreas, includeCardio, includeCardioFinisher, cardioFinisherUpper, cardioFinisherLower,
         notes: document.getElementById('fr-as-notes').value.trim()
       };
@@ -4257,6 +4293,7 @@
       if(limitations.length > 0){
         const { error } = await sb.from('assessment_submissions').insert({
           user_id: currentUser.id, goal: answers.goal, level: answers.level, days_per_week: answers.days,
+          location: answers.location,
           medical_clearance: medical, limitations, limitations_notes: answers.notes, include_cardio: includeCardio,
           include_cardio_finisher: includeCardioFinisher,
           cardio_finisher_upper: includeCardioFinisher ? cardioFinisherUpper : null,
@@ -4297,7 +4334,11 @@
       // reduz também a quantidade nos grupos afetados pela limitação da pessoa —
       // menos volume ali, mesmo entre os exercícios considerados seguros.
       if(reducedGroups.has(groupName)) target = Math.max(1, Math.ceil(target/2));
-      const list = (groups[groupName] || []).filter(e=> !excludedNames.includes(e.name));
+      let list = (groups[groupName] || []).filter(e=> !excludedNames.includes(e.name));
+      // Quem vai treinar em casa só recebe exercícios marcados como "casa"
+      // (sem equipamento de academia). Quem treina na academia continua
+      // vendo tudo, já que lá também dá pra fazer os exercícios de casa.
+      if(answers.location === 'casa') list = list.filter(e=> Array.isArray(e.locations) && e.locations.includes('casa'));
       return list.slice(0, Math.min(target, list.length));
     }
     let plan = [];
@@ -5486,7 +5527,8 @@
 
   function openExerciseFormModal(workoutId, workoutName, existing){
     const isEdit = !!existing;
-    const ex = existing || { name:'', sets:'', reps:'', rest_seconds:'', video_url:'', notes:'', sets_detail:null };
+    const ex = existing || { name:'', sets:'', reps:'', rest_seconds:'', video_url:'', notes:'', sets_detail:null, locations:['academia'] };
+    const exIsHome = Array.isArray(ex.locations) && ex.locations.includes('casa');
     const catalog = exerciseLibrary.length ? exerciseLibrary : [];
     const uniqueByName = new Map();
     catalog.forEach(e=>{ if(!uniqueByName.has(e.name)) uniqueByName.set(e.name, e); });
@@ -5521,6 +5563,9 @@
         <div id="fr-ex-detail-section" style="${hasExistingDetail ? '' : 'display:none;'}margin-bottom:14px;">
           <div id="fr-ex-detail-rows"></div>
           <button type="button" class="fr-btn-ghost" id="fr-ex-detail-add" style="width:100%;margin-top:4px;">+ Adicionar série</button>
+        </div>
+        <div class="fr-field">
+          <label class="fr-pick-row"><input type="checkbox" id="fr-ex-home" ${exIsHome ? 'checked' : ''}><span>🏠 Também serve pra treinar em casa (sem equipamento de academia)</span></label>
         </div>
         <div class="fr-field"><label for="fr-ex-video">Link do vídeo de demonstração</label><input type="url" id="fr-ex-video" placeholder="https://..." value="${esc(ex.video_url||'')}"></div>
         <div class="fr-field"><label for="fr-ex-notes">Observações</label><textarea id="fr-ex-notes" style="min-height:50px">${esc(ex.notes||'')}</textarea></div>
@@ -5562,6 +5607,7 @@
       document.getElementById('fr-ex-rest').value = match.rest_seconds ?? '';
       document.getElementById('fr-ex-video').value = match.video_url || '';
       document.getElementById('fr-ex-notes').value = match.notes || '';
+      document.getElementById('fr-ex-home').checked = Array.isArray(match.locations) && match.locations.includes('casa');
       // Também copia o detalhe por série, se o exercício do catálogo tiver.
       detailRowsEl.innerHTML = '';
       const matchDetail = Array.isArray(match.sets_detail) ? match.sets_detail : [];
@@ -5645,7 +5691,8 @@
         rest_seconds: sets_detail ? detailRestSeconds : numOrNull(document.getElementById('fr-ex-rest').value),
         video_url: document.getElementById('fr-ex-video').value.trim() || null,
         notes: document.getElementById('fr-ex-notes').value,
-        sets_detail
+        sets_detail,
+        locations: document.getElementById('fr-ex-home').checked ? ['casa','academia'] : ['academia']
       };
       btn.disabled = true; btn.textContent = 'Salvando...';
       try{
@@ -6210,6 +6257,10 @@
     recipesLoaded = true;
     if(error) showToast('Não foi possível carregar as receitas.', 'err');
     renderGrid();
+    // A sugestão de alimentação do diário usa essa lista — se as receitas
+    // demorarem a carregar (chamado uma vez lá no boot()) e a pessoa já
+    // estiver na aba Diário, atualiza a sugestão assim que chegarem.
+    if(currentView==='diary') renderMealSuggestion();
   }
 
   async function loadPersonalRecipes(){
@@ -6269,6 +6320,7 @@
     await Promise.all([loadDiaryForDate(), loadTargetsOnce(), loadWaterForDate(), loadCaloriesBurnedForDate()]);
     renderDateNav();
     renderSummary();
+    renderMealSuggestion();
     renderDiaryList();
     renderWeightSection();
     renderWeeklyGoalsProgress();
@@ -6360,6 +6412,70 @@
     });
   }
 
+  // Monta até 3 sugestões de receita pra "fechar" o dia dentro da meta:
+  // olha quanto falta de calorias (e, como critério secundário, de
+  // proteína) e escolhe entre as receitas da refeição atual (café, almoço,
+  // etc., pelo horário) as que cabem melhor no que resta. Se não houver
+  // receita nenhuma daquela refeição, procura em todas.
+  function suggestMealsForToday(){
+    const mealType = guessMealTypeByTime();
+    if(!recipesLoaded) return { mealType, remainingCalories:null, candidates:[], loading:true };
+    const hasTargets = !!(targets && targets.calories);
+    if(!hasTargets) return { mealType, remainingCalories:null, candidates:[], loading:false };
+    const totals = dayTotals();
+    const remainingCalories = Math.round(Math.max(0, n0(targets.calories) - totals.calories));
+    if(remainingCalories <= 0) return { mealType, remainingCalories, candidates:[], loading:false, goalReached:true };
+    const remainingProtein = targets.protein ? Math.max(0, n0(targets.protein) - totals.protein) : 0;
+    if(recipes.length === 0) return { mealType, remainingCalories, candidates:[], loading:false };
+    let pool = recipes.filter(r=> r.category === mealType && n0(r.calories) > 0);
+    if(pool.length === 0) pool = recipes.filter(r=> n0(r.calories) > 0);
+    // Prioriza quem cabe no que resta (com uma folga de 15%) — só usa o
+    // restante se nada coube, pra sempre sobrar alguma sugestão.
+    const withinBudget = pool.filter(r=> n0(r.calories) <= remainingCalories * 1.15);
+    if(withinBudget.length > 0) pool = withinBudget;
+    const scored = pool.map(r=>{
+      let score = Math.abs(n0(r.calories) - remainingCalories);
+      if(remainingProtein > 0) score -= Math.min(n0(r.protein), remainingProtein) * 3;
+      return { recipe:r, score };
+    }).sort((a,b)=> a.score - b.score);
+    const candidates = scored.slice(0,3).map(s=>s.recipe);
+    return { mealType, remainingCalories, candidates, loading:false };
+  }
+
+  function renderMealSuggestion(){
+    const el = document.getElementById('fr-meal-suggestion');
+    if(!el) return;
+    // Só faz sentido sugerir o que comer pra hoje, não pra editar um dia
+    // passado ou futuro do diário.
+    if(currentDate !== todayStr()){ el.innerHTML = ''; return; }
+    if(!recipesLoaded){ el.innerHTML = `<div class="fr-suggestion-box"><div class="fr-loading">Carregando sugestões...</div></div>`; return; }
+    if(!targets || !targets.calories){ el.innerHTML = ''; return; }
+    const { mealType, remainingCalories, candidates, goalReached } = suggestMealsForToday();
+    if(goalReached){
+      el.innerHTML = `<div class="fr-suggestion-box"><p class="fr-hint">🎉 Você já bateu sua meta de calorias hoje. Se ainda quiser comer algo, fique de olho pra não passar muito da meta.</p></div>`;
+      return;
+    }
+    if(candidates.length === 0){
+      el.innerHTML = `<div class="fr-suggestion-box"><p class="fr-hint">Ainda não achei uma receita que caiba nos ${esc(remainingCalories)} kcal que faltam hoje — dá uma olhada nas receitas disponíveis pra ver outras opções.</p></div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="fr-suggestion-box">
+        <div class="fr-suggestion-title">💡 Sugestão pra ${esc((CATS[mealType]||CATS.almoco).label.toLowerCase())} · faltam ${esc(remainingCalories)} kcal hoje</div>
+        <div class="fr-suggestion-list">
+          ${candidates.map(r=>`
+            <div class="fr-suggestion-card">
+              <div class="fr-suggestion-name">${esc(r.name)}</div>
+              <div class="fr-suggestion-macros">${Math.round(n0(r.calories))} kcal · P:${Math.round(n0(r.protein))} C:${Math.round(n0(r.carbs))} G:${Math.round(n0(r.fat))}</div>
+              <button type="button" class="fr-btn-ghost fr-suggestion-log-btn" data-id="${r.id}">Registrar</button>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    el.querySelectorAll('.fr-suggestion-log-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=> openLogModal(btn.getAttribute('data-id')));
+    });
+  }
+
   function logRowHtml(e){
     return `
       <div class="fr-log-row">
@@ -6404,6 +6520,7 @@
     currentDayLogs = currentDayLogs.filter(l=>l.id!==id);
     showToast('Removido do diário.', 'ok');
     renderSummary();
+    renderMealSuggestion();
     renderDiaryList();
   }
 
@@ -6848,7 +6965,11 @@
     });
   }
 
-  function openLogModal(){
+  function openLogModal(presetRecipeId){
+    // Quando chamado direto como handler de clique (ex.: botão "Registrar
+    // alimento"), o próprio evento do clique vem nesse parâmetro — só
+    // tratamos como pré-seleção quando for de fato um id (string).
+    presetRecipeId = (typeof presetRecipeId === 'string') ? presetRecipeId : null;
     const hasRecipes = recipes.length > 0;
     const defaultMeal = guessMealTypeByTime();
     const sortedRecipes = recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
@@ -6862,7 +6983,7 @@
         <div class="fr-log-panel ${hasRecipes?'active':''}" id="fr-log-panel-recipe">
           ${hasRecipes ? `
           <div class="fr-field"><label for="fr-log-recipe-select">Receita</label>
-            <select id="fr-log-recipe-select">${sortedRecipes.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>
+            <select id="fr-log-recipe-select">${sortedRecipes.map(r=>`<option value="${r.id}" ${presetRecipeId===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select>
           </div>
           <div class="fr-field"><label for="fr-log-qty">Quantidade (em porções)</label><input type="number" min="0.25" step="0.25" id="fr-log-qty" value="1"></div>
           <div class="fr-log-preview">

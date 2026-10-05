@@ -330,7 +330,10 @@
     function pick(groupName, n){
       let target = focusAreas.includes(groupName) ? n + 2 : n;
       if(reducedGroups.has(groupName)) target = Math.max(1, Math.ceil(target/2));
-      const list = (groups[groupName] || []).filter(e=> !excludedNames.includes(e.name));
+      let list = (groups[groupName] || []).filter(e=> !excludedNames.includes(e.name));
+      // Mesma regra do app: avaliação marcada pra "casa" só usa exercícios
+      // sem equipamento de academia.
+      if(answers.location === 'casa') list = list.filter(e=> Array.isArray(e.locations) && e.locations.includes('casa'));
       return list.slice(0, Math.min(target, list.length));
     }
     let plan = [];
@@ -525,7 +528,7 @@
       <div class="review-item" data-id="${a.id}">
         <div class="review-name">${esc(emailById[a.user_id]||'Pessoa')}</div>
         <div class="review-meta">
-          Objetivo: ${esc(a.goal)} · Nível: ${esc(a.level)} · ${esc(a.days_per_week)}x/semana · Liberação médica: ${esc(a.medical_clearance)}<br>
+          Objetivo: ${esc(a.goal)} · Nível: ${esc(a.level)} · ${esc(a.days_per_week)}x/semana · Local: ${a.location==='casa' ? 'Casa (sem equipamento)' : 'Academia'} · Liberação médica: ${esc(a.medical_clearance)}<br>
           Limitações: ${a.limitations && a.limitations.length ? esc(a.limitations.map(l=>LIMITATION_LABELS[l]||l).join(', ')) : '—'}
           ${a.limitations_notes ? `<br>Nota da pessoa: "${esc(a.limitations_notes)}"` : ''}
         </div>
@@ -545,11 +548,11 @@
             const excluded = [];
             (assessment.limitations||[]).forEach(l=>{ (LIMITATION_EXCLUSIONS[l]||[]).forEach(name=> excluded.push(name)); });
             await loadExerciseLibrary();
-            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio, includeCardioFinisher: assessment.include_cardio_finisher, cardioFinisherUpper: assessment.cardio_finisher_upper, cardioFinisherLower: assessment.cardio_finisher_lower, limitations: assessment.limitations }, excluded);
+            const plan = generateWorkoutPlan({ goal: assessment.goal, level: assessment.level, days: assessment.days_per_week, includeCardio: assessment.include_cardio, includeCardioFinisher: assessment.include_cardio_finisher, cardioFinisherUpper: assessment.cardio_finisher_upper, cardioFinisherLower: assessment.cardio_finisher_lower, limitations: assessment.limitations, location: assessment.location }, excluded);
             for(const day of plan){
               const { data: w, error: wErr } = await sb.from('workouts').insert({ name: day.name, assigned_to_user_id: assessment.user_id, created_by: currentUser.id, notes: 'Gerado a partir da avaliação, revisado pelo admin.' }).select().single();
               if(wErr || !w) continue;
-              const rows = day.exercises.map((ex,i)=> ({ workout_id: w.id, position:i+1, name:ex.name, sets:ex.sets, reps:ex.reps, rest_seconds:ex.rest_seconds, video_url:ex.video_url, notes:ex.notes }));
+              const rows = day.exercises.map((ex,i)=> ({ workout_id: w.id, position:i+1, name:ex.name, sets:ex.sets, reps:ex.reps, rest_seconds:ex.rest_seconds, video_url:ex.video_url, notes:ex.notes, sets_detail: ex.sets_detail || null, locations: ex.locations || ['academia'] }));
               if(rows.length) await sb.from('workout_exercises').insert(rows);
             }
             await sb.from('assessment_submissions').update({ status:'approved', reviewed_at:new Date().toISOString() }).eq('id', id);
