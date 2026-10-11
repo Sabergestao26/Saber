@@ -733,6 +733,22 @@
     .fr-summary-kcal .val{ font-size:26px; }
     .fr-date-label{ min-width:84px; font-size:16px; }
   }
+
+  /* ---------- Pergunte à IA ---------- */
+  .fr-ai-wrap{ max-width: 720px; margin: 0 auto; }
+  .fr-ai-head h2{ font-family:'Fraunces', serif; font-weight:600; font-size:24px; margin:0 0 4px; }
+  .fr-ai-head p{ font-size:13.5px; color: var(--ink-soft); margin:0 0 14px; line-height:1.5; }
+  .fr-ai-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .fr-ai-chip{ font-family:'Inter',sans-serif; font-size:13px; background: var(--card); color: var(--ink); border:1px solid var(--border); border-radius:999px; padding:8px 14px; cursor:pointer; text-align:left; }
+  .fr-ai-chip:hover{ border-color: var(--green-deep); color: var(--green-deep); }
+  .fr-ai-thread{ display:flex; flex-direction:column; gap:10px; margin-bottom:12px; }
+  .fr-ai-msg{ max-width:88%; padding:10px 14px; border-radius:12px; font-size:14px; line-height:1.55; word-wrap:break-word; }
+  .fr-ai-msg.user{ align-self:flex-end; background: var(--green-deep); color:#F6F1DF; border-bottom-right-radius:4px; }
+  .fr-ai-msg.bot{ align-self:flex-start; background: var(--card); border:1px solid var(--border); border-bottom-left-radius:4px; }
+  .fr-ai-msg.err{ align-self:flex-start; background: var(--err-bg); color: var(--rust); border:1px solid var(--rust); }
+  .fr-ai-foot{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:8px; }
+  .fr-ai-chip-done{ border-color: var(--green-deep); color: var(--green-deep); }
+  .fr-ai-link{ background:none; border:none; padding:0; font-size:11.5px; color: var(--ink-soft); text-decoration:underline; cursor:pointer; font-family:'Inter',sans-serif; }
 </style>
 </head>
 <body>
@@ -819,6 +835,10 @@
   <div id="fr-view-articles" style="display:none">
     <div class="fr-tabs" id="fr-article-tabs"></div>
     <div id="fr-articles-content"></div>
+  </div>
+
+  <div id="fr-view-ia" style="display:none">
+    <div id="fr-ia-content"></div>
   </div>
 
   <div id="fr-view-workouts" style="display:none">
@@ -2647,7 +2667,7 @@
 
   /* ---------- View switching ---------- */
   function renderViewTabs(){
-    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['articles','Artigos'], ['leitura','Leitura'], ['settings','Configurações']];
+    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['articles','Artigos'], ['leitura','Leitura'], ['ia','Dúvidas rápidas'], ['settings','Configurações']];
     document.getElementById('fr-view-tabs').innerHTML = tabs.map(t=>
       `<button class="fr-view-tab ${currentView===t[0]?'active':''}" data-view="${t[0]}">${t[1]}</button>`
     ).join('');
@@ -2692,6 +2712,7 @@
     document.getElementById('fr-view-workouts').style.display = view==='workouts' ? '' : 'none';
     document.getElementById('fr-view-articles').style.display = view==='articles' ? '' : 'none';
     document.getElementById('fr-view-leitura').style.display = view==='leitura' ? '' : 'none';
+    document.getElementById('fr-view-ia').style.display = view==='ia' ? '' : 'none';
     document.getElementById('fr-view-settings').style.display = view==='settings' ? '' : 'none';
     renderViewTabs();
     renderPrimaryAction();
@@ -2701,7 +2722,151 @@
     if(view==='workouts') renderWorkoutsView();
     if(view==='articles') renderArticlesView();
     if(view==='leitura') renderLeituraView();
+    if(view==='ia') renderIAView();
     if(view==='settings') renderSettingsView();
+  }
+
+  /* ---------- Dúvidas rápidas (perguntas e respostas prontas) ---------- */
+  // Respostas gerais, sem valor clínico fechado. Não usam IA nem custam nada:
+  // a pessoa escolhe a pergunta e a resposta já está escrita aqui.
+  const QA_GROUPS = [
+  {
+    "title": "Treino",
+    "items": [
+      {
+        "q": "Preciso descansar quantos dias entre treinos do mesmo grupo muscular?",
+        "a": "Em geral, 48 horas é um bom ponto de partida pra permitir a recuperação do músculo trabalhado. Isso pode variar de acordo com a intensidade do treino, o nível de condicionamento da pessoa e orientação do profissional que acompanha o treino."
+      },
+      {
+        "q": "É normal sentir dor muscular nos dias depois do treino?",
+        "a": "Sim, é a chamada dor muscular tardia, comum principalmente em quem está começando ou mudou o tipo de treino. Ela tende a melhorar com leve movimento e passar em alguns dias; dor muito intensa ou que não melhora vale conversar com o profissional responsável."
+      },
+      {
+        "q": "Qual a diferença entre treino de hipertrofia e treino de resistência?",
+        "a": "Hipertrofia geralmente usa cargas mais altas com menos repetições, focando em aumento de massa muscular. Resistência usa cargas mais baixas com mais repetições, focando em resistência muscular e, em geral, menos ganho de volume."
+      },
+      {
+        "q": "Posso fazer cardio e musculação no mesmo dia?",
+        "a": "Pode, e é uma combinação comum. A ordem e o volume de cada um costumam depender do objetivo da pessoa (perda de peso, ganho de massa, condicionamento) — por isso vale seguir a orientação do profissional que montou o treino."
+      },
+      {
+        "q": "Quanto tempo de cardio é recomendado por semana?",
+        "a": "Uma referência geral costuma ficar entre 150 minutos de atividade moderada por semana, mas isso varia bastante de acordo com objetivo e condição física de cada pessoa."
+      },
+      {
+        "q": "O que significa \"treinar até a falha\"?",
+        "a": "É continuar a série até não conseguir mais completar uma repetição com a técnica correta. É uma estratégia usada em alguns treinos, mas não é indicada pra todo tipo de exercício ou pessoa — depende da orientação de quem montou o treino."
+      }
+    ]
+  },
+  {
+    "title": "Alimentação",
+    "items": [
+      {
+        "q": "Preciso comer de 3 em 3 horas?",
+        "a": "Não existe uma regra única que funcione pra todo mundo. O que mais importa, de forma geral, é a quantidade total de calorias e nutrientes ao longo do dia — a frequência das refeições pode ser ajustada à rotina e preferência de cada pessoa."
+      },
+      {
+        "q": "O que é mais importante: contar calorias ou qualidade dos alimentos?",
+        "a": "Os dois pesam. Quantidade (calorias) influencia o peso; qualidade (nutrientes, fibra, tipo de gordura, etc.) influencia a saúde geral e a saciedade. O ideal é equilibrar os dois."
+      },
+      {
+        "q": "Carboidrato à noite engorda?",
+        "a": "Não existe essa regra isolada — o que importa pro peso é o total de calorias consumidas no dia comparado ao gasto, não o horário específico em que um nutriente é consumido."
+      },
+      {
+        "q": "Preciso tirar o carboidrato pra perder peso?",
+        "a": "Reduzir drasticamente qualquer grupo alimentar não é necessário pra maioria das pessoas. O que costuma funcionar de forma sustentável é o equilíbrio calórico e de nutrientes, ajustado ao objetivo de cada pessoa com acompanhamento profissional."
+      },
+      {
+        "q": "Quanto de proteína eu preciso comer por dia?",
+        "a": "Varia de acordo com peso, nível de atividade física e objetivo (manter, perder peso ou ganhar massa muscular). Por isso o app usa a calculadora de metas a partir dos seus dados — e o ideal é ter esse número confirmado por um nutricionista quando possível."
+      },
+      {
+        "q": "Pular refeição ajuda a perder peso mais rápido?",
+        "a": "Não necessariamente — pular refeições pode levar a comer mais nas próximas, além de deixar a energia mais instável ao longo do dia. O foco em um padrão sustentável costuma funcionar melhor no longo prazo."
+      },
+      {
+        "q": "Fruta à noite faz mal?",
+        "a": "Não há evidência de que o horário da fruta, por si só, faça diferença. O que importa é o total de nutrientes e calorias do dia."
+      }
+    ]
+  },
+  {
+    "title": "Água",
+    "items": [
+      {
+        "q": "Quanto de água eu devo beber por dia?",
+        "a": "Uma referência comum é cerca de 35ml por kg de peso corporal, mas isso pode variar com clima, nível de atividade física e outras condições individuais."
+      },
+      {
+        "q": "Beber muita água ajuda a perder peso?",
+        "a": "A água não tem calorias e ajuda na saciedade e no funcionamento do corpo, mas sozinha não é responsável pela perda de peso — isso depende do equilíbrio calórico geral."
+      },
+      {
+        "q": "Café e chá contam como hidratação?",
+        "a": "Em geral sim, contribuem para a hidratação total do dia, embora a água pura costume ser a referência mais simples de acompanhar."
+      },
+      {
+        "q": "Sinto pouca sede, isso significa que estou bem hidratada?",
+        "a": "Não necessariamente — a sensação de sede nem sempre acompanha de perto a necessidade real de hidratação, principalmente em dias de calor ou treino intenso. Por isso pode ajudar acompanhar o volume bebido, não só a sensação de sede."
+      }
+    ]
+  },
+  {
+    "title": "Vida saudável (geral)",
+    "items": [
+      {
+        "q": "Preciso treinar todos os dias para ver resultado?",
+        "a": "Não — o descanso faz parte do processo de resultado, tanto físico quanto mental. A consistência ao longo das semanas importa mais do que treinar sem nenhum dia de pausa."
+      },
+      {
+        "q": "Quanto tempo leva pra ver resultado de um novo hábito (treino ou alimentação)?",
+        "a": "Varia muito de pessoa pra pessoa, mas mudanças perceptíveis costumam levar algumas semanas de consistência, e resultados mais visíveis costumam aparecer em alguns meses."
+      },
+      {
+        "q": "Sono afeta o resultado do treino e da alimentação?",
+        "a": "Sim — o sono influencia recuperação muscular, apetite e disposição para treinar. Dormir mal com frequência pode dificultar os resultados mesmo com treino e alimentação em dia."
+      }
+    ]
+  }
+];
+  let qaThread = [];   // lista de "grupo:item" já abertos, na ordem
+
+  function renderIAView(){
+    const el = document.getElementById('fr-ia-content');
+    if(!el) return;
+    const exchanges = qaThread.map(key=>{
+      const [g,i] = key.split(':').map(Number);
+      return QA_GROUPS[g].items[i];
+    });
+    el.innerHTML = `
+      <div class="fr-ai-wrap">
+        <div class="fr-ai-head">
+          <h2>Dúvidas rápidas</h2>
+          <p>Escolha uma pergunta e veja a resposta. São orientações gerais e não substituem uma consulta com nutricionista, médico ou personal.</p>
+        </div>
+        ${exchanges.length ? `
+        <div class="fr-ai-thread" id="fr-ai-thread" aria-live="polite">
+          ${exchanges.map(x=>`<div class="fr-ai-msg user">${esc(x.q)}</div><div class="fr-ai-msg bot">${esc(x.a)}</div>`).join('')}
+        </div>
+        <div class="fr-ai-foot"><span></span><button type="button" class="fr-ai-link" id="fr-ai-reset">Limpar conversa</button></div>` : ''}
+        ${QA_GROUPS.map((grp,gi)=>`
+          <div class="fr-faq-group-title">${esc(grp.title)}</div>
+          <div class="fr-ai-chips">${grp.items.map((it,ii)=>`<button type="button" class="fr-ai-chip${qaThread.includes(gi+':'+ii)?' fr-ai-chip-done':''}" data-k="${gi}:${ii}">${esc(it.q)}</button>`).join('')}</div>
+        `).join('')}
+      </div>`;
+    el.querySelectorAll('.fr-ai-chip').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const k = b.getAttribute('data-k');
+        qaThread = qaThread.filter(x=> x!==k).concat(k);
+        renderIAView();
+        const t = document.getElementById('fr-ai-thread');
+        if(t && t.lastElementChild) t.lastElementChild.scrollIntoView({ block:'nearest', behavior:'smooth' });
+      });
+    });
+    const reset = el.querySelector('#fr-ai-reset');
+    if(reset) reset.addEventListener('click', ()=>{ qaThread = []; renderIAView(); });
   }
 
   /* ---------- Lista de Compras ---------- */
