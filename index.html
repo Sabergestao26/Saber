@@ -466,6 +466,8 @@
   select:focus{ outline:2px solid var(--green); outline-offset:1px; }
   .fr-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .fr-row4{ display:grid; grid-template-columns: repeat(4,1fr); gap:10px; }
+  .fr-field label.fr-pick-row{ font-family:'Inter',sans-serif; font-size:13.5px; letter-spacing:0; text-transform:none; color: var(--ink); }
+  .fr-as-progress{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color: var(--ink-soft); margin: -4px 0 14px; }
   .fr-hint{ font-size:11.5px; color: var(--ink-soft); margin-top:4px; }
 
   .fr-form-actions{ display:flex; justify-content:space-between; align-items:center; margin-top: 18px; gap:10px; flex-wrap:wrap; }
@@ -4091,10 +4093,10 @@
 
   // Retorna o id do treino criado (usado pra já encaminhar pra tela de
   // editar os exercícios logo depois de criar), ou null se der erro.
-  async function saveNewPersonalWorkout(name, exercisesToCopy){
+  async function saveNewPersonalWorkout(name, exercisesToCopy, notes){
     try{
       const { data: w, error: wErr } = await sb.from('workouts').insert({
-        name, assigned_to_user_id: currentUser.id, created_by: currentUser.id, notes: null
+        name, assigned_to_user_id: currentUser.id, created_by: currentUser.id, notes: notes || null
       }).select().single();
       if(wErr) throw wErr;
       const rows = exercisesToCopy.map((e,i)=> ({
@@ -4320,24 +4322,8 @@
     ombros: 'Ombros',
     punhos_cotovelos: 'Punhos ou cotovelos',
     quadril: 'Quadril',
-    tornozelo_pe: 'Tornozelo ou pé'
-  };
-  const FOCUS_AREA_LABELS = [
-    ['Treino de Peito', 'Peito'],
-    ['Treino de Costas', 'Costas'],
-    ['Treino de Pernas', 'Pernas'],
-    ['Treino de Ombros', 'Ombros'],
-    ['Treino de Bíceps', 'Bíceps'],
-    ['Treino de Tríceps', 'Tríceps'],
-    ['Treino de Abdômen', 'Abdômen'],
-    ['Treino de Glúteos', 'Glúteos'],
-    ['Treino de Panturrilhas', 'Panturrilhas'],
-    ['Treino de Trapézio', 'Trapézio'],
-    ['Treino de Antebraço', 'Antebraço']
-  ];
-  const FOCUS_AREA_GROUPS = {
-    superiores: ['Treino de Peito', 'Treino de Costas', 'Treino de Ombros', 'Treino de Bíceps', 'Treino de Tríceps', 'Treino de Trapézio', 'Treino de Antebraço'],
-    inferiores: ['Treino de Pernas', 'Treino de Glúteos', 'Treino de Panturrilhas']
+    tornozelo_pe: 'Tornozelo ou pé',
+    gestacao: 'Gestação ou pós-parto recente (até 6 meses)'
   };
   const LIMITATION_EXCLUSIONS = {
     coluna: ['Levantamento terra','Levantamento terra romeno','Stiff','Remada curvada','Remada cavalinho','Agachamento livre','Agachamento frontal','Agachamento sumô (pés afastados)','Agachamento búlgaro','Roda abdominal','Agachamento no hack'],
@@ -4356,115 +4342,232 @@
     ombros: ['Treino de Ombros', 'Treino de Peito'],
     punhos_cotovelos: ['Treino de Bíceps', 'Treino de Tríceps', 'Treino de Antebraço'],
     quadril: ['Treino de Pernas', 'Treino de Glúteos'],
-    tornozelo_pe: ['Treino de Panturrilhas', 'Treino de Pernas']
+    tornozelo_pe: ['Treino de Panturrilhas', 'Treino de Pernas'],
+    gestacao: ['Treino de Abdômen']
   };
 
+  const AS_REGIONS = [
+    ['bracos',  'Braços',   [['definir','Afinar e definir'], ['volume','Engrossar e ganhar volume']]],
+    ['pernas',  'Pernas',   [['definir','Afinar e definir'], ['volume','Aumentar e ganhar volume']]],
+    ['gluteos', 'Glúteos',  [['definir','Definir e firmar'], ['volume','Aumentar e levantar']]],
+    ['barriga', 'Barriga',  [['afinar','Reduzir a barriga'], ['definir','Definir o abdômen']]],
+    ['costas',  'Costas',   [['definir','Postura e definição'], ['volume','Aumentar a largura']]],
+    ['peito',   'Peito',    [['definir','Definir'], ['volume','Aumentar']]],
+    ['ombros',  'Ombros',   [['definir','Definir'], ['volume','Aumentar']]]
+  ];
+  const AS_STEP_TITLES = ['Sobre você', 'Objetivo', 'Foco por região', 'Experiência e rotina', 'Saúde'];
+  const AS_EXPERIENCE_LEVEL = { nunca:'iniciante', ate6m:'iniciante', ate2a:'intermediario', mais2a:'avancado' };
+
+  function assessmentDerivedLevel(experience, paused){
+    let lv = AS_EXPERIENCE_LEVEL[experience] || 'iniciante';
+    if(paused){
+      if(lv === 'avancado') lv = 'intermediario';
+      else if(lv === 'intermediario') lv = 'iniciante';
+    }
+    return lv;
+  }
+
+  // Resumo curto das respostas, gravado nas observações do treino gerado.
+  function assessmentSummary(a){
+    const goals = { emagrecer:'emagrecer', definir:'definir', emagrecer_definir:'emagrecer e definir', ganhar_massa:'ganhar massa muscular', geral:'condicionamento geral' };
+    const parts = [`Objetivo: ${goals[a.goal] || a.goal}`];
+    const regions = AS_REGIONS.map(([key,label,opts])=>{
+      const v = (a.regionGoals || {})[key];
+      const o = opts.find(x=> x[0]===v);
+      return o ? `${label.toLowerCase()} (${o[1].toLowerCase()})` : null;
+    }).filter(Boolean);
+    if(regions.length) parts.push('Foco: ' + regions.join(', '));
+    parts.push(`${a.days} ${plural(a.days,'dia','dias')} por semana, cerca de ${a.minutes} minutos por treino`);
+    return 'Gerado pela sua avaliação. ' + parts.join(' · ') + '.';
+  }
+
   function openAssessmentModal(){
+    const regionRows = AS_REGIONS.map(([key,label,opts])=>`
+      <div class="fr-field">
+        <label for="fr-as-region-${key}">${esc(label)}</label>
+        <select id="fr-as-region-${key}" class="fr-as-region" data-region="${key}">
+          <option value="nenhum">Sem foco específico</option>
+          ${opts.map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join('')}
+        </select>
+      </div>`).join('');
+    const finisherOptions = ['Bicicleta ergométrica','Caminhada rápida','Corrida (esteira ou rua)','Elíptico (transport)','Pular corda','Subir escada / step','HIIT (intervalado de alta intensidade)','Remo (ergômetro)']
+      .map(n=> `<option>${esc(n)}</option>`).join('');
     const overlay = buildOverlay(`
-      <h3 class="fr-form-title">Avaliação rápida</h3>
-      <p class="fr-hint" style="margin-bottom:16px;">Responda pra eu montar um treino sugerido a partir da biblioteca de exercícios.</p>
-      <form id="fr-assess-form">
-        <div class="fr-field"><label for="fr-as-goal">Objetivo</label>
-          <select id="fr-as-goal">
-            <option value="emagrecer">Emagrecer</option>
-            <option value="definir">Definir</option>
-            <option value="emagrecer_definir">Emagrecer e definir</option>
-            <option value="ganhar_massa">Ganhar massa muscular</option>
-            <option value="geral">Condicionamento geral</option>
-          </select>
+      <h3 class="fr-form-title">Avaliação</h3>
+      <div class="fr-as-progress" id="fr-as-progress"></div>
+      <form id="fr-assess-form" novalidate>
+
+        <div class="fr-as-step" data-step="0">
+          <p class="fr-hint" style="margin-bottom:14px;">Essas respostas ajudam a montar um treino que combina com o seu corpo e a sua rotina.</p>
+          <div class="fr-field"><label for="fr-as-sex">Sexo</label>
+            <select id="fr-as-sex">
+              <option value="">Selecione</option>
+              <option value="feminino">Feminino</option>
+              <option value="masculino">Masculino</option>
+              <option value="nao_informar">Prefiro não informar</option>
+            </select>
+            <p class="fr-hint">Usamos só para ajustar a ênfase padrão do treino. Você pode mudar isso na etapa de foco por região.</p>
+          </div>
+          <div class="fr-field"><label for="fr-as-age">Faixa de idade</label>
+            <select id="fr-as-age">
+              <option value="">Selecione</option>
+              <option value="ate17">Menos de 18 anos</option>
+              <option value="18-29">18 a 29 anos</option>
+              <option value="30-39">30 a 39 anos</option>
+              <option value="40-49">40 a 49 anos</option>
+              <option value="50-59">50 a 59 anos</option>
+              <option value="60+">60 anos ou mais</option>
+            </select>
+          </div>
         </div>
-        <div class="fr-field"><label for="fr-as-location">Onde você vai treinar?</label>
-          <select id="fr-as-location">
-            <option value="academia">Na academia</option>
-            <option value="casa">Em casa (sem equipamento)</option>
-          </select>
+
+        <div class="fr-as-step" data-step="1" style="display:none">
+          <div class="fr-field"><label for="fr-as-goal">Qual é o seu objetivo principal?</label>
+            <select id="fr-as-goal">
+              <option value="emagrecer">Emagrecer</option>
+              <option value="definir">Definir o corpo</option>
+              <option value="emagrecer_definir">Emagrecer e definir</option>
+              <option value="ganhar_massa">Ganhar massa muscular</option>
+              <option value="geral">Condicionamento geral e saúde</option>
+            </select>
+          </div>
+          <div class="fr-detail-notes" style="margin-top:0;">Não dá para escolher de onde o corpo perde gordura. Treinar uma região ajuda a firmar e definir os músculos dali; para afinar, o que mais pesa é a alimentação e o cardio.</div>
         </div>
-        <div class="fr-field"><label for="fr-as-level">Nível de experiência</label>
-          <select id="fr-as-level">
-            <option value="iniciante">Iniciante</option>
-            <option value="intermediario" selected>Intermediário</option>
-            <option value="avancado">Avançado</option>
-          </select>
+
+        <div class="fr-as-step" data-step="2" style="display:none">
+          <p class="fr-hint" style="margin-bottom:14px;">Escolha o que você quer para cada região. Deixe "Sem foco específico" nas que não importam agora. As regiões escolhidas ganham mais exercícios e aparecem em mais de um dia da semana.</p>
+          ${regionRows}
         </div>
-        <div class="fr-field"><label for="fr-as-days">Quantos dias por semana você vai treinar?</label>
-          <select id="fr-as-days">
-            <option value="2">2 dias</option>
-            <option value="3" selected>3 dias</option>
-            <option value="4">4 dias</option>
-            <option value="5">5 ou mais dias</option>
-          </select>
-        </div>
-        <div class="fr-field">
-          <label class="fr-pick-row"><input type="checkbox" id="fr-as-cardio"><span>Quero incluir um <strong>treino de cardio</strong> também (fica separado dos outros, você escolhe fazer ou não em qualquer dia)</span></label>
-        </div>
-        <div class="fr-field">
-          <label class="fr-pick-row"><input type="checkbox" id="fr-as-cardio-finisher"><span>Adicionar <strong>10-15min de cardio no final de cada treino</strong> (dentro do próprio treino de musculação)</span></label>
-          <div id="fr-as-cardio-finisher-options" style="display:none;margin-top:8px;">
-            <div class="fr-field"><label for="fr-as-cardio-finisher-upper">Cardio nos treinos de superiores</label>
-              <select id="fr-as-cardio-finisher-upper">
-                <option>Bicicleta ergométrica</option>
-                <option>Caminhada rápida</option>
-                <option>Corrida (esteira ou rua)</option>
-                <option>Elíptico (transport)</option>
-                <option>Pular corda</option>
-                <option>Subir escada / step</option>
-                <option>HIIT (intervalado de alta intensidade)</option>
-                <option>Remo (ergômetro)</option>
-              </select>
+
+        <div class="fr-as-step" data-step="3" style="display:none">
+          <div class="fr-field"><label for="fr-as-exp">Há quanto tempo você treina com regularidade?</label>
+            <select id="fr-as-exp">
+              <option value="">Selecione</option>
+              <option value="nunca">Nunca treinei</option>
+              <option value="ate6m">Menos de 6 meses</option>
+              <option value="ate2a">De 6 meses a 2 anos</option>
+              <option value="mais2a">Mais de 2 anos</option>
+            </select>
+            <label class="fr-pick-row" style="margin-top:6px;"><input type="checkbox" id="fr-as-paused"><span>Estou parada ou parado há mais de 3 meses</span></label>
+          </div>
+          <div class="fr-field"><label for="fr-as-days">Quantos dias por semana você vai treinar?</label>
+            <select id="fr-as-days">
+              <option value="2">2 dias</option>
+              <option value="3" selected>3 dias</option>
+              <option value="4">4 dias</option>
+              <option value="5">5 ou mais dias</option>
+            </select>
+          </div>
+          <div class="fr-field"><label for="fr-as-minutes">Quanto tempo você tem por treino?</label>
+            <select id="fr-as-minutes">
+              <option value="30">Cerca de 30 minutos</option>
+              <option value="45">Cerca de 45 minutos</option>
+              <option value="60" selected>Cerca de 1 hora</option>
+              <option value="90">1 hora e meia ou mais</option>
+            </select>
+          </div>
+          <div class="fr-field"><label for="fr-as-location">Onde você vai treinar?</label>
+            <select id="fr-as-location">
+              <option value="academia">Na academia</option>
+              <option value="casa">Em casa (sem equipamento)</option>
+            </select>
+          </div>
+          <div class="fr-field">
+            <label class="fr-pick-row"><input type="checkbox" id="fr-as-impact"><span>Prefiro <strong>evitar saltos e exercícios de impacto</strong> (por exemplo, por morar em apartamento)</span></label>
+          </div>
+          <div class="fr-field">
+            <label class="fr-pick-row"><input type="checkbox" id="fr-as-cardio"><span>Quero um <strong>treino de cardio</strong> separado (você escolhe fazer ou não em qualquer dia)</span></label>
+            <label class="fr-pick-row"><input type="checkbox" id="fr-as-cardio-finisher"><span>Adicionar <strong>10 a 15 minutos de cardio no final de cada treino</strong></span></label>
+            <p class="fr-hint" id="fr-as-cardio-suggest" style="display:none;">Como você escolheu afinar uma região, sugerimos incluir cardio. Você pode desmarcar.</p>
+            <div id="fr-as-cardio-finisher-options" style="display:none;margin-top:8px;">
+              <div class="fr-field"><label for="fr-as-cardio-finisher-upper">Cardio nos treinos de superiores</label>
+                <select id="fr-as-cardio-finisher-upper">${finisherOptions}</select>
+              </div>
+              <div class="fr-field"><label for="fr-as-cardio-finisher-lower">Cardio nos treinos de inferiores</label>
+                <select id="fr-as-cardio-finisher-lower">${finisherOptions}</select>
+              </div>
+              <p class="fr-hint">Em dias de corpo inteiro, vale a opção de superiores.</p>
             </div>
-            <div class="fr-field"><label for="fr-as-cardio-finisher-lower">Cardio nos treinos de inferiores</label>
-              <select id="fr-as-cardio-finisher-lower">
-                <option>Bicicleta ergométrica</option>
-                <option>Caminhada rápida</option>
-                <option>Corrida (esteira ou rua)</option>
-                <option>Elíptico (transport)</option>
-                <option>Pular corda</option>
-                <option>Subir escada / step</option>
-                <option>HIIT (intervalado de alta intensidade)</option>
-                <option>Remo (ergômetro)</option>
-              </select>
+          </div>
+        </div>
+
+        <div class="fr-as-step" data-step="4" style="display:none">
+          <div class="fr-field"><label for="fr-as-medical">Você tem liberação médica para praticar exercícios físicos?</label>
+            <select id="fr-as-medical">
+              <option value="sim">Sim</option>
+              <option value="nao_certeza">Não tenho certeza</option>
+              <option value="nao">Não</option>
+            </select>
+          </div>
+          <div class="fr-field"><label>Você sente dor ou tem alguma limitação nessas áreas?</label>
+            <div id="fr-as-limitations">
+              ${Object.keys(LIMITATION_LABELS).map(k=>`
+                <label class="fr-pick-row"><input type="checkbox" class="fr-as-limit-box" value="${k}"><span>${esc(LIMITATION_LABELS[k])}</span></label>
+              `).join('')}
+              <label class="fr-pick-row"><input type="checkbox" class="fr-as-limit-box" id="fr-as-limit-none" value="nenhuma" checked><span>Nenhuma</span></label>
             </div>
-            <p class="fr-hint">Se o seu plano tiver um dia de corpo inteiro (full body), esse dia usa a opção de superiores.</p>
           </div>
-        </div>
-        <div class="fr-field"><label>Tem alguma área específica que você quer focar mais? (opcional)</label>
-          <p class="fr-hint" style="margin-bottom:6px;">Pode marcar de forma ampla (superiores/inferiores) ou específica por grupo muscular.</p>
-          <div id="fr-as-focus-broad" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
-            <label class="fr-pick-row"><input type="checkbox" class="fr-as-focus-broad-box" value="superiores"><span><strong>Superiores</strong> (peito, costas, ombros, braços)</span></label>
-            <label class="fr-pick-row"><input type="checkbox" class="fr-as-focus-broad-box" value="inferiores"><span><strong>Inferiores</strong> (pernas, glúteos, panturrilha)</span></label>
+          <div class="fr-field"><label for="fr-as-notes">Quer descrever melhor? (opcional)</label>
+            <textarea id="fr-as-notes" style="min-height:60px" placeholder="ex.: dor lombar ao agachar com peso"></textarea>
           </div>
-          <div id="fr-as-focus">
-            ${FOCUS_AREA_LABELS.map(([key,label])=>`
-              <label class="fr-pick-row"><input type="checkbox" class="fr-as-focus-box" value="${key}"><span>${esc(label)}</span></label>
-            `).join('')}
-          </div>
+          <div class="fr-detail-notes" style="margin-top:0;">Se você marcar alguma limitação, estiver em gestação ou pós-parto, tiver menos de 18 ou 60 anos ou mais, o treino passa por uma revisão antes de ser liberado.</div>
+          <div id="fr-as-medical-warning"></div>
         </div>
-        <div class="fr-field"><label for="fr-as-medical">Você tem liberação médica para praticar exercícios físicos?</label>
-          <select id="fr-as-medical">
-            <option value="sim">Sim</option>
-            <option value="nao_certeza">Não tenho certeza</option>
-            <option value="nao">Não</option>
-          </select>
-        </div>
-        <div class="fr-field"><label>Você sente dor ou tem alguma limitação nessas áreas?</label>
-          <div id="fr-as-limitations">
-            ${Object.keys(LIMITATION_LABELS).map(k=>`
-              <label class="fr-pick-row"><input type="checkbox" class="fr-as-limit-box" value="${k}"><span>${esc(LIMITATION_LABELS[k])}</span></label>
-            `).join('')}
-            <label class="fr-pick-row"><input type="checkbox" class="fr-as-limit-box" id="fr-as-limit-none" value="nenhuma" checked><span>Nenhuma</span></label>
-          </div>
-        </div>
-        <div class="fr-field"><label for="fr-as-notes">Quer descrever melhor essa limitação? (opcional)</label>
-          <textarea id="fr-as-notes" style="min-height:60px" placeholder="ex.: dor lombar ao agachar com peso"></textarea>
-        </div>
-        <div id="fr-as-medical-warning"></div>
-        <div class="fr-form-actions">
-          <button type="button" class="fr-btn-ghost" id="fr-as-cancel">Cancelar</button>
-          <button type="submit" class="fr-btn-primary">Gerar meu treino</button>
+
+        <div class="fr-form-actions" style="margin-top:16px;">
+          <button type="button" class="fr-btn-ghost" id="fr-as-back">Cancelar</button>
+          <button type="button" class="fr-btn-primary" id="fr-as-next">Continuar</button>
+          <button type="submit" class="fr-btn-primary" id="fr-as-submit" style="display:none;">Gerar meu treino</button>
         </div>
       </form>
     `);
-    overlay.querySelector('#fr-as-cancel').addEventListener('click', closeOverlay);
+
+    let step = 0;
+    const steps = Array.from(overlay.querySelectorAll('.fr-as-step'));
+    const backBtn = overlay.querySelector('#fr-as-back');
+    const nextBtn = overlay.querySelector('#fr-as-next');
+    const submitBtn = overlay.querySelector('#fr-as-submit');
+    let cardioTouched = false;
+
+    function anyAfinar(){
+      return Array.from(overlay.querySelectorAll('.fr-as-region')).some(sel=>{
+        const r = sel.getAttribute('data-region');
+        return (r === 'barriga' && sel.value === 'afinar') || (r !== 'barriga' && sel.value === 'definir' && (r === 'bracos' || r === 'pernas' || r === 'gluteos'));
+      });
+    }
+    function showStep(n){
+      step = n;
+      steps.forEach((el,i)=>{ el.style.display = i===n ? '' : 'none'; });
+      overlay.querySelector('#fr-as-progress').textContent = `Etapa ${n+1} de ${steps.length} · ${AS_STEP_TITLES[n]}`;
+      backBtn.textContent = n === 0 ? 'Cancelar' : 'Voltar';
+      nextBtn.style.display = n === steps.length-1 ? 'none' : '';
+      submitBtn.style.display = n === steps.length-1 ? '' : 'none';
+      if(n === 3){
+        const suggest = anyAfinar();
+        overlay.querySelector('#fr-as-cardio-suggest').style.display = suggest ? '' : 'none';
+        const fin = overlay.querySelector('#fr-as-cardio-finisher');
+        if(suggest && !cardioTouched){
+          fin.checked = true;
+          overlay.querySelector('#fr-as-cardio-finisher-options').style.display = '';
+        }
+      }
+      const modal = overlay.querySelector('.fr-modal');
+      if(modal) modal.scrollTop = 0;
+    }
+    function validateStep(n){
+      if(n === 0){
+        if(!document.getElementById('fr-as-sex').value || !document.getElementById('fr-as-age').value){
+          showToast('Escolha o sexo e a faixa de idade para continuar.', 'err'); return false;
+        }
+      }
+      if(n === 3 && !document.getElementById('fr-as-exp').value){
+        showToast('Conte há quanto tempo você treina para continuar.', 'err'); return false;
+      }
+      return true;
+    }
+    backBtn.addEventListener('click', ()=>{ if(step === 0) closeOverlay(); else showStep(step-1); });
+    nextBtn.addEventListener('click', ()=>{ if(validateStep(step)) showStep(step+1); });
+    showStep(0);
 
     const noneBox = overlay.querySelector('#fr-as-limit-none');
     const otherBoxes = Array.from(overlay.querySelectorAll('.fr-as-limit-box')).filter(b=>b!==noneBox);
@@ -4476,47 +4579,61 @@
     }));
 
     overlay.querySelector('#fr-as-cardio-finisher').addEventListener('change', function(){
+      cardioTouched = true;
       overlay.querySelector('#fr-as-cardio-finisher-options').style.display = this.checked ? '' : 'none';
     });
 
     overlay.querySelector('#fr-assess-form').addEventListener('submit', async function(e){
       e.preventDefault();
-      const btn = overlay.querySelector('button[type="submit"]');
+      if(step !== steps.length-1) return;
       const medical = document.getElementById('fr-as-medical').value;
       const warnEl = overlay.querySelector('#fr-as-medical-warning');
       if(medical === 'nao'){
-        warnEl.innerHTML = `<div class="fr-detail-notes" style="margin-top:0;">Antes de treinar, é importante buscar uma avaliação médica — isso não é algo que o app substitui. Volte aqui quando tiver a liberação.</div>`;
+        warnEl.innerHTML = `<div class="fr-detail-notes" style="margin-top:12px;">Antes de treinar, é importante buscar uma avaliação médica — isso não é algo que o app substitui. Volte aqui quando tiver a liberação.</div>`;
         return;
       }
+      warnEl.innerHTML = '';
       const limitations = Array.from(overlay.querySelectorAll('.fr-as-limit-box:checked')).map(b=>b.value).filter(v=>v!=='nenhuma');
-      const focusAreasGranular = Array.from(overlay.querySelectorAll('.fr-as-focus-box:checked')).map(b=>b.value);
-      const focusAreasBroad = Array.from(overlay.querySelectorAll('.fr-as-focus-broad-box:checked')).map(b=>b.value);
-      let focusAreas = [...focusAreasGranular];
-      focusAreasBroad.forEach(g=>{ FOCUS_AREA_GROUPS[g].forEach(name=>{ if(!focusAreas.includes(name)) focusAreas.push(name); }); });
+      const regionGoals = {};
+      overlay.querySelectorAll('.fr-as-region').forEach(sel=>{ regionGoals[sel.getAttribute('data-region')] = sel.value; });
       const includeCardio = document.getElementById('fr-as-cardio').checked;
       const includeCardioFinisher = document.getElementById('fr-as-cardio-finisher').checked;
-      const cardioFinisherUpper = document.getElementById('fr-as-cardio-finisher-upper').value;
-      const cardioFinisherLower = document.getElementById('fr-as-cardio-finisher-lower').value;
+      const experience = document.getElementById('fr-as-exp').value;
+      const paused = document.getElementById('fr-as-paused').checked;
+      const ageRange = document.getElementById('fr-as-age').value;
       const answers = {
+        sex: document.getElementById('fr-as-sex').value,
+        ageRange,
         goal: document.getElementById('fr-as-goal').value,
-        level: document.getElementById('fr-as-level').value,
+        regionGoals,
+        experience, paused,
+        level: assessmentDerivedLevel(experience, paused),
         days: parseInt(document.getElementById('fr-as-days').value, 10),
+        minutes: parseInt(document.getElementById('fr-as-minutes').value, 10),
         location: document.getElementById('fr-as-location').value,
-        medical, limitations, focusAreas, includeCardio, includeCardioFinisher, cardioFinisherUpper, cardioFinisherLower,
+        avoidImpact: document.getElementById('fr-as-impact').checked,
+        medical, limitations,
+        includeCardio, includeCardioFinisher,
+        cardioFinisherUpper: document.getElementById('fr-as-cardio-finisher-upper').value,
+        cardioFinisherLower: document.getElementById('fr-as-cardio-finisher-lower').value,
         notes: document.getElementById('fr-as-notes').value.trim()
       };
-      btn.disabled = true; btn.textContent = 'Enviando...';
+      const needsReview = limitations.length > 0 || ageRange === 'ate17' || ageRange === '60+';
+      submitBtn.disabled = true; submitBtn.textContent = 'Enviando...';
 
-      if(limitations.length > 0){
-        const { error } = await sb.from('assessment_submissions').insert({
+      if(needsReview){
+        const row = {
           user_id: currentUser.id, goal: answers.goal, level: answers.level, days_per_week: answers.days,
           location: answers.location,
           medical_clearance: medical, limitations, limitations_notes: answers.notes, include_cardio: includeCardio,
           include_cardio_finisher: includeCardioFinisher,
-          cardio_finisher_upper: includeCardioFinisher ? cardioFinisherUpper : null,
-          cardio_finisher_lower: includeCardioFinisher ? cardioFinisherLower : null
-        });
-        if(error){ showToast('Não foi possível enviar. Tente novamente.', 'err'); btn.disabled=false; btn.textContent='Gerar meu treino'; return; }
+          cardio_finisher_upper: includeCardioFinisher ? answers.cardioFinisherUpper : null,
+          cardio_finisher_lower: includeCardioFinisher ? answers.cardioFinisherLower : null
+        };
+        let { error } = await sb.from('assessment_submissions').insert({ ...row, answers });
+        // Se a coluna "answers" ainda não existir no banco, envia sem ela.
+        if(error && /answers/i.test(error.message || '')) ({ error } = await sb.from('assessment_submissions').insert(row));
+        if(error){ showToast('Não foi possível enviar. Tente novamente.', 'err'); submitBtn.disabled=false; submitBtn.textContent='Gerar meu treino'; return; }
         notifyAdminsPendingReview('assessment');
         showToast('Avaliação enviada! Seu treino será liberado depois da revisão.', 'ok');
         closeOverlay();
@@ -4526,83 +4643,316 @@
 
       await loadExerciseLibrary();
       const plan = generateWorkoutPlan(answers, []);
+      if(!plan.length){
+        showToast('Não encontrei exercícios para essas respostas. Tente mudar o local ou as preferências.', 'err');
+        submitBtn.disabled=false; submitBtn.textContent='Gerar meu treino'; return;
+      }
+      const note = assessmentSummary(answers);
       let allOk = true;
       for(const day of plan){
-        const ok = await saveNewPersonalWorkout(day.name, day.exercises);
+        const ok = await saveNewPersonalWorkout(day.name, day.exercises, note);
         if(!ok) allOk = false;
       }
-      if(!allOk){ btn.disabled=false; btn.textContent='Gerar meu treino'; return; }
+      if(!allOk){ submitBtn.disabled=false; submitBtn.textContent='Gerar meu treino'; return; }
       showToast(`${plan.length} ${plural(plan.length,'treino gerado','treinos gerados')} com base na sua avaliação.`, 'ok');
       closeOverlay();
       loadWorkouts();
     });
   }
 
+  /* PLAN_GENERATOR_START */
+  // ---------------------------------------------------------------
+  // Gerador de treino a partir da avaliação detalhada.
+  // Usa: sexo, faixa de idade, objetivo, foco por região do corpo,
+  // experiência, dias por semana, tempo por sessão, local, preferência
+  // por evitar impacto, limitações e cardio. Esse bloco é idêntico no
+  // index.html e no admin.html (a aprovação da avaliação gera o treino
+  // com a mesma regra) — se mudar um, mude o outro.
+  // ---------------------------------------------------------------
+  const REGION_GROUPS = {
+    bracos:  ['Treino de Bíceps', 'Treino de Tríceps'],
+    pernas:  ['Treino de Pernas', 'Treino de Panturrilhas'],
+    gluteos: ['Treino de Glúteos'],
+    barriga: ['Treino de Abdômen'],
+    costas:  ['Treino de Costas', 'Treino de Trapézio'],
+    peito:   ['Treino de Peito'],
+    ombros:  ['Treino de Ombros']
+  };
+  // Exercícios com salto ou impacto (para quem prefere evitar, ou 50+).
+  const IMPACT_EXERCISES = ['Salto no agachamento (jump squat)','Burpee','Polichinelo (jumping jack)','Corrida estacionária (joelho alto)','Afundo com salto (jump lunge)','Pular corda','HIIT (intervalado de alta intensidade)','Corrida (esteira ou rua)','Mountain climber'];
+  // Cardio que dá para fazer em casa/na rua sem equipamento de academia.
+  const HOME_OK_CARDIO = ['Caminhada rápida','Bicicleta ao ar livre'];
+  // Gestação ou pós-parto recente: sem impacto e sem flexão abdominal intensa
+  // (o treino ainda passa por revisão da administração antes de ser liberado).
+  const PREGNANCY_EXCLUDED = ['Roda abdominal','Abdominal reto (tradicional)','Abdominal infra solo (invertido)','Abdominal invertido (no chão)','Abdominal declinado','Abdominal tesoura','Abdominal supra (crunch)','Abdominal infra (elevação de pernas)','Abdominal infra nas paralelas','Abdominal remador','Abdominal cruzado','Abdominal na máquina','Abdominal na polia','Supino declinado','Superman (extensão lombar)','Levantamento terra'];
+  // Exercícios mais técnicos, que ficam de fora para quem está começando.
+  const ADVANCED_EXERCISES = ['Barra fixa','Barra fixa supinada (chin-up)','Chin-up (barra fixa supinada)','Paralelas','Paralelas (foco em peito)','Agachamento búlgaro','Agachamento búlgaro com cadeira/sofá','Levantamento terra','Levantamento terra romeno','Roda abdominal','Flexão pike com pés elevados','Desenvolvimento Arnold','Rosca Zottman','Agachamento frontal','Salto no agachamento (jump squat)','Afundo com salto (jump lunge)','HIIT (intervalado de alta intensidade)','Burpee','Elevação em Y'];
+  // Exercícios compostos (vários músculos): mantêm repetições mais baixas.
+  const COMPOUND_EXERCISES = ['Supino reto','Supino inclinado','Supino declinado','Supino máquina','Paralelas','Paralelas (foco em peito)','Agachamento livre','Agachamento frontal','Agachamento no hack','Leg press','Stiff','Agachamento búlgaro','Passada','Barra fixa','Barra fixa supinada (chin-up)','Chin-up (barra fixa supinada)','Remada curvada','Remada cavalinho','Pulley costas','Pull down','Desenvolvimento com barra','Desenvolvimento com halteres','Levantamento terra','Levantamento terra romeno','Elevação pélvica (ponte com barra)','Agachamento sumô (pés afastados)','Supino fechado'];
+  // Ordem de preferência dentro de cada grupo. "forca" = compostos primeiro
+  // (para ganhar volume); "definicao" = mais isolados e de repetições altas.
+  const EXERCISE_RANK = {
+    'Treino de Peito': {
+      forca: ['Supino reto','Supino inclinado','Paralelas (foco em peito)','Supino declinado','Supino máquina','Crucifixo','Peck deck (voador)','Pullover com halteres','Flexão de braço','Flexão de braço (push-up)','Flexão com pés elevados','Flexão inclinada (mãos elevadas)','Flexão diamante (mãos próximas)'],
+      definicao: ['Supino inclinado','Crucifixo','Peck deck (voador)','Supino máquina','Flexão de braço','Supino reto','Pullover com halteres','Flexão de braço (push-up)','Flexão inclinada (mãos elevadas)','Flexão com pés elevados']
+    },
+    'Treino de Costas': {
+      forca: ['Barra fixa','Remada curvada','Pulley costas','Remada baixa (cabo sentado)','Remada serrote (unilateral)','Pull down','Remada cavalinho','Barra fixa supinada (chin-up)','Voador invertido','Remada com toalha na porta','Superman (extensão lombar)'],
+      definicao: ['Pulley costas','Remada baixa (cabo sentado)','Pull down','Remada serrote (unilateral)','Voador invertido','Remada curvada','Remada com toalha na porta','Superman (extensão lombar)','Bird-dog (prancha com extensão alternada)']
+    },
+    'Treino de Ombros': {
+      forca: ['Desenvolvimento com barra','Desenvolvimento com halteres','Elevação lateral com halteres','Remada alta com halteres','Face pull','Elevação lateral na polia','Flexão pike (pike push-up)','Crucifixo invertido com halteres'],
+      definicao: ['Elevação lateral com halteres','Elevação lateral na polia','Desenvolvimento com halteres','Face pull','Elevação lateral inclinada','Crucifixo invertido com halteres','Voador invertido (máquina)','Flexão pike (pike push-up)','Prancha com toque no ombro alternado']
+    },
+    'Treino de Bíceps': {
+      forca: ['Rosca direta (barra reta ou W)','Rosca alternada','Rosca Scott','Rosca martelo','Rosca inclinada','Rosca simultânea (halteres)','Rosca direta na polia baixa','Rosca isométrica auto-resistida','Flexão de bíceps com toalha'],
+      definicao: ['Rosca martelo','Rosca direta na polia baixa','Rosca concentrada','Rosca simultânea (halteres)','Rosca spider','Rosca alternada','Rosca isométrica auto-resistida','Flexão de bíceps com toalha']
+    },
+    'Treino de Tríceps': {
+      forca: ['Supino fechado','Tríceps na polia (barra reta ou W)','Paralelas','Tríceps francês','Tríceps corda','Flexão de tríceps (cotovelos junto ao corpo)','Mergulho no banco/sofá (bench dip)'],
+      definicao: ['Tríceps corda','Tríceps na polia (barra reta ou W)','Tríceps coice','Tríceps francês','Tríceps invertido (pegada supinada)','Flexão de tríceps (cotovelos junto ao corpo)','Mergulho no banco/sofá (bench dip)']
+    },
+    'Treino de Pernas': {
+      forca: ['Agachamento livre','Leg press','Agachamento no hack','Stiff','Agachamento búlgaro','Passada','Extensora','Flexora','Agachamento frontal','Afundo alternado (lunge)','Agachamento búlgaro com cadeira/sofá','Cadeira na parede (wall sit)'],
+      definicao: ['Leg press','Passada','Agachamento búlgaro','Extensora','Flexora','Agachamento no hack','Agachamento livre','Afundo alternado (lunge)','Agachamento búlgaro com cadeira/sofá','Cadeira na parede (wall sit)']
+    },
+    'Treino de Glúteos': {
+      forca: ['Elevação pélvica (ponte com barra)','Levantamento terra romeno','Agachamento sumô (pés afastados)','Passada (glúteos)','Extensão de quadril na polia','Abdução de quadril (máquina)','Elevação de quadril (hip thrust no chão)','Ponte unilateral'],
+      definicao: ['Extensão de quadril na polia','Abdução de quadril (máquina)','Elevação pélvica (ponte com barra)','Passada (glúteos)','Agachamento sumô (pés afastados)','Elevação de quadril (hip thrust no chão)','Ponte unilateral','Coice (donkey kick)','Agachamento sumô']
+    },
+    'Treino de Abdômen': {
+      forca: ['Abdominal na polia','Abdominal infra nas paralelas','Roda abdominal','Prancha abdominal','Abdominal declinado','Abdominal infra solo (invertido)','Abdominal oblíquo (lateral)','Abdominal reto (tradicional)'],
+      definicao: ['Prancha abdominal','Abdominal infra solo (invertido)','Abdominal oblíquo (lateral)','Abdominal cruzado','Abdominal reto (tradicional)','Abdominal remador','Abdominal na polia','Prancha lateral','Bicicleta no chão (bicycle crunch)','Abdominal infra (elevação de pernas)','Abdominal supra (crunch)']
+    }
+  };
+
+  // Modelos de divisão por dias de treino. n = quantos exercícios daquele
+  // grupo por dia, antes de ajustar ao tempo disponível e às prioridades.
+  function planTemplates(days, level){
+    const T = (name, lower, groups)=> ({ name, lower, groups });
+    if(days <= 2){
+      return [
+        T('Treino A — Corpo inteiro', false, { 'Treino de Pernas':2, 'Treino de Peito':1, 'Treino de Costas':2, 'Treino de Ombros':1, 'Treino de Tríceps':1, 'Treino de Abdômen':1 }),
+        T('Treino B — Corpo inteiro', true,  { 'Treino de Glúteos':2, 'Treino de Pernas':1, 'Treino de Costas':1, 'Treino de Peito':2, 'Treino de Bíceps':1, 'Treino de Ombros':1, 'Treino de Abdômen':1 })
+      ];
+    }
+    if(days === 3){
+      if(level === 'iniciante'){
+        return [
+          T('Treino A — Corpo inteiro', false, { 'Treino de Pernas':2, 'Treino de Peito':2, 'Treino de Costas':2, 'Treino de Abdômen':1 }),
+          T('Treino B — Corpo inteiro', true,  { 'Treino de Glúteos':2, 'Treino de Costas':2, 'Treino de Ombros':1, 'Treino de Bíceps':1, 'Treino de Abdômen':1 }),
+          T('Treino C — Corpo inteiro', false, { 'Treino de Pernas':2, 'Treino de Peito':1, 'Treino de Ombros':1, 'Treino de Tríceps':1, 'Treino de Costas':1, 'Treino de Abdômen':1 })
+        ];
+      }
+      return [
+        T('Treino A — Superiores 1', false, { 'Treino de Peito':3, 'Treino de Ombros':2, 'Treino de Tríceps':2 }),
+        T('Treino B — Inferiores', true,    { 'Treino de Pernas':3, 'Treino de Glúteos':2, 'Treino de Panturrilhas':1, 'Treino de Abdômen':1 }),
+        T('Treino C — Superiores 2', false, { 'Treino de Costas':3, 'Treino de Bíceps':2, 'Treino de Trapézio':1, 'Treino de Ombros':1 })
+      ];
+    }
+    if(days === 4){
+      return [
+        T('Treino A — Superiores 1', false, { 'Treino de Peito':3, 'Treino de Ombros':2, 'Treino de Tríceps':2 }),
+        T('Treino B — Inferiores 1', true,  { 'Treino de Pernas':4, 'Treino de Panturrilhas':1, 'Treino de Abdômen':2 }),
+        T('Treino C — Superiores 2', false, { 'Treino de Costas':3, 'Treino de Bíceps':2, 'Treino de Trapézio':1, 'Treino de Ombros':1 }),
+        T('Treino D — Inferiores 2', true,  { 'Treino de Glúteos':3, 'Treino de Pernas':2, 'Treino de Panturrilhas':1, 'Treino de Abdômen':1 })
+      ];
+    }
+    return [
+      T('Treino A — Peito e Tríceps', false,         { 'Treino de Peito':4, 'Treino de Tríceps':3 }),
+      T('Treino B — Costas e Bíceps', false,         { 'Treino de Costas':4, 'Treino de Bíceps':3, 'Treino de Trapézio':1 }),
+      T('Treino C — Pernas', true,                   { 'Treino de Pernas':5, 'Treino de Panturrilhas':2 }),
+      T('Treino D — Ombros e Abdômen', false,        { 'Treino de Ombros':4, 'Treino de Abdômen':3 }),
+      T('Treino E — Glúteos e posteriores', true,    { 'Treino de Glúteos':4, 'Treino de Pernas':2, 'Treino de Panturrilhas':1, 'Treino de Abdômen':1 })
+    ];
+  }
+
+  // Ajusta quantos exercícios cada grupo recebe no dia: respeita o tempo
+  // disponível e dá mais espaço aos grupos prioritários.
+  function allocateDay(day, budget, priority, libSize){
+    const counts = {};
+    Object.keys(day.groups).forEach(g=>{
+      const bonus = priority[g] || 0;
+      counts[g] = day.groups[g] + (bonus >= 2 ? 2 : (bonus >= 1 ? 1 : 0));
+    });
+    const sum = ()=> Object.values(counts).reduce((a,b)=>a+b, 0);
+    const isPrio = g=> (priority[g] || 0) >= 1;
+    let guard = 60;
+    while(sum() > budget && guard-- > 0){
+      let cand = Object.keys(counts).filter(g=> !isPrio(g) && counts[g] > 1);
+      if(!cand.length) cand = Object.keys(counts).filter(g=> counts[g] > 1);
+      if(cand.length){
+        cand.sort((a,b)=> counts[b]-counts[a]);
+        counts[cand[0]]--;
+        continue;
+      }
+      const droppable = Object.keys(counts).filter(g=> !isPrio(g));
+      if(droppable.length && Object.keys(counts).length > 1){ delete counts[droppable[droppable.length-1]]; continue; }
+      break;
+    }
+    // Se sobrar tempo, acrescenta exercícios com um limite por grupo (grupos
+    // pequenos, como panturrilha e trapézio, não passam de 3).
+    const SMALL = ['Treino de Panturrilhas','Treino de Trapézio','Treino de Antebraço'];
+    const cap = g=> Math.min(libSize[g] || 0, SMALL.includes(g) ? 3 : (day.groups[g] + (priority[g] >= 2 ? 2 : (priority[g] >= 1 ? 1 : 0)) + 2));
+    guard = 60;
+    while(sum() < budget && guard-- > 0){
+      let cand = Object.keys(counts).filter(g=> isPrio(g) && counts[g] < cap(g));
+      if(!cand.length) cand = Object.keys(counts).filter(g=> counts[g] < cap(g));
+      if(!cand.length) break;
+      cand.sort((a,b)=> counts[a]-counts[b]);
+      counts[cand[0]]++;
+    }
+    return counts;
+  }
+
   function generateWorkoutPlan(answers, excludedNames){
     excludedNames = excludedNames || [];
-    const focusAreas = answers.focusAreas || [];
     const groups = groupLibraryByMuscle();
-    const exPerGroup = answers.level==='iniciante' ? 2 : (answers.level==='avancado' ? 4 : 3);
+    const sex = answers.sex || '';
+    const age = answers.ageRange || '';
+    const level = answers.level || 'intermediario';
+    const days = answers.days || 3;
+    const goal = answers.goal || 'geral';
+    const regionGoals = answers.regionGoals || {};
+    const older = (age === '50-59' || age === '60+');
+    const pregnant = (answers.limitations || []).includes('gestacao');
+    const avoidImpact = !!answers.avoidImpact || older || pregnant;
+    const location = answers.location || 'academia';
+
+    // Prioridades por grupo muscular: 2 = ganhar volume, 1 = definir/afinar.
+    // Sem nenhuma região escolhida, o sexo só dá uma pequena ênfase padrão.
+    const priority = {};
+    const profileOf = {};   // 'forca' (volume) ou 'definicao'
+    let anyRegion = false;
+    Object.keys(REGION_GROUPS).forEach(region=>{
+      const v = regionGoals[region];
+      if(!v || v === 'nenhum') return;
+      anyRegion = true;
+      const lvl = v === 'volume' ? 2 : 1;
+      REGION_GROUPS[region].forEach((g, i)=>{
+        // O grupo principal da região recebe a prioridade cheia; o
+        // secundário (panturrilha, trapézio) só um pouco.
+        const p = i === 0 || region === 'bracos' ? lvl : 0;
+        if(p > (priority[g] || 0)) priority[g] = p;
+        if(p) profileOf[g] = v === 'volume' ? 'forca' : 'definicao';
+      });
+    });
+    if(!anyRegion){
+      if(sex === 'feminino'){ ['Treino de Glúteos','Treino de Pernas'].forEach(g=> priority[g] = 1); }
+      if(sex === 'masculino'){ ['Treino de Peito','Treino de Costas','Treino de Ombros'].forEach(g=> priority[g] = 1); }
+    }
+    const baseProfile = (goal === 'ganhar_massa' || goal === 'geral') ? 'forca' : 'definicao';
+    const profileFor = g=> profileOf[g] || baseProfile;
+
+    // Filtros de exercícios disponíveis.
     const reducedGroups = new Set();
     (answers.limitations || []).forEach(lim=>{ (LIMITATION_REDUCED_GROUPS[lim] || []).forEach(g=> reducedGroups.add(g)); });
-    function pick(groupName, n){
-      let target = focusAreas.includes(groupName) ? n + 2 : n;
-      // Camada extra de segurança: além de excluir os exercícios mais arriscados,
-      // reduz também a quantidade nos grupos afetados pela limitação da pessoa —
-      // menos volume ali, mesmo entre os exercícios considerados seguros.
-      if(reducedGroups.has(groupName)) target = Math.max(1, Math.ceil(target/2));
-      let list = (groups[groupName] || []).filter(e=> !excludedNames.includes(e.name));
-      // Quem vai treinar em casa só recebe exercícios marcados como "casa"
-      // (sem equipamento de academia). Quem treina na academia continua
-      // vendo tudo, já que lá também dá pra fazer os exercícios de casa.
-      if(answers.location === 'casa') list = list.filter(e=> Array.isArray(e.locations) && e.locations.includes('casa'));
-      return list.slice(0, Math.min(target, list.length));
-    }
-    let plan = [];
-    if(answers.days <= 2){
-      const fullBodyGroups = ['Treino de Peito','Treino de Costas','Treino de Pernas','Treino de Ombros','Treino de Bíceps','Treino de Tríceps','Treino de Abdômen'];
-      const exs = [];
-      fullBodyGroups.forEach(g=> exs.push(...pick(g, Math.max(1, Math.round(exPerGroup/2)))));
-      plan.push({ name: 'Treino Full Body (gerado pela avaliação)', exercises: exs });
-    } else if(answers.days === 3){
-      plan.push({ name: 'Treino A — Superiores 1 (gerado pela avaliação)', exercises: [
-        ...pick('Treino de Peito', exPerGroup), ...pick('Treino de Ombros', Math.max(1,exPerGroup-1)), ...pick('Treino de Tríceps', Math.max(1,exPerGroup-1))
-      ]});
-      plan.push({ name: 'Treino B — Inferiores (gerado pela avaliação)', exercises: [
-        ...pick('Treino de Pernas', exPerGroup+1), ...pick('Treino de Glúteos', exPerGroup), ...pick('Treino de Panturrilhas', 2), ...pick('Treino de Abdômen', exPerGroup)
-      ]});
-      plan.push({ name: 'Treino C — Superiores 2 (gerado pela avaliação)', exercises: [
-        ...pick('Treino de Costas', exPerGroup), ...pick('Treino de Bíceps', Math.max(1,exPerGroup-1)), ...pick('Treino de Trapézio', 2)
-      ]});
-    } else if(answers.days === 4){
-      plan.push({ name: 'Treino A — Superiores 1 (gerado pela avaliação)', exercises: [...pick('Treino de Peito', exPerGroup), ...pick('Treino de Ombros', exPerGroup), ...pick('Treino de Tríceps', exPerGroup)] });
-      plan.push({ name: 'Treino B — Inferiores 1 (gerado pela avaliação)', exercises: [...pick('Treino de Pernas', exPerGroup+1), ...pick('Treino de Abdômen', exPerGroup)] });
-      plan.push({ name: 'Treino C — Superiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Costas', exPerGroup), ...pick('Treino de Trapézio', 2), ...pick('Treino de Bíceps', exPerGroup), ...pick('Treino de Antebraço', 2)] });
-      plan.push({ name: 'Treino D — Inferiores 2 (gerado pela avaliação)', exercises: [...pick('Treino de Glúteos', exPerGroup), ...pick('Treino de Panturrilhas', 2)] });
-    } else {
-      plan.push({ name: 'Treino de Peito (gerado pela avaliação)', exercises: pick('Treino de Peito', exPerGroup+2) });
-      plan.push({ name: 'Treino de Costas (gerado pela avaliação)', exercises: pick('Treino de Costas', exPerGroup+2) });
-      plan.push({ name: 'Treino de Pernas (gerado pela avaliação)', exercises: pick('Treino de Pernas', exPerGroup+2) });
-      plan.push({ name: 'Treino de Ombros (gerado pela avaliação)', exercises: pick('Treino de Ombros', exPerGroup+1) });
-      plan.push({ name: 'Treino de Braços (gerado pela avaliação)', exercises: [...pick('Treino de Bíceps', exPerGroup), ...pick('Treino de Tríceps', exPerGroup)] });
-    }
-    if(answers.includeCardioFinisher && groups['Treino de Cardio']){
+    const usable = {};
+    Object.keys(groups).forEach(g=>{
+      let list = groups[g].filter(e=> !excludedNames.includes(e.name));
+      if(location === 'casa') list = list.filter(e=> Array.isArray(e.locations) && e.locations.includes('casa'));
+      if(avoidImpact) list = list.filter(e=> !IMPACT_EXERCISES.includes(e.name));
+      if(pregnant) list = list.filter(e=> !PREGNANCY_EXCLUDED.includes(e.name));
+      if(level === 'iniciante') list = list.filter(e=> !ADVANCED_EXERCISES.includes(e.name));
+      // Mesmo nome em duas versões (academia e casa): fica só uma.
+      const seen = new Map();
+      list.slice().sort((a,b)=> (Array.isArray(a.locations)&&a.locations.includes('casa') ? 1 : 0) - (Array.isArray(b.locations)&&b.locations.includes('casa') ? 1 : 0))
+          .forEach(e=>{ if(!seen.has(e.name)) seen.set(e.name, e); });
+      usable[g] = Array.from(seen.values());
+    });
+    const libSize = {};
+    Object.keys(usable).forEach(g=> libSize[g] = usable[g].length);
+
+    // Divisão por dias + frequência extra dos grupos prioritários.
+    const minutes = parseInt(answers.minutes, 10) || 60;
+    let budget = minutes <= 30 ? 5 : (minutes <= 45 ? 7 : (minutes <= 60 ? 9 : 12));
+    if(level === 'iniciante') budget = Math.min(budget, 8);
+    const daysSpec = planTemplates(days, level).map(d=> ({ ...d, groups: { ...d.groups } }));
+    // Só quando a pessoa escolheu uma região: o grupo aparece em mais de um
+    // dia da semana (com 5 dias, cada grupo já tem o seu dia).
+    Object.keys(priority).forEach(g=>{
+      if(!anyRegion || !priority[g] || daysSpec.length < 3 || daysSpec.length > 4 || !(usable[g] && usable[g].length)) return;
+      const has = daysSpec.filter(d=> d.groups[g]);
+      if(has.length >= 2) return;
+      const lowerGroup = (REGION_GROUPS.pernas.concat(REGION_GROUPS.gluteos)).includes(g) || g === 'Treino de Abdômen';
+      let target = daysSpec.filter(d=> !d.groups[g] && d.lower === (lowerGroup && g !== 'Treino de Abdômen'));
+      if(!target.length) target = daysSpec.filter(d=> !d.groups[g]);
+      if(!target.length) return;
+      target.sort((a,b)=> Object.keys(a.groups).length - Object.keys(b.groups).length);
+      target[0].groups[g] = priority[g] >= 2 ? 2 : 1;
+    });
+
+    // Escolha dos exercícios (não repete o mesmo exercício entre os dias
+    // enquanto houver alternativa).
+    const used = new Set();
+    const prioritySeen = {};
+    const plan = [];
+    daysSpec.forEach(day=>{
+      const counts = allocateDay(day, budget, priority, libSize);
+      const exercises = [];
+      Object.keys(counts).forEach(g=>{
+        const profile = profileFor(g);
+        const rank = (EXERCISE_RANK[g] && EXERCISE_RANK[g][profile]) || [];
+        const pool = (usable[g] || []).slice().sort((a,b)=>{
+          const ia = rank.indexOf(a.name), ib = rank.indexOf(b.name);
+          return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+        });
+        let n = counts[g];
+        if(reducedGroups.has(g)) n = Math.max(1, Math.ceil(n/2));
+        const fresh = pool.filter(e=> !used.has(e.name));
+        const chosen = fresh.slice(0, n);
+        if(chosen.length < n){ pool.filter(e=> !chosen.includes(e)).slice(0, n - chosen.length).forEach(e=> chosen.push(e)); }
+        chosen.forEach((e, idx)=>{
+          used.add(e.name);
+          exercises.push(tuneExercise(e, { profile, prio: priority[g] || 0, idx, level, older }));
+        });
+      });
+      if(exercises.length) plan.push({ name: day.name + ' (gerado pela avaliação)', lower: day.lower, exercises });
+    });
+
+    // Cardio no final de cada treino e/ou dia só de cardio.
+    const cardioAll = (groups['Treino de Cardio'] || []).filter(e=>
+      !excludedNames.includes(e.name)
+      && (!avoidImpact || !IMPACT_EXERCISES.includes(e.name))
+      && (level !== 'iniciante' || !ADVANCED_EXERCISES.includes(e.name))
+      && (location !== 'casa' || (Array.isArray(e.locations) && e.locations.includes('casa')) || HOME_OK_CARDIO.includes(e.name)));
+    if(answers.includeCardioFinisher && cardioAll.length){
       plan.forEach(day=>{
-        const isLower = /inferior/i.test(day.name);
-        const finisherName = isLower ? answers.cardioFinisherLower : answers.cardioFinisherUpper;
-        if(!finisherName) return;
-        const finisherEx = groups['Treino de Cardio'].find(e=> e.name === finisherName);
-        if(finisherEx && !excludedNames.includes(finisherEx.name)){
-          day.exercises = [...day.exercises, { ...finisherEx, sets:1, reps:'10-15 minutos', rest_seconds:0 }];
-        }
+        const wanted = day.lower ? answers.cardioFinisherLower : answers.cardioFinisherUpper;
+        const finisherEx = cardioAll.find(e=> e.name === wanted) || (location === 'casa' ? (cardioAll.find(e=> e.name === 'Caminhada rápida') || cardioAll[0]) : null);
+        if(finisherEx) day.exercises = [...day.exercises, { ...finisherEx, sets:1, reps:'10-15 minutos', rest_seconds:0 }];
       });
     }
-    if(answers.includeCardio && groups['Treino de Cardio'] && groups['Treino de Cardio'].length){
-      const cardioExercises = groups['Treino de Cardio'].filter(e=> !excludedNames.includes(e.name));
-      plan.push({ name: 'Cardio (gerado pela avaliação)', exercises: cardioExercises });
+    if(answers.includeCardio && cardioAll.length){
+      plan.push({ name: 'Cardio (gerado pela avaliação)', lower: false, exercises: cardioAll });
     }
-    return plan.filter(day=> day.exercises.length>0);
+    return plan.filter(day=> day.exercises.length > 0);
   }
+
+  // Ajusta séries, repetições e descanso ao objetivo, ao nível e à idade.
+  // Só mexe em repetições "numéricas" (ex.: 8-10); exercícios medidos em
+  // tempo, por lado ou até a falha mantêm o que está cadastrado.
+  function tuneExercise(e, ctx){
+    const numeric = /^\d+(\s*-\s*\d+)?$/.test(String(e.reps || '').trim());
+    const compound = COMPOUND_EXERCISES.includes(e.name);
+    let sets = e.sets || 3;
+    let reps = e.reps;
+    let rest = e.rest_seconds;
+    if(numeric){
+      if(ctx.level === 'iniciante' || ctx.older) reps = '10-12';
+      else if(ctx.profile === 'definicao') reps = compound ? '10-12' : '12-15';
+      else reps = compound ? e.reps : '8-12';
+    }
+    if(typeof rest === 'number' && rest > 0){
+      if(ctx.profile === 'definicao') rest = Math.min(rest, compound ? 75 : 60);
+      if(ctx.level === 'iniciante') rest = Math.max(rest, 60);
+      if(ctx.older) rest += 15;
+    }
+    if(ctx.level === 'iniciante') sets = Math.min(sets, 3);
+    else if(ctx.prio >= 2 && ctx.idx < 2 && numeric) sets = Math.min(sets + 1, 4);
+    return { ...e, sets, reps, rest_seconds: rest, sets_detail: null };
+  }
+  /* PLAN_GENERATOR_END */
 
   async function openWorkoutDetail(id){
     const w = workouts.find(x=>x.id===id);
