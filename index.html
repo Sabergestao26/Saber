@@ -316,6 +316,8 @@
 
   .fr-load-box{ background:var(--surface); border:1px dashed var(--border); border-radius:8px; padding:10px; margin-top:10px; }
   .fr-load-box-detail{ border-style:solid; }
+  .fr-last-load{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--green-deep); margin:2px 0 10px; }
+  .fr-last-load b{ font-weight:600; }
   .fr-load-set-row{ display:grid; grid-template-columns: 58px minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:center; margin-bottom:6px; }
   .fr-load-set-row-detail{
     display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;
@@ -5039,6 +5041,7 @@
     const exercises = data || [];
     if(exercises.length===0){ exEl.innerHTML = `<p class="fr-hint">Nenhum exercício cadastrado ainda.</p>`; return; }
     exEl.innerHTML = exercises.map((ex,i)=>exerciseCardHtml(ex, i+1, !!activeSessionId, sessionCompletedExerciseIds.has(ex.id))).join('');
+    loadLastLoads(exercises);
     exercises.forEach(ex=>{
       const videoBtn = exEl.querySelector(`#fr-ex-video-${ex.id}`);
       if(videoBtn) videoBtn.addEventListener('click', ()=> window.open(ex.video_url, '_blank', 'noopener'));
@@ -5176,6 +5179,65 @@
   // "Ver histórico" separadamente. Só busca uma vez por abertura da
   // tela (dataset.hintsLoaded evita repetir a consulta toda hora que
   // a caixa é aberta/fechada).
+  // Mostra, embaixo do nome de cada exercício, a carga da última vez
+  // que a pessoa treinou e liga o botão "Usar carga anterior", que
+  // preenche as séries de hoje (a pessoa ainda pode editar antes de salvar).
+  async function loadLastLoads(exercises){
+    const ids = exercises.map(e=>e.id);
+    if(!ids.length) return;
+    let q = sb.from('exercise_load_logs').select('exercise_id, set_number, weight_kg, reps_done, session_id, created_at')
+      .eq('user_id', currentUser.id).in('exercise_id', ids)
+      .order('created_at', { ascending: false }).limit(600);
+    if(activeSessionId) q = q.neq('session_id', activeSessionId);
+    const { data, error } = await q;
+    if(error || !data || data.length===0) return;
+    const byEx = {};
+    data.forEach(l=>{
+      const cur = byEx[l.exercise_id];
+      if(!cur){ byEx[l.exercise_id] = { session: l.session_id, date: l.created_at.slice(0,10), sets: {} }; }
+      const e = byEx[l.exercise_id];
+      if(l.session_id !== e.session) return;
+      if(!(l.set_number in e.sets)) e.sets[l.set_number] = { w: l.weight_kg, r: l.reps_done };
+    });
+    exercises.forEach(ex=>{
+      const last = byEx[ex.id];
+      if(!last) return;
+      const nums = Object.keys(last.sets).map(Number).sort((a,b)=>a-b);
+      if(!nums.length) return;
+      const label = document.getElementById(`fr-ex-last-${ex.id}`);
+      if(label){
+        const parts = nums.map(n=>{
+          const x = last.sets[n];
+          const w = x.w!=null ? `${x.w}kg` : '';
+          const r = x.r!=null ? `${x.r}` : '';
+          return w && r ? `${w} × ${r}` : (w || (r ? `${r} reps` : ''));
+        }).filter(Boolean);
+        if(parts.length){
+          label.innerHTML = `Última carga (${esc(formatDateLabel(last.date))}): <b>${esc(parts.join(' · '))}</b>`;
+          label.style.display = '';
+        }
+      }
+      const useBtn = document.getElementById(`fr-ex-use-last-${ex.id}`);
+      if(useBtn){
+        useBtn.style.display = '';
+        useBtn.addEventListener('click', ()=>{
+          const box = document.getElementById(`fr-ex-load-box-${ex.id}`);
+          if(!box) return;
+          box.querySelectorAll('.fr-load-set-row').forEach(row=>{
+            const n = parseInt(row.getAttribute('data-set'), 10);
+            // Se hoje tem mais séries que da última vez, repete os valores da última série feita.
+            const src = last.sets[n] || last.sets[nums[nums.length-1]];
+            const w = row.querySelector('.fr-load-weight');
+            const r = row.querySelector('.fr-load-reps');
+            if(w) w.value = (src && src.w!=null) ? src.w : '';
+            if(r) r.value = (src && src.r!=null) ? src.r : '';
+          });
+          showToast('Carga anterior preenchida. Ajuste o que mudou e salve.', 'ok');
+        });
+      }
+    });
+  }
+
   async function fillLastLoadHints(ex){
     const box = document.getElementById(`fr-ex-load-box-${ex.id}`);
     if(!box || box.dataset.hintsLoaded) return;
@@ -5342,6 +5404,7 @@
           <div class="fr-exercise-name">${esc(ex.name)}</div>
         </div>
         ${metaParts.length ? `<div class="fr-exercise-meta">${metaParts.join(' · ')}</div>` : ''}
+        <div class="fr-last-load" id="fr-ex-last-${ex.id}" style="display:none"></div>
         ${ex.notes ? `<div class="fr-hint" style="margin-bottom:10px;">${esc(ex.notes)}</div>` : ''}
         <div class="fr-exercise-actions">
           ${ex.video_url ? `<button type="button" class="fr-chip fr-chip-video" id="fr-ex-video-${ex.id}">Ver vídeo</button>` : ''}
@@ -5353,6 +5416,7 @@
         <div id="fr-ex-timer-box-${ex.id}"></div>
         <div id="fr-ex-load-box-${ex.id}" class="fr-load-box ${hasDetail ? 'fr-load-box-detail' : ''}" style="${hasDetail ? '' : 'display:none'}">
           ${hasDetail ? `<div class="fr-section-label" style="padding-top:0;">Séries deste treino — registre o que você fez</div>` : ''}
+          <button type="button" class="fr-btn-ghost fr-use-last" id="fr-ex-use-last-${ex.id}" style="display:none;width:100%;margin-bottom:8px;">Usar carga anterior</button>
           ${loadRows}
           <button type="button" class="fr-btn-primary" id="fr-ex-load-save-${ex.id}" style="width:100%;margin-top:8px;">Salvar cargas</button>
           <button type="button" class="fr-btn-ghost" id="fr-ex-load-history-${ex.id}" style="width:100%;margin-top:6px;">Ver/ocultar histórico</button>
