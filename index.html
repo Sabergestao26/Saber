@@ -316,7 +316,7 @@
 
   .fr-load-box{ background:var(--surface); border:1px dashed var(--border); border-radius:8px; padding:10px; margin-top:10px; }
   .fr-load-box-detail{ border-style:solid; }
-  .fr-load-set-row{ display:grid; grid-template-columns: 70px 1fr 1fr; gap:8px; align-items:center; margin-bottom:6px; }
+  .fr-load-set-row{ display:grid; grid-template-columns: 58px minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:center; margin-bottom:6px; }
   .fr-load-set-row-detail{
     display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;
     padding:8px 0; border-bottom:1px dashed var(--border);
@@ -328,6 +328,7 @@
   .fr-set-timer-btn{ flex:0 0 auto; padding:5px 10px; font-size:11.5px; }
   .fr-load-set-num{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-soft); }
   .fr-load-weight, .fr-load-reps{
+    min-width:0; width:100%; box-sizing:border-box;
     padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:12.5px;
   }
   .fr-load-history-day{
@@ -449,6 +450,14 @@
   .fr-modal{ background: var(--card); border-radius: 14px; max-width: 620px; width:100%; padding: 26px 26px 22px; box-shadow: 0 20px 50px rgba(0,0,0,0.28); position:relative; margin: auto 0; }
   .fr-modal-close{ position:absolute; top:16px; right:16px; background:none; border:none; cursor:pointer; font-size:20px; color: var(--ink-soft); line-height:1; padding:4px; }
   .fr-modal-close:hover{ color: var(--ink); }
+  /* Treino, avaliação e cardio abrem em página inteira (sem janela flutuante) */
+  .fr-overlay-page{ background:var(--card); padding:0; align-items:stretch; overflow-x:hidden; }
+  .fr-overlay-page .fr-modal{ max-width:720px; width:100%; min-width:0; border-radius:0; box-shadow:none; background:transparent; margin:0 auto; padding:0 18px 40px; min-height:100%; box-sizing:border-box; }
+  .fr-overlay-page .fr-modal-close{ display:none; }
+  .fr-page-bar{ position:sticky; top:0; z-index:5; background:var(--card); display:flex; align-items:center; padding:12px 0; margin:0 -18px 14px; padding-left:18px; padding-right:18px; border-bottom:1px solid var(--border); }
+  .fr-page-back{ background:none; border:none; cursor:pointer; font-family:inherit; font-size:15px; font-weight:600; color:var(--ink); padding:6px 4px; }
+  .fr-overlay-page *{ min-width:0; }
+
 
   .fr-form-title{ font-family:'Fraunces', serif; font-weight:600; font-size:22px; color: var(--green-deep); margin: 0 0 18px; }
   .fr-field{ margin-bottom:14px; }
@@ -4392,7 +4401,7 @@
       </div>`).join('');
     const finisherOptions = ['Bicicleta ergométrica','Caminhada rápida','Corrida (esteira ou rua)','Elíptico (transport)','Pular corda','Subir escada / step','HIIT (intervalado de alta intensidade)','Remo (ergômetro)']
       .map(n=> `<option>${esc(n)}</option>`).join('');
-    const overlay = buildOverlay(`
+    const overlay = buildPage(`
       <h3 class="fr-form-title">Avaliação</h3>
       <div class="fr-as-progress" id="fr-as-progress"></div>
       <form id="fr-assess-form" novalidate>
@@ -4976,7 +4985,7 @@
       activeSessionId = null; activeSessionWorkoutId = null; sessionStartTime = null;
     }
 
-    const overlay = buildOverlay(`
+    const overlay = buildPage(`
       <h3 class="fr-form-title">${esc(w.name)}</h3>
       ${w.notes ? `<p class="fr-hint" style="margin-bottom:14px;">${esc(w.notes)}</p>` : ''}
       <div id="fr-session-box"></div>
@@ -5726,7 +5735,7 @@
   function renderCardioRunning(){
     const isCountdown = activeCardio.targetSeconds != null;
     const displaySecs = isCountdown ? cardioRemainingSeconds() : cardioElapsedSeconds();
-    const overlay = buildOverlay(`
+    const overlay = buildPage(`
       <h3 class="fr-form-title">${ico('pulse')}${esc(activeCardio.name)}</h3>
       <div class="fr-cardio-timer-box">
         <div class="fr-cardio-timer-num" id="fr-cardio-timer-num">${formatTimer(displaySecs)}</div>
@@ -6460,11 +6469,29 @@
     document.addEventListener('keydown', escListener);
     return overlay;
   }
+  let pageHistoryPushed = false;
+  function buildPage(innerHtml){
+    const overlay = buildOverlay(`<div class="fr-page-bar"><button type="button" class="fr-page-back" id="fr-page-back">&larr; Voltar</button></div>${innerHtml}`);
+    overlay.classList.add('fr-overlay-page');
+    document.body.style.overflow = 'hidden';
+    overlay.querySelector('#fr-page-back').addEventListener('click', closeOverlay);
+    try{ history.pushState({ frPage:1 }, ''); pageHistoryPushed = true; }catch(e){}
+    overlay.scrollTop = 0;
+    return overlay;
+  }
+  window.addEventListener('popstate', ()=>{
+    if(pageHistoryPushed){ pageHistoryPushed = false; closeOverlay(true); }
+  });
   function escListener(e){ if(e.key==='Escape') closeOverlay(); }
   let activeChatPollTimer = null;
-  function closeOverlay(){
+  function closeOverlay(fromPop){
     const existing = document.getElementById('fr-overlay');
+    const wasPage = !!(existing && existing.classList.contains('fr-overlay-page'));
     if(existing) existing.remove();
+    if(wasPage){
+      document.body.style.overflow = '';
+      if(pageHistoryPushed && fromPop !== true){ pageHistoryPushed = false; try{ history.back(); }catch(e){} }
+    }
     document.removeEventListener('keydown', escListener);
     if(activeChatPollTimer){ clearInterval(activeChatPollTimer); activeChatPollTimer = null; }
   }
