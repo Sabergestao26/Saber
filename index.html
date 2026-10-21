@@ -464,7 +464,7 @@
   .fr-form-title{ font-family:'Fraunces', serif; font-weight:600; font-size:22px; color: var(--green-deep); margin: 0 0 18px; }
   .fr-field{ margin-bottom:14px; }
   .fr-field label{ display:block; font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color: var(--ink-soft); margin-bottom:5px; }
-  .fr-field input[type=text], .fr-field input[type=email], .fr-field input[type=password], .fr-field input[type=number], .fr-field input[type=date], .fr-field select, .fr-field textarea{
+  .fr-field input[type=text], .fr-field input[type=tel], .fr-field input[type=email], .fr-field input[type=password], .fr-field input[type=number], .fr-field input[type=date], .fr-field select, .fr-field textarea{
     width:100%; font-family:'Inter',sans-serif; font-size:14px; padding:9px 11px; border:1px solid var(--border);
     border-radius:7px; background:var(--surface); color: var(--ink);
   }
@@ -608,6 +608,9 @@
   .fr-log-macros b{ color:var(--ink); }
   .fr-log-del{ background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:18px; line-height:1; padding:4px; flex-shrink:0; }
   .fr-log-del:hover{ color:var(--rust); }
+  .fr-log-edit{ background:none; border:1px solid var(--border); color:var(--ink-soft); cursor:pointer; font-family:'Inter',sans-serif; font-size:12px; font-weight:600; border-radius:6px; padding:4px 9px; flex-shrink:0; }
+  .fr-log-edit:hover{ color:var(--green-deep); border-color:var(--green-deep); }
+  @media (max-width:520px){ .fr-log-row{ flex-wrap:wrap; } .fr-log-name{ flex-basis:100%; } .fr-log-macros{ flex:1; } }
 
   .fr-empty-diary{ max-width:520px; margin:50px auto; text-align:center; color:var(--ink-soft); }
   .fr-empty-diary h3{ font-family:'Fraunces',serif; color:var(--green-deep); font-size:19px; margin-bottom:6px; }
@@ -776,7 +779,10 @@
     </div>
     <div id="auth-message" class="auth-message" hidden></div>
     <form id="auth-form">
-      <div class="fr-field"><label for="auth-email">E-mail</label><input type="email" id="auth-email" required autocomplete="email"></div>
+      <div class="fr-field" id="auth-name-field" style="display:none;"><label for="auth-name">Nome completo</label><input type="text" id="auth-name" autocomplete="name" maxlength="120"></div>
+      <div class="fr-field"><label for="auth-email" id="auth-email-label">E-mail ou telefone</label><input type="text" id="auth-email" required autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+      <div class="fr-field" id="auth-phone-field" style="display:none;"><label for="auth-phone">Telefone (com DDD)</label><input type="tel" id="auth-phone" autocomplete="tel" inputmode="tel" placeholder="(11) 91234-5678"></div>
+      <div class="fr-field" id="auth-cpf-field" style="display:none;"><label for="auth-cpf">CPF</label><input type="text" id="auth-cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" maxlength="14"></div>
       <div class="fr-field"><label for="auth-password">Senha</label><input type="password" id="auth-password" required minlength="6" autocomplete="current-password"></div>
       <div class="fr-field" id="auth-role-field" style="display:none;">
         <label for="auth-role">Você é...</label>
@@ -1237,6 +1243,10 @@
     authSubmit.textContent = mode==='login' ? 'Entrar' : 'Criar conta';
     document.getElementById('auth-role-field').style.display = mode==='signup' ? '' : 'none';
     document.getElementById('auth-terms-field').style.display = mode==='signup' ? '' : 'none';
+    ['auth-name-field','auth-phone-field','auth-cpf-field'].forEach(id=>{ document.getElementById(id).style.display = mode==='signup' ? '' : 'none'; });
+    document.getElementById('auth-email-label').textContent = mode==='signup' ? 'E-mail' : 'E-mail ou telefone';
+    document.getElementById('auth-email').autocomplete = mode==='signup' ? 'email' : 'username';
+    document.getElementById('auth-password').autocomplete = mode==='signup' ? 'new-password' : 'current-password';
     updateProfTermsVisibility();
     authMessage.hidden = true;
   }
@@ -1260,7 +1270,7 @@
 
   document.getElementById('auth-forgot-link').addEventListener('click', async function(){
     const email = document.getElementById('auth-email').value.trim();
-    if(!email){
+    if(!email || email.indexOf('@') < 0){
       showAuthMessage('Digite seu e-mail no campo acima primeiro, depois toque em "Esqueci minha senha".', 'err');
       document.getElementById('auth-email').focus();
       return;
@@ -1272,10 +1282,55 @@
     showAuthMessage('Enviamos um link pro seu e-mail. Abra ele nesse mesmo aparelho pra criar uma nova senha.', 'ok');
   });
 
+  /* ---------- CPF / telefone (cadastro e login) ---------- */
+  function onlyDigits(v){ return String(v||'').replace(/\D/g,''); }
+  function isValidCpf(v){
+    const d = onlyDigits(v);
+    if(d.length!==11 || /^(\d)\1{10}$/.test(d)) return false;
+    for(let t=9;t<11;t++){
+      let sum=0; for(let i=0;i<t;i++) sum += parseInt(d[i],10)*(t+1-i);
+      let r=(sum*10)%11; if(r===10) r=0;
+      if(r!==parseInt(d[t],10)) return false;
+    }
+    return true;
+  }
+  function normalizePhone(v){
+    let d = onlyDigits(v);
+    if((d.length===12||d.length===13) && d.startsWith('55')) d = d.slice(2);
+    return (d.length===10||d.length===11) ? d : null;
+  }
+  function formatCpfInput(el){
+    const d = onlyDigits(el.value).slice(0,11);
+    let o = d;
+    if(d.length>9) o = d.slice(0,3)+'.'+d.slice(3,6)+'.'+d.slice(6,9)+'-'+d.slice(9);
+    else if(d.length>6) o = d.slice(0,3)+'.'+d.slice(3,6)+'.'+d.slice(6);
+    else if(d.length>3) o = d.slice(0,3)+'.'+d.slice(3);
+    el.value = o;
+  }
+  function formatPhoneInput(el){
+    const d = onlyDigits(el.value).slice(0,11);
+    let o = d;
+    if(d.length>6) o = '('+d.slice(0,2)+') '+d.slice(2, d.length>10 ? 7 : 6)+'-'+d.slice(d.length>10 ? 7 : 6);
+    else if(d.length>2) o = '('+d.slice(0,2)+') '+d.slice(2);
+    el.value = o;
+  }
+  document.getElementById('auth-cpf').addEventListener('input', function(){ formatCpfInput(this); });
+  document.getElementById('auth-phone').addEventListener('input', function(){ formatPhoneInput(this); });
+
   authForm.addEventListener('submit', async function(e){
     e.preventDefault();
-    const email = document.getElementById('auth-email').value.trim();
+    const identifier = document.getElementById('auth-email').value.trim();
+    const email = identifier;
     const password = document.getElementById('auth-password').value;
+    if(authMode==='signup'){
+      const fullName = document.getElementById('auth-name').value.trim().replace(/\s+/g,' ');
+      const cpfRaw = document.getElementById('auth-cpf').value;
+      const phoneRaw = document.getElementById('auth-phone').value;
+      if(fullName.length < 5 || fullName.indexOf(' ') < 0){ showAuthMessage('Digite seu nome completo (nome e sobrenome).', 'err'); document.getElementById('auth-name').focus(); return; }
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showAuthMessage('Digite um e-mail válido.', 'err'); document.getElementById('auth-email').focus(); return; }
+      if(!normalizePhone(phoneRaw)){ showAuthMessage('Digite um telefone válido, com DDD.', 'err'); document.getElementById('auth-phone').focus(); return; }
+      if(!isValidCpf(cpfRaw)){ showAuthMessage('Esse CPF não é válido. Confira os números.', 'err'); document.getElementById('auth-cpf').focus(); return; }
+    }
     if(authMode==='signup' && !document.getElementById('auth-terms-checkbox').checked){
       showAuthMessage('Pra criar sua conta, você precisa marcar que leu e concorda com os Termos de Uso e a Política de Privacidade.', 'err');
       return;
@@ -1288,13 +1343,46 @@
     authSubmit.textContent = authMode==='login' ? 'Entrando...' : 'Criando conta...';
     try{
       if(authMode==='login'){
-        const { error } = await sb.auth.signInWithPassword({ email, password });
-        if(error){
-          showAuthMessage(error.message==='Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message, 'err');
+        if(identifier.indexOf('@') < 0){
+          // login por telefone
+          if(!normalizePhone(identifier)){
+            showAuthMessage('Digite seu e-mail ou o telefone com DDD.', 'err');
+          } else {
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/login-phone`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+              body: JSON.stringify({ phone: identifier, password })
+            });
+            const out = await res.json().catch(()=> ({}));
+            if(!res.ok || !out.access_token){
+              showAuthMessage(out.message || 'Telefone ou senha incorretos.', 'err');
+            } else {
+              const { error: sErr } = await sb.auth.setSession({ access_token: out.access_token, refresh_token: out.refresh_token });
+              if(sErr) showAuthMessage('Não foi possível entrar agora. Tente novamente.', 'err');
+            }
+          }
+        } else {
+          const { error } = await sb.auth.signInWithPassword({ email, password });
+          if(error){
+            showAuthMessage(error.message==='Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message, 'err');
+          }
         }
       } else {
         const role = document.getElementById('auth-role').value;
-        const { data, error } = await sb.auth.signUp({ email, password });
+        const fullName = document.getElementById('auth-name').value.trim().replace(/\s+/g,' ');
+        const cpf = onlyDigits(document.getElementById('auth-cpf').value);
+        const phone = normalizePhone(document.getElementById('auth-phone').value);
+        // CPF e telefone não podem já existir em outra conta
+        const { data: avail } = await sb.rpc('signup_available', { p_cpf: cpf, p_phone: phone, p_email: email });
+        if(avail && avail.cpf_taken){
+          showAuthMessage('Já existe uma conta com esse CPF. Se é a sua, entre na aba "Entrar" (use "Esqueci minha senha" se precisar).', 'err');
+          authSubmit.disabled = false; authSubmit.textContent = 'Criar conta'; return;
+        }
+        if(avail && avail.phone_taken){
+          showAuthMessage('Já existe uma conta com esse telefone. Se é a sua, entre na aba "Entrar".', 'err');
+          authSubmit.disabled = false; authSubmit.textContent = 'Criar conta'; return;
+        }
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { full_name: fullName, cpf, phone } } });
         if(error){
           showAuthMessage(error.message, 'err');
         } else {
@@ -2675,7 +2763,58 @@
       }catch(err){
         console.error('Erro ao abrir a calculadora de metas', err);
       }
+    } else {
+      maybePromptPrivateData();
     }
+  }
+
+  /* ---------- Completar cadastro (nome, CPF, telefone) pra quem já tinha conta ---------- */
+  async function maybePromptPrivateData(){
+    try{
+      const today = new Date().toISOString().slice(0,10);
+      if(localStorage.getItem('saber_reg_skip_' + currentUser.id) === today) return;
+      const { data, error } = await sb.from('user_private').select('full_name,cpf,phone').eq('user_id', currentUser.id).maybeSingle();
+      if(error) return; // tabela ainda não existe ou falha de rede: não incomoda
+      if(data && data.full_name && data.cpf && data.phone) return;
+      openCompleteRegistrationModal(data || {});
+    }catch(e){ /* silencioso */ }
+  }
+  function openCompleteRegistrationModal(existing){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Complete seu cadastro</h3>
+      <p class="fr-hint" style="margin-bottom:14px;">Pedimos nome completo, CPF e telefone pra identificar sua conta com segurança e pra você poder entrar também com o telefone. Esses dados ficam privados — só você e a equipe do Saber têm acesso.</p>
+      <div class="fr-field"><label for="fr-reg-name">Nome completo</label><input type="text" id="fr-reg-name" autocomplete="name" maxlength="120" value="${esc(existing.full_name || (currentProfile && currentProfile.display_name) || '')}"></div>
+      <div class="fr-field"><label for="fr-reg-phone">Telefone (com DDD)</label><input type="tel" id="fr-reg-phone" inputmode="tel" autocomplete="tel" placeholder="(11) 91234-5678"></div>
+      <div class="fr-field"><label for="fr-reg-cpf">CPF</label><input type="text" id="fr-reg-cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" maxlength="14"></div>
+      <div id="fr-reg-msg" class="fr-hint" style="color:var(--rust);margin-bottom:10px;" hidden></div>
+      <button type="button" class="fr-btn-primary" id="fr-reg-save" style="width:100%;">Salvar</button>
+      <button type="button" class="fr-btn-ghost" id="fr-reg-later" style="width:100%;margin-top:8px;">Agora não</button>
+    `);
+    const phoneEl = overlay.querySelector('#fr-reg-phone'), cpfEl = overlay.querySelector('#fr-reg-cpf'), msg = overlay.querySelector('#fr-reg-msg');
+    if(existing.phone){ phoneEl.value = existing.phone; formatPhoneInput(phoneEl); }
+    phoneEl.addEventListener('input', ()=> formatPhoneInput(phoneEl));
+    cpfEl.addEventListener('input', ()=> formatCpfInput(cpfEl));
+    const showErr = t=>{ msg.textContent = t; msg.hidden = false; };
+    overlay.querySelector('#fr-reg-later').addEventListener('click', ()=>{
+      try{ localStorage.setItem('saber_reg_skip_' + currentUser.id, new Date().toISOString().slice(0,10)); }catch(e){}
+      closeOverlay();
+    });
+    overlay.querySelector('#fr-reg-save').addEventListener('click', async function(){
+      const name = overlay.querySelector('#fr-reg-name').value.trim().replace(/\s+/g,' ');
+      if(name.length < 5 || name.indexOf(' ') < 0){ showErr('Digite seu nome completo (nome e sobrenome).'); return; }
+      if(!normalizePhone(phoneEl.value)){ showErr('Digite um telefone válido, com DDD.'); return; }
+      if(!isValidCpf(cpfEl.value)){ showErr('Esse CPF não é válido. Confira os números.'); return; }
+      const btn = this; btn.disabled = true; btn.textContent = 'Salvando...';
+      const { data, error } = await sb.rpc('save_my_private_data', { p_name: name, p_cpf: onlyDigits(cpfEl.value), p_phone: phoneEl.value });
+      btn.disabled = false; btn.textContent = 'Salvar';
+      if(error || !data || !data.ok){
+        const code = data && data.error;
+        showErr(code==='cpf_taken' ? 'Esse CPF já está em outra conta.' : code==='phone_taken' ? 'Esse telefone já está em outra conta.' : 'Não foi possível salvar agora. Tente novamente.');
+        return;
+      }
+      showToast('Cadastro completo. Agora você também pode entrar com o telefone.', 'ok');
+      closeOverlay();
+    });
   }
 
   /* ---------- View switching ---------- */
@@ -3999,7 +4138,7 @@
 
   function workoutCardHtml(w){
     let tag = 'Geral', color = 'var(--blue)';
-    if(w.assigned_to_user_id === currentUser.id && w.created_by !== currentUser.id){ tag = 'Seu personal'; color = 'var(--green-deep)'; }
+    if(w.assigned_to_user_id === currentUser.id && w.created_by !== currentUser.id){ tag = w.locked ? 'Seu personal \u{1F512}' : 'Seu personal'; color = 'var(--green-deep)'; }
     else if(w.created_by === currentUser.id){ tag = 'Você montou'; color = 'var(--mustard)'; }
     return `
       <div class="fr-card" id="fr-workout-card-${w.id}" tabindex="0" role="button" aria-label="Ver treino ${esc(w.name)}">
@@ -4968,9 +5107,11 @@
   async function openWorkoutDetail(id){
     const w = workouts.find(x=>x.id===id);
     if(!w) return;
-    const canEdit = w.created_by === currentUser.id || w.assigned_to_user_id === currentUser.id;
+    // Treino montado pelo personal pro aluno: só o personal altera (o aluno só treina e registra cargas)
+    const lockedByPro = !!w.locked && w.created_by !== currentUser.id;
+    const canEdit = !lockedByPro && (w.created_by === currentUser.id || w.assigned_to_user_id === currentUser.id);
     const isLibraryWorkout = w.assigned_to_user_id === null;
-    const canDelete = !isLibraryWorkout && (w.created_by === currentUser.id || w.assigned_to_user_id === currentUser.id);
+    const canDelete = !lockedByPro && !isLibraryWorkout && (w.created_by === currentUser.id || w.assigned_to_user_id === currentUser.id);
 
     const { data: openSession } = await sb.from('workout_sessions').select('*').eq('user_id', currentUser.id).eq('workout_id', id).is('finished_at', null).order('started_at', {ascending:false}).limit(1).maybeSingle();
     const STALE_SESSION_HOURS = 6;
@@ -4990,6 +5131,7 @@
     const overlay = buildPage(`
       <h3 class="fr-form-title">${esc(w.name)}</h3>
       ${w.notes ? `<p class="fr-hint" style="margin-bottom:14px;">${esc(w.notes)}</p>` : ''}
+      ${lockedByPro ? `<div class="fr-detail-notes" style="margin-bottom:14px;">&#128274; Este treino foi montado pelo seu personal. Só ele pode alterar os exercícios; você pode treinar e registrar suas cargas normalmente.</div>` : ''}
       <div id="fr-session-box"></div>
       <div id="fr-workout-exercises"><div class="fr-loading">Carregando exercícios...</div></div>
       <button type="button" class="fr-btn-ghost" id="fr-session-history-toggle" style="width:100%;margin-top:14px;">Ver histórico de sessões deste treino</button>
@@ -7148,6 +7290,7 @@
       <div class="fr-log-row">
         <div class="fr-log-name">${esc(e.name)}${e.source==='recipe' ? `<small>${esc(e.quantity)}× porção</small>` : (e.source==='food' ? `<small>${esc(e.quantity)}g</small>` : '')}</div>
         <div class="fr-log-macros"><b>${Math.round(n0(e.calories))}</b> kcal &nbsp;P:${Math.round(n0(e.protein))} C:${Math.round(n0(e.carbs))} G:${Math.round(n0(e.fat))} F:${Math.round(n0(e.fiber))}</div>
+        <button class="fr-log-edit" id="fr-log-edit-${e.id}" aria-label="Editar ${esc(e.name)}">Editar</button>
         <button class="fr-log-del" id="fr-log-del-${e.id}" aria-label="Remover ${esc(e.name)}">&times;</button>
       </div>`;
   }
@@ -7178,6 +7321,100 @@
     currentDayLogs.forEach(e=>{
       const btn = document.getElementById('fr-log-del-'+e.id);
       if(btn) btn.addEventListener('click', ()=> deleteLogEntry(e.id));
+      const eb = document.getElementById('fr-log-edit-'+e.id);
+      if(eb) eb.addEventListener('click', ()=> openEditLogModal(e.id));
+    });
+  }
+
+  // Editar um alimento já registrado: quantidade (porções ou gramas), refeição e data.
+  // Os valores nutricionais são reescalados pela proporção da quantidade, então
+  // funcionam mesmo se a receita ou o alimento original mudaram depois.
+  function openEditLogModal(id){
+    const e = currentDayLogs.find(l=>l.id===id);
+    if(!e) return;
+    const mealKey = e.meal_type || e.mealType;
+    const isCustom = e.source==='custom';
+    const qtyLabel = e.source==='recipe' ? 'Quantidade (em porções)' : 'Quantidade (em gramas)';
+    const mealOptions = Object.keys(CATS).filter(k=>k!=='todas').map(k=>`<option value="${k}" ${k===mealKey?'selected':''}>${esc(CATS[k].label)}</option>`).join('');
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Editar registro</h3>
+      <form id="fr-editlog-form">
+        <div class="fr-field"><label for="fr-el-name">Alimento</label><input type="text" id="fr-el-name" value="${esc(e.name)}" ${isCustom ? '' : 'readonly'}></div>
+        ${isCustom ? `
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-el-cal">Calorias (kcal)</label><input type="number" min="0" step="any" id="fr-el-cal" value="${n0(e.calories)}"></div>
+          <div class="fr-field"><label for="fr-el-prot">Proteínas (g)</label><input type="number" min="0" step="any" id="fr-el-prot" value="${n0(e.protein)}"></div>
+        </div>
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-el-carb">Carboidratos (g)</label><input type="number" min="0" step="any" id="fr-el-carb" value="${n0(e.carbs)}"></div>
+          <div class="fr-field"><label for="fr-el-fat">Gorduras (g)</label><input type="number" min="0" step="any" id="fr-el-fat" value="${n0(e.fat)}"></div>
+        </div>
+        <div class="fr-field"><label for="fr-el-fiber">Fibras (g)</label><input type="number" min="0" step="any" id="fr-el-fiber" value="${n0(e.fiber)}"></div>
+        ` : `
+        <div class="fr-field"><label for="fr-el-qty">${qtyLabel}</label><input type="number" min="0" step="any" id="fr-el-qty" value="${n0(e.quantity)}"></div>
+        <div class="fr-log-preview">
+          <div><span class="v" id="fr-el-pcal">0</span><span class="l">kcal</span></div>
+          <div><span class="v" id="fr-el-pprot">0</span><span class="l">ptn</span></div>
+          <div><span class="v" id="fr-el-pcarb">0</span><span class="l">carb</span></div>
+          <div><span class="v" id="fr-el-pfat">0</span><span class="l">gord</span></div>
+          <div><span class="v" id="fr-el-pfiber">0</span><span class="l">fibra</span></div>
+        </div>`}
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-el-meal">Refeição</label><select id="fr-el-meal">${mealOptions}</select></div>
+          <div class="fr-field"><label for="fr-el-date">Data</label><input type="date" id="fr-el-date" value="${esc(e.date || currentDate)}" max="${todayStr()}"></div>
+        </div>
+        <div class="fr-form-actions">
+          <button type="button" class="fr-btn-ghost" id="fr-el-cancel">Cancelar</button>
+          <button type="submit" class="fr-btn-primary">Salvar alterações</button>
+        </div>
+      </form>`);
+    const baseQty = n0(e.quantity);
+    const scaled = (field, q)=> baseQty>0 ? n0(e[field]) * q / baseQty : n0(e[field]);
+    if(!isCustom){
+      const qtyEl = overlay.querySelector('#fr-el-qty');
+      const upd = ()=>{
+        const q = parseFloat(qtyEl.value) || 0;
+        overlay.querySelector('#fr-el-pcal').textContent = Math.round(scaled('calories', q));
+        overlay.querySelector('#fr-el-pprot').textContent = Math.round(scaled('protein', q));
+        overlay.querySelector('#fr-el-pcarb').textContent = Math.round(scaled('carbs', q));
+        overlay.querySelector('#fr-el-pfat').textContent = Math.round(scaled('fat', q));
+        overlay.querySelector('#fr-el-pfiber').textContent = Math.round(scaled('fiber', q));
+      };
+      qtyEl.addEventListener('input', upd); upd();
+    }
+    overlay.querySelector('#fr-el-cancel').addEventListener('click', closeOverlay);
+    overlay.querySelector('#fr-editlog-form').addEventListener('submit', async function(ev){
+      ev.preventDefault();
+      const btn = overlay.querySelector('button[type="submit"]');
+      const patch = { meal_type: overlay.querySelector('#fr-el-meal').value, date: overlay.querySelector('#fr-el-date').value || e.date };
+      if(isCustom){
+        const name = overlay.querySelector('#fr-el-name').value.trim();
+        if(!name){ overlay.querySelector('#fr-el-name').focus(); return; }
+        patch.name = name;
+        patch.calories = numOrNull(overlay.querySelector('#fr-el-cal').value) || 0;
+        patch.protein = numOrNull(overlay.querySelector('#fr-el-prot').value) || 0;
+        patch.carbs = numOrNull(overlay.querySelector('#fr-el-carb').value) || 0;
+        patch.fat = numOrNull(overlay.querySelector('#fr-el-fat').value) || 0;
+        patch.fiber = numOrNull(overlay.querySelector('#fr-el-fiber').value) || 0;
+      } else {
+        const q = parseFloat(overlay.querySelector('#fr-el-qty').value) || 0;
+        if(q<=0){ overlay.querySelector('#fr-el-qty').focus(); return; }
+        patch.quantity = q;
+        patch.calories = scaled('calories', q); patch.protein = scaled('protein', q); patch.carbs = scaled('carbs', q);
+        patch.fat = scaled('fat', q); patch.fiber = scaled('fiber', q);
+      }
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.from('diary_logs').update(patch).eq('id', id);
+      if(error){
+        console.error(error);
+        showToast('Não foi possível salvar agora. Tente novamente.', 'err');
+        btn.disabled = false; btn.textContent = 'Salvar alterações';
+        return;
+      }
+      showToast('Registro atualizado.', 'ok');
+      closeOverlay();
+      if(patch.date !== currentDate){ currentDate = patch.date; }
+      renderDiary();
     });
   }
 
