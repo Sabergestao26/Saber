@@ -74,6 +74,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-tab="resumo">Resumo</button>
     <button class="tab-btn" data-tab="clientes">Clientes<span class="tab-badge" id="badge-clientes" style="display:none;"></span></button>
+    <button class="tab-btn" data-tab="usuarios">Usuários</button>
     <button class="tab-btn" data-tab="profissionais">Profissionais<span class="tab-badge" id="badge-profissionais" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="conteudo">Conteúdo<span class="tab-badge" id="badge-conteudo" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="config">Configurações</button>
@@ -117,6 +118,18 @@
     <div class="card">
       <h4>Problemas reportados</h4>
       <div id="problems-area"><p class="hint">Carregando...</p></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="usuarios" style="display:none;">
+    <div class="card">
+      <h4>Usuários</h4>
+      <p class="hint" style="margin-bottom:10px;">Busque por nome, e-mail, telefone ou CPF. O CPF só é encontrado se você digitar ele inteiro, e aparece parcialmente oculto na lista.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="text" id="users-q" placeholder="Nome, e-mail, telefone ou CPF completo" style="flex:1;min-width:0;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+        <button type="button" id="users-go" style="width:auto;padding:10px 16px;">Buscar</button>
+      </div>
+      <div id="users-area"><p class="hint">Carregando...</p></div>
     </div>
   </div>
 
@@ -949,6 +962,33 @@
     setTabBadge('clientes', pendingCounts.assessments + pendingCounts.problems);
     setTabBadge('conteudo', pendingCounts.suggestions);
   }
+
+  /* ---------- Usuários (busca) ---------- */
+  let usersLoaded = false;
+  async function searchUsers(){
+    const area = document.getElementById('users-area');
+    const q = document.getElementById('users-q').value.trim();
+    area.innerHTML = '<p class="hint">Buscando...</p>';
+    const { data, error } = await sb.rpc('admin_search_users', { p_query: q, p_limit: 50 });
+    if(error){
+      area.innerHTML = '<p class="hint">Não foi possível buscar. Se for a primeira vez, rode o arquivo SQL de cadastro no Supabase.</p>';
+      return;
+    }
+    if(!data || !data.length){ area.innerHTML = '<p class="hint">Nenhum usuário encontrado.</p>'; return; }
+    const fmtPhone = p => p ? (p.length===11 ? `(${p.slice(0,2)}) ${p.slice(2,7)}-${p.slice(7)}` : `(${p.slice(0,2)}) ${p.slice(2,6)}-${p.slice(6)}`) : '—';
+    area.innerHTML = `<p class="hint" style="margin-bottom:8px;">${data.length} resultado(s)${data.length===50 ? ' (mostrando os 50 mais recentes — refine a busca)' : ''}</p>` +
+      data.map(u=>{
+        const tags = [u.is_admin ? 'Admin' : '', u.is_professional ? (u.professional_label || 'Profissional') : ''].filter(Boolean).join(' · ');
+        return `<div style="padding:10px 0;border-top:1px solid var(--border);">
+          <div style="font-weight:600;">${esc(u.full_name || 'Sem nome cadastrado')}${tags ? ` <span class="hint">(${esc(tags)})</span>` : ''}</div>
+          <div class="hint">${esc(u.email || '—')}</div>
+          <div class="hint">Tel.: ${esc(fmtPhone(u.phone))} &nbsp;·&nbsp; CPF: ${esc(u.cpf_masked || '—')} &nbsp;·&nbsp; Desde ${esc(new Date(u.created_at).toLocaleDateString('pt-BR'))}</div>
+        </div>`;
+      }).join('');
+  }
+  document.getElementById('users-go').addEventListener('click', searchUsers);
+  document.getElementById('users-q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); searchUsers(); } });
+  document.querySelector('.tab-btn[data-tab="usuarios"]').addEventListener('click', ()=>{ if(!usersLoaded){ usersLoaded = true; searchUsers(); } });
 
   /* ---------- Login ---------- */
   async function checkSession(){

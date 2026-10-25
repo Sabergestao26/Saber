@@ -765,6 +765,24 @@
   .fr-ai-foot{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:8px; }
   .fr-ai-chip-done{ border-color: var(--green-deep); color: var(--green-deep); }
   .fr-ai-link{ background:none; border:none; padding:0; font-size:11.5px; color: var(--ink-soft); text-decoration:underline; cursor:pointer; font-family:'Inter',sans-serif; }
+
+  /* ---------- Ferrugem em mais lugares (acento) ---------- */
+  :root{ --accent: var(--rust); --on-accent:#FFFFFF; --accent-soft:#F0D5C2; --accent-soft-ink:#7E3515; }
+  html[data-theme="dark"]{ --on-accent:#1B1E15; --accent-soft:#3A2820; --accent-soft-ink:#F0B38F; }
+  /* títulos de página e de seção */
+  .fr-form-title, .fr-detail-name, .fr-settings-subtitle, .fr-ai-head h2,
+  .fr-empty h3, .fr-empty-diary h3, .fr-suggestion-title{ color: var(--accent); }
+  /* aba ativa */
+  .fr-tab.active{ background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .fr-tab:focus-visible{ outline-color: var(--accent); }
+  /* botão secundário com contorno */
+  .fr-chip-upload{ color: var(--accent); border-color: var(--accent); }
+  .fr-btn-ghost:hover{ color: var(--accent); border-color: var(--accent); }
+  /* faixa de destaque nos cartões de sugestão */
+  .fr-suggestion-card, .fr-suggestion{ border-left: 4px solid var(--accent); }
+  /* etiqueta e links */
+  .fr-chip-video{ background: var(--accent-soft); color: var(--accent-soft-ink); }
+  .fr-settings-navrow-arrow{ color: var(--accent); }
 </style>
 </head>
 <body>
@@ -1075,6 +1093,9 @@
   let personalRecipes = [];
   let personalRecipesLoaded = false;
   let recipeScope = 'shared'; // 'shared' | 'personal'
+  let sharedKind = 'fitness'; // 'fitness' | 'tradicional' (quando recipeScope === 'shared')
+  const RECIPE_KINDS = { fitness:'Receitas fitness', tradicional:'Receitas tradicionais' };
+  function recipeKindOf(r){ return r && r.kind === 'tradicional' ? 'tradicional' : 'fitness'; }
   let currentDayLogs = [];
   let currentDayWater = 0;
   let currentDayCaloriesBurned = null;
@@ -6500,20 +6521,23 @@
   }
 
   function renderScopeTabs(){
-    const tabs = [['shared','Sugestão de Receitas'], ['personal','Minhas Receitas']];
+    const tabs = [['fitness','Receitas fitness'], ['tradicional','Receitas tradicionais'], ['personal','Minhas Receitas']];
+    const activeKey = recipeScope==='personal' ? 'personal' : sharedKind;
     document.getElementById('fr-scope-tabs').innerHTML = tabs.map(t=>
-      `<button class="fr-scope-tab ${recipeScope===t[0]?'active':''}" data-scope="${t[0]}">${t[1]}</button>`
+      `<button class="fr-scope-tab ${activeKey===t[0]?'active':''}" data-scope="${t[0]}">${t[1]}</button>`
     ).join('');
     document.querySelectorAll('.fr-scope-tab').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        recipeScope = btn.getAttribute('data-scope');
+        const key = btn.getAttribute('data-scope');
+        if(key==='personal'){ recipeScope = 'personal'; }
+        else { recipeScope = 'shared'; sharedKind = key; }
         renderScopeTabs();
         renderPrimaryAction();
         renderGrid();
       });
     });
   }
-  function activeRecipeList(){ return recipeScope==='shared' ? recipes : personalRecipes; }
+  function activeRecipeList(){ return recipeScope==='shared' ? recipes.filter(r=> recipeKindOf(r)===sharedKind) : personalRecipes; }
   function activeRecipesLoaded(){ return recipeScope==='shared' ? recipesLoaded : personalRecipesLoaded; }
   function canEditActiveScope(){ return recipeScope==='shared' ? isAdmin : true; }
 
@@ -6777,6 +6801,9 @@
           </div>
           <div class="fr-field"><label for="fr-f-portions">Porções que rende</label><input type="number" min="1" id="fr-f-portions" value="${esc(r.portions||1)}"></div>
         </div>
+        ${scope==='shared' ? `<div class="fr-field"><label for="fr-f-kind">Tipo de receita</label>
+          <select id="fr-f-kind"><option value="fitness" ${(r.kind ? recipeKindOf(r) : sharedKind)==='fitness'?'selected':''}>Fitness</option><option value="tradicional" ${(r.kind ? recipeKindOf(r) : sharedKind)==='tradicional'?'selected':''}>Tradicional</option></select>
+        </div>` : ''}
         <div class="fr-hint" style="margin:-6px 0 12px;">Valores nutricionais por porção (opcional, mas ajudam no diário)</div>
         <div class="fr-row4">
           <div class="fr-field"><label for="fr-f-cal">Kcal</label><input type="number" min="0" id="fr-f-cal" value="${esc(r.calories ?? '')}"></div>
@@ -6808,6 +6835,7 @@
       const payload = {
         name,
         category: document.getElementById('fr-f-cat').value,
+        ...(scope==='shared' ? { kind: document.getElementById('fr-f-kind').value } : {}),
         portions: numOrNull(document.getElementById('fr-f-portions').value),
         calories: numOrNull(document.getElementById('fr-f-cal').value),
         protein: numOrNull(document.getElementById('fr-f-prot').value),
@@ -7235,9 +7263,10 @@
     const remainingCalories = Math.round(Math.max(0, n0(targets.calories) - totals.calories));
     if(remainingCalories <= 0) return { mealType, remainingCalories, candidates:[], loading:false, goalReached:true };
     const remainingProtein = targets.protein ? Math.max(0, n0(targets.protein) - totals.protein) : 0;
-    if(recipes.length === 0) return { mealType, remainingCalories, candidates:[], loading:false };
-    let pool = recipes.filter(r=> r.category === mealType && n0(r.calories) > 0);
-    if(pool.length === 0) pool = recipes.filter(r=> n0(r.calories) > 0);
+    const fitRecipes = recipes.filter(r=> recipeKindOf(r)==='fitness');
+    if(fitRecipes.length === 0) return { mealType, remainingCalories, candidates:[], loading:false };
+    let pool = fitRecipes.filter(r=> r.category === mealType && n0(r.calories) > 0);
+    if(pool.length === 0) pool = fitRecipes.filter(r=> n0(r.calories) > 0);
     // Prioriza quem cabe no que resta (com uma folga de 15%) — só usa o
     // restante se nada coube, pra sempre sobrar alguma sugestão.
     const withinBudget = pool.filter(r=> n0(r.calories) <= remainingCalories * 1.15);
@@ -7469,8 +7498,124 @@
         </div>
         <div class="fr-hint" style="margin-top:2px;">Último registro: ${esc(formatDateLabel(latest.date))}</div>
         ${goalHtml}
+        <button type="button" class="fr-btn-ghost" id="fr-weight-hist-btn" style="width:100%;margin-top:12px;">Ver histórico e gráfico</button>
       </div>`;
     el.querySelector('#fr-weight-log-btn').addEventListener('click', openWeightLogModal);
+    el.querySelector('#fr-weight-hist-btn').addEventListener('click', openWeightHistoryPage);
+  }
+
+  /* ---------- Histórico de peso (lista, gráfico, editar e apagar) ---------- */
+  function weightChartSvg(points, goal){
+    // points: [{date, weight_kg}] em ordem cronológica
+    if(points.length < 2) return '<p class="fr-hint">O gráfico aparece a partir da segunda pesagem.</p>';
+    const W = 600, H = 220, padL = 40, padR = 14, padT = 14, padB = 28;
+    const vals = points.map(p=>Number(p.weight_kg));
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if(goal!=null){ lo = Math.min(lo, goal); hi = Math.max(hi, goal); }
+    const span = Math.max(hi - lo, 1);
+    lo -= span*0.12; hi += span*0.12;
+    const t0 = new Date(points[0].date+'T12:00:00').getTime(), t1 = new Date(points[points.length-1].date+'T12:00:00').getTime();
+    const x = d=> padL + (t1===t0 ? 0.5 : (new Date(d+'T12:00:00').getTime()-t0)/(t1-t0)) * (W-padL-padR);
+    const y = v=> padT + (1-(v-lo)/(hi-lo)) * (H-padT-padB);
+    const path = points.map((p,i)=> (i?'L':'M') + x(p.date).toFixed(1) + ' ' + y(Number(p.weight_kg)).toFixed(1)).join(' ');
+    const ticks = [0,1,2,3].map(i=> lo + (hi-lo)*i/3);
+    const fmtD = d=> { const [yy,mm,dd] = d.split('-'); return dd+'/'+mm; };
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Evolução do peso" style="display:block;">
+      ${ticks.map(v=>`<line x1="${padL}" x2="${W-padR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--border)" stroke-width="1"/><text x="${padL-6}" y="${(y(v)+4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">${v.toFixed(1)}</text>`).join('')}
+      ${goal!=null ? `<line x1="${padL}" x2="${W-padR}" y1="${y(goal).toFixed(1)}" y2="${y(goal).toFixed(1)}" stroke="var(--mustard)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W-padR}" y="${(y(goal)-5).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--mustard)" font-family="IBM Plex Mono, monospace">meta ${goal}kg</text>` : ''}
+      <path d="${path}" fill="none" stroke="var(--green-deep)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${points.map(p=>`<circle cx="${x(p.date).toFixed(1)}" cy="${y(Number(p.weight_kg)).toFixed(1)}" r="3.4" fill="var(--green-deep)"/>`).join('')}
+      <text x="${padL}" y="${H-8}" font-size="11" fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">${fmtD(points[0].date)}</text>
+      <text x="${W-padR}" y="${H-8}" text-anchor="end" font-size="11" fill="var(--ink-soft)" font-family="IBM Plex Mono, monospace">${fmtD(points[points.length-1].date)}</text>
+    </svg>`;
+  }
+
+  async function openWeightHistoryPage(){
+    const overlay = buildPage(`
+      <h3 class="fr-form-title">Histórico de peso</h3>
+      <div id="fr-wh-content"><div class="fr-loading">Carregando...</div></div>
+    `);
+    const box = overlay.querySelector('#fr-wh-content');
+    const { data, error } = await sb.from('body_measurements').select('id, date, weight_kg, source, fat_percent, muscle_mass_kg').eq('user_id', currentUser.id).not('weight_kg','is',null).order('date', {ascending:false}).order('created_at', {ascending:false}).limit(500);
+    if(error){ box.innerHTML = '<p class="fr-hint">Não foi possível carregar o histórico agora.</p>'; return; }
+    if(!data || data.length===0){ box.innerHTML = '<p class="fr-hint">Nenhuma pesagem registrada ainda.</p>'; return; }
+    const goal = targets ? numOrNull(targets.target_weight_kg) : null;
+    // um ponto por dia no gráfico (o registro mais recente do dia)
+    const byDay = {}; data.forEach(r=>{ if(!(r.date in byDay)) byDay[r.date] = r; });
+    const chartPts = Object.values(byDay).sort((a,b)=> a.date<b.date ? -1 : 1).slice(-60);
+    const first = chartPts[0], last = chartPts[chartPts.length-1];
+    const total = chartPts.length>1 ? Number(last.weight_kg) - Number(first.weight_kg) : null;
+    const srcLabel = {manual:'manual', withings:'balança', import:'importado'};
+    box.innerHTML = `
+      <div class="fr-weight-card" style="margin-bottom:16px;">
+        ${weightChartSvg(chartPts, goal)}
+        ${total!==null ? `<p class="fr-hint" style="margin:8px 0 0;">De ${esc(formatDateLabel(first.date))} a ${esc(formatDateLabel(last.date))}: <b style="color:${total>0?'var(--rust)':'var(--green-deep)'}">${total>0?'+':''}${total.toFixed(1)}kg</b></p>` : ''}
+      </div>
+      <div class="fr-evo-title">Todas as pesagens (${data.length})</div>
+      ${data.map((r,i)=>{
+        const older = data.slice(i+1).find(x=>x.date<r.date);
+        const diff = older ? Number(r.weight_kg) - Number(older.weight_kg) : null;
+        const dHtml = diff===null ? '' : `<span style="color:${diff>0?'var(--rust)':(diff<0?'var(--green-deep)':'var(--ink-soft)')};font-size:12px;font-weight:600;">${diff>0?'▲':(diff<0?'▼':'—')} ${Math.abs(diff).toFixed(1)}kg</span>`;
+        return `<div class="fr-log-row">
+          <div class="fr-log-name">${esc(formatDateLabel(r.date))}<small>${esc(srcLabel[r.source] || r.source || '')}${r.fat_percent!=null ? ' · '+Number(r.fat_percent).toFixed(1)+'% gordura' : ''}</small></div>
+          <div class="fr-log-macros"><b>${Number(r.weight_kg).toFixed(1)}</b> kg &nbsp;${dHtml}</div>
+          <button type="button" class="fr-log-edit" data-wh-edit="${r.id}">Editar</button>
+          <button type="button" class="fr-log-del" data-wh-del="${r.id}" aria-label="Apagar pesagem">&times;</button>
+        </div>`;
+      }).join('')}`;
+    box.querySelectorAll('[data-wh-edit]').forEach(b=> b.addEventListener('click', ()=>{
+      const r = data.find(x=>x.id===b.getAttribute('data-wh-edit'));
+      if(r) openWeightEditModal(r);
+    }));
+    box.querySelectorAll('[data-wh-del]').forEach(b=> b.addEventListener('click', async ()=>{
+      const r = data.find(x=>x.id===b.getAttribute('data-wh-del'));
+      if(!r) return;
+      if(b.getAttribute('data-confirm') !== '1'){
+        b.setAttribute('data-confirm','1'); b.innerHTML = 'Apagar?'; b.style.fontSize='12px'; b.style.color='var(--rust)'; b.style.fontWeight='600';
+        setTimeout(()=>{ if(b.isConnected){ b.removeAttribute('data-confirm'); b.innerHTML='&times;'; b.style.cssText=''; } }, 3500);
+        return;
+      }
+      const { error: dErr } = await sb.from('body_measurements').delete().eq('id', r.id);
+      if(dErr){ showToast('Não foi possível apagar. Tente novamente.', 'err'); return; }
+      showToast('Pesagem apagada.', 'ok');
+      renderWeightSection();
+      openWeightHistoryPage();
+    }));
+  }
+
+  function openWeightEditModal(r){
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Editar pesagem</h3>
+      <form id="fr-whe-form">
+        <div class="fr-row">
+          <div class="fr-field"><label for="fr-whe-date">Data</label><input type="date" id="fr-whe-date" value="${esc(r.date)}" max="${todayStr()}" required></div>
+          <div class="fr-field"><label for="fr-whe-weight">Peso (kg)</label><input type="number" min="1" step="any" id="fr-whe-weight" value="${Number(r.weight_kg)}" required></div>
+        </div>
+        <div class="fr-form-actions">
+          <button type="button" class="fr-btn-ghost" id="fr-whe-cancel">Cancelar</button>
+          <button type="submit" class="fr-btn-primary">Salvar alterações</button>
+        </div>
+      </form>`);
+    overlay.querySelector('#fr-whe-cancel').addEventListener('click', ()=>{ closeOverlay(); openWeightHistoryPage(); });
+    overlay.querySelector('#fr-whe-form').addEventListener('submit', async function(ev){
+      ev.preventDefault();
+      const btn = overlay.querySelector('button[type="submit"]');
+      const date = overlay.querySelector('#fr-whe-date').value;
+      const weight = numOrNull(overlay.querySelector('#fr-whe-weight').value);
+      if(!date || weight===null){ showToast('Preencha a data e o peso.', 'err'); return; }
+      const heightM = currentProfile && currentProfile.height_cm ? Number(currentProfile.height_cm)/100 : null;
+      const patch = { date, weight_kg: weight, bmi: heightM ? +(weight/(heightM*heightM)).toFixed(1) : null };
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      const { error } = await sb.from('body_measurements').update(patch).eq('id', r.id);
+      if(error){
+        showToast(error.code==='23505' ? 'Já existe uma pesagem desse tipo nessa data.' : 'Não foi possível salvar. Tente novamente.', 'err');
+        btn.disabled = false; btn.textContent = 'Salvar alterações'; return;
+      }
+      showToast('Pesagem atualizada.', 'ok');
+      closeOverlay();
+      renderWeightSection();
+      openWeightHistoryPage();
+    });
   }
 
   function openWeightLogModal(){
@@ -8178,20 +8323,25 @@
     // alimento"), o próprio evento do clique vem nesse parâmetro — só
     // tratamos como pré-seleção quando for de fato um id (string).
     presetRecipeId = (typeof presetRecipeId === 'string') ? presetRecipeId : null;
-    const hasRecipes = recipes.length > 0;
-    const defaultMeal = guessMealTypeByTime();
     const sortedRecipes = recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+    const kindCount = { fitness: recipes.filter(r=>recipeKindOf(r)==='fitness').length, tradicional: recipes.filter(r=>recipeKindOf(r)==='tradicional').length };
+    const hasRecipes = kindCount.fitness + kindCount.tradicional > 0;
+    const presetRecipe = presetRecipeId ? recipes.find(r=>r.id===presetRecipeId) : null;
+    let recipeKind = presetRecipe ? recipeKindOf(presetRecipe) : (kindCount.fitness>0 ? 'fitness' : 'tradicional');
+    const defaultMeal = guessMealTypeByTime();
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Registrar alimento</h3>
       <div class="fr-log-subtabs">
-        <button type="button" class="fr-log-subtab ${hasRecipes?'active':''}" id="fr-subtab-recipe" ${hasRecipes?'':'disabled'}>Da minha receita</button>
-        <button type="button" class="fr-log-subtab ${hasRecipes?'':'active'}" id="fr-subtab-custom">Item avulso</button>
+        <button type="button" class="fr-log-subtab ${hasRecipes && recipeKind==='fitness'?'active':''}" id="fr-subtab-fit" ${kindCount.fitness?'':'disabled'}>Receitas fitness</button>
+        <button type="button" class="fr-log-subtab ${hasRecipes && recipeKind==='tradicional'?'active':''}" id="fr-subtab-trad" ${kindCount.tradicional?'':'disabled'}>Receitas tradicionais</button>
+        <button type="button" class="fr-log-subtab ${hasRecipes?'':'active'}" id="fr-subtab-custom">Ingredientes avulsos</button>
       </div>
       <form id="fr-log-form">
         <div class="fr-log-panel ${hasRecipes?'active':''}" id="fr-log-panel-recipe">
           ${hasRecipes ? `
-          <div class="fr-field"><label for="fr-log-recipe-select">Receita</label>
-            <select id="fr-log-recipe-select">${sortedRecipes.map(r=>`<option value="${r.id}" ${presetRecipeId===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select>
+          <div class="fr-field"><label for="fr-log-recipe-search">Buscar receita</label><input type="text" id="fr-log-recipe-search" placeholder="ex.: frango, bolo, feijoada..." autocomplete="off"></div>
+          <div class="fr-field"><label for="fr-log-recipe-select" id="fr-log-recipe-label">Receita</label>
+            <select id="fr-log-recipe-select"></select>
           </div>
           <div class="fr-field"><label for="fr-log-qty">Quantidade (em porções)</label><input type="number" min="0.25" step="0.25" id="fr-log-qty" value="1"></div>
           <div class="fr-log-preview">
@@ -8250,18 +8400,32 @@
 
     const panelRecipe = overlay.querySelector('#fr-log-panel-recipe');
     const panelCustom = overlay.querySelector('#fr-log-panel-custom');
-    const subtabRecipe = overlay.querySelector('#fr-subtab-recipe');
+    const subtabFit = overlay.querySelector('#fr-subtab-fit');
+    const subtabTrad = overlay.querySelector('#fr-subtab-trad');
     const subtabCustom = overlay.querySelector('#fr-subtab-custom');
     let activeSource = hasRecipes ? 'recipe' : 'custom';
 
+    function fillRecipeOptions(keepId){
+      const sel = overlay.querySelector('#fr-log-recipe-select');
+      if(!sel) return;
+      const q = normalize((overlay.querySelector('#fr-log-recipe-search')||{value:''}).value);
+      const list = sortedRecipes.filter(r=> recipeKindOf(r)===recipeKind && (!q || normalize(r.name).includes(q)));
+      sel.innerHTML = list.length
+        ? list.map(r=>`<option value="${r.id}" ${keepId===r.id?'selected':''}>${esc(r.name)}</option>`).join('')
+        : `<option value="">Nenhuma receita encontrada</option>`;
+      overlay.querySelector('#fr-log-recipe-label').textContent = (recipeKind==='fitness' ? 'Receita fitness' : 'Receita tradicional') + ' (' + list.length + ')';
+      updateRecipePreview();
+    }
     function setSource(src){
       activeSource = src;
       panelRecipe.classList.toggle('active', src==='recipe');
       panelCustom.classList.toggle('active', src==='custom');
-      if(subtabRecipe) subtabRecipe.classList.toggle('active', src==='recipe');
+      if(subtabFit) subtabFit.classList.toggle('active', src==='recipe' && recipeKind==='fitness');
+      if(subtabTrad) subtabTrad.classList.toggle('active', src==='recipe' && recipeKind==='tradicional');
       subtabCustom.classList.toggle('active', src==='custom');
     }
-    if(subtabRecipe) subtabRecipe.addEventListener('click', ()=> setSource('recipe'));
+    if(subtabFit) subtabFit.addEventListener('click', ()=>{ recipeKind='fitness'; setSource('recipe'); fillRecipeOptions(); });
+    if(subtabTrad) subtabTrad.addEventListener('click', ()=>{ recipeKind='tradicional'; setSource('recipe'); fillRecipeOptions(); });
     subtabCustom.addEventListener('click', ()=> setSource('custom'));
 
     let selectedFood = null;
@@ -8288,7 +8452,8 @@
       const norm = normalize(query);
       if(norm.length < 2){ foodResultsEl.innerHTML=''; return; }
       if(!foodsLoaded){ foodResultsEl.innerHTML = `<div class="fr-hint">Carregando base de alimentos...</div>`; return; }
-      const matches = foods.filter(f=> normalize(f.name).includes(norm)).slice(0,8);
+      const matches = foods.filter(f=> normalize(f.name).includes(norm))
+        .sort((a,b)=> (b.category==='avulso') - (a.category==='avulso') || a.name.localeCompare(b.name,'pt-BR')).slice(0,14);
       if(matches.length===0){
         foodResultsEl.innerHTML = `<div class="fr-hint" style="padding:6px 2px;">Nenhum resultado. Tente outro termo ou informe manualmente.</div>`;
         return;
@@ -8346,7 +8511,8 @@
     if(hasRecipes){
       document.getElementById('fr-log-recipe-select').addEventListener('change', updateRecipePreview);
       document.getElementById('fr-log-qty').addEventListener('input', updateRecipePreview);
-      updateRecipePreview();
+      document.getElementById('fr-log-recipe-search').addEventListener('input', ()=> fillRecipeOptions());
+      fillRecipeOptions(presetRecipeId);
     }
 
     overlay.querySelector('#fr-log-cancel').addEventListener('click', closeOverlay);
@@ -8360,7 +8526,7 @@
         const sel = document.getElementById('fr-log-recipe-select');
         const qty = parseFloat(document.getElementById('fr-log-qty').value) || 0;
         const recipe = recipes.find(r=>r.id===sel.value);
-        if(!recipe || qty<=0){ return; }
+        if(!recipe || qty<=0){ showToast('Escolha uma receita da lista.', 'err'); return; }
         entry = {
           user_id: currentUser.id, date, meal_type: mealType, source:'recipe', recipe_id:recipe.id, name:recipe.name, quantity:qty,
           calories:n0(recipe.calories)*qty, protein:n0(recipe.protein)*qty, carbs:n0(recipe.carbs)*qty, fat:n0(recipe.fat)*qty, fiber:n0(recipe.fiber)*qty
