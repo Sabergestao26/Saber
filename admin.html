@@ -59,6 +59,38 @@
 .fr-pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;background:transparent;color:var(--ink,#262B1E);opacity:.65;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;padding:0;}
 .fr-pw-toggle:hover,.fr-pw-toggle:focus-visible{opacity:1;outline:2px solid currentColor;}
 .fr-pw-toggle svg{width:20px;height:20px;}
+
+/* ---------- Financeiro ---------- */
+.fin-sub{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.fin-subbtn{width:auto;background:var(--surface);color:var(--ink);border:1px solid var(--border);padding:8px 14px;font-size:13px;border-radius:999px;}
+.fin-subbtn.active{background:var(--green-deep);color:#fff;border-color:var(--green-deep);}
+.fin-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 10px;align-items:start;}
+.fin-form button{align-self:start;}
+.fin-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.fin-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);}
+input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
+.fin-out{margin-top:8px;font-size:14px;line-height:1.7;}
+.fin-out .big{font-family:'Fraunces',serif;font-weight:700;font-size:24px;}
+.fin-kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--border);}
+.fin-kv:first-child{border-top:0;}
+.fin-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--border);}
+.fin-item:first-child{border-top:0;}
+.fin-item .l{min-width:0;}
+.fin-item .t{font-weight:600;overflow-wrap:anywhere;}
+.fin-item .r{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.fin-item button{width:auto;padding:6px 10px;font-size:12px;}
+.fin-in{color:var(--green-deep);font-weight:700;}
+.fin-outc{color:var(--rust);font-weight:700;}
+.fin-tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--border);color:var(--ink);margin-left:6px;}
+.fin-tag.late{background:var(--rust);color:#fff;}
+.fin-tag.soon{background:var(--mustard);color:#fff;}
+.fin-tag.ok{background:var(--green-deep);color:#fff;}
+.fin-bar{height:8px;border-radius:6px;background:var(--border);overflow:hidden;margin-top:4px;}
+.fin-bar>span{display:block;height:100%;background:var(--rust);}
+.fin-tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px;}
+.fin-tbl th,.fin-tbl td{text-align:right;padding:5px 6px;border-top:1px solid var(--border);}
+.fin-tbl th:first-child,.fin-tbl td:first-child{text-align:left;}
+.fin-tblwrap{max-height:320px;overflow:auto;}
 </style>
 </head>
 <body>
@@ -84,6 +116,7 @@
     <button class="tab-btn" data-tab="usuarios">Usuários</button>
     <button class="tab-btn" data-tab="profissionais">Profissionais<span class="tab-badge" id="badge-profissionais" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="conteudo">Conteúdo<span class="tab-badge" id="badge-conteudo" style="display:none;"></span></button>
+    <button class="tab-btn" data-tab="financeiro">Financeiro</button>
     <button class="tab-btn" data-tab="config">Configurações</button>
   </div>
 
@@ -157,6 +190,119 @@
     <div class="card">
       <h4>Sugestões de alimentos</h4>
       <div id="suggestions-area"><p class="hint">Carregando...</p></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="financeiro" style="display:none;">
+    <div class="fin-sub">
+      <button class="fin-subbtn active" data-fin="resumo">Resumo</button>
+      <button class="fin-subbtn" data-fin="lanc">Lançamentos</button>
+      <button class="fin-subbtn" data-fin="contas">Contas a pagar</button>
+      <button class="fin-subbtn" data-fin="calc">Calculadoras</button>
+    </div>
+    <p class="hint" id="fin-setup-msg" style="display:none;color:var(--rust);margin-bottom:12px;">Para usar lançamentos e contas, rode o arquivo SQL do financeiro no Supabase (as calculadoras funcionam sem isso).</p>
+
+    <div class="fin-pane" data-finpane="resumo">
+      <div class="card">
+        <div class="fin-row"><label class="fin-lbl">Mês</label><input type="month" id="fin-month-r" class="fin-sm"></div>
+        <div class="grid" id="fin-summary"></div>
+      </div>
+      <div class="card"><h4>Saídas por categoria</h4><div id="fin-cats"><p class="hint">Carregando...</p></div></div>
+      <div class="card"><h4>Contas a pagar em aberto</h4><div id="fin-due-summary"></div></div>
+    </div>
+
+    <div class="fin-pane" data-finpane="lanc" style="display:none;">
+      <div class="card">
+        <h4>Novo lançamento</h4>
+        <div class="fin-form">
+          <select id="fe-kind"><option value="saida">Saída (gasto)</option><option value="entrada">Entrada (receita)</option></select>
+          <input id="fe-desc" placeholder="Descrição (ex: Mercado Pago, servidor, freelancer)">
+          <input id="fe-cat" list="fin-cat-list" placeholder="Categoria (ex: Ferramentas, Impostos, Vendas)">
+          <datalist id="fin-cat-list"></datalist>
+          <input id="fe-amount" inputmode="decimal" placeholder="Valor (R$)">
+          <input id="fe-date" type="date">
+          <button id="fe-add">Adicionar</button>
+        </div>
+        <div class="err" id="fe-err"></div>
+      </div>
+      <div class="card">
+        <div class="fin-row"><label class="fin-lbl">Mês</label><input type="month" id="fin-month-l" class="fin-sm"></div>
+        <div id="fin-entries-list"><p class="hint">Carregando...</p></div>
+      </div>
+    </div>
+
+    <div class="fin-pane" data-finpane="contas" style="display:none;">
+      <div class="card">
+        <h4>Nova conta a pagar</h4>
+        <div class="fin-form">
+          <input id="fb-desc" placeholder="Descrição (ex: Supabase, domínio, DAS, aluguel)">
+          <input id="fb-amount" inputmode="decimal" placeholder="Valor (R$)">
+          <input id="fb-due" type="date">
+          <select id="fb-rec"><option value="nenhuma">Pagamento único</option><option value="mensal">Repete todo mês</option></select>
+          <button id="fb-add">Adicionar</button>
+        </div>
+        <div class="err" id="fb-err"></div>
+      </div>
+      <div class="card">
+        <div class="fin-row"><select id="fb-filter" class="fin-sm"><option value="open">Em aberto</option><option value="paid">Pagas</option><option value="all">Todas</option></select></div>
+        <div id="fin-bills-list"><p class="hint">Carregando...</p></div>
+      </div>
+    </div>
+
+    <div class="fin-pane" data-finpane="calc" style="display:none;">
+      <div class="card">
+        <h4>Parcelamento com juros</h4>
+        <p class="hint">Quanto fica a parcela e o total pago, no sistema Price (parcelas iguais).</p>
+        <div class="fin-form">
+          <input id="c1-val" inputmode="decimal" placeholder="Valor à vista (R$)">
+          <input id="c1-n" inputmode="numeric" placeholder="Número de parcelas">
+          <input id="c1-i" inputmode="decimal" placeholder="Juros ao mês (%)">
+        </div>
+        <div class="fin-out" id="c1-out"></div>
+      </div>
+      <div class="card">
+        <h4>Descobrir os juros escondidos</h4>
+        <p class="hint">Você sabe o preço à vista e a parcela? Veja a taxa de juros ao mês que a loja está cobrando.</p>
+        <div class="fin-form">
+          <input id="c2-val" inputmode="decimal" placeholder="Valor à vista (R$)">
+          <input id="c2-n" inputmode="numeric" placeholder="Número de parcelas">
+          <input id="c2-p" inputmode="decimal" placeholder="Valor de cada parcela (R$)">
+        </div>
+        <div class="fin-out" id="c2-out"></div>
+      </div>
+      <div class="card">
+        <h4>Empréstimo ou financiamento (tabela)</h4>
+        <p class="hint">Compare Price (parcela fixa) e SAC (parcela decrescente) e veja mês a mês quanto é juros e quanto é dívida.</p>
+        <div class="fin-form">
+          <input id="c3-val" inputmode="decimal" placeholder="Valor financiado (R$)">
+          <input id="c3-n" inputmode="numeric" placeholder="Número de meses">
+          <input id="c3-i" inputmode="decimal" placeholder="Juros ao mês (%)">
+          <select id="c3-sys"><option value="price">Price (parcela fixa)</option><option value="sac">SAC (amortização constante)</option></select>
+        </div>
+        <div class="fin-out" id="c3-out"></div>
+      </div>
+      <div class="card">
+        <h4>Taxas de recebimento (maquininha, Pix, link, Mercado Pago)</h4>
+        <p class="hint">Digite a taxa que o seu meio de pagamento cobra (veja no contrato ou no app) para saber quanto sobra, ou quanto cobrar para receber um valor líquido.</p>
+        <div class="fin-form">
+          <input id="c4-val" inputmode="decimal" placeholder="Valor da venda (R$)">
+          <input id="c4-pct" inputmode="decimal" placeholder="Taxa percentual (%)">
+          <input id="c4-fix" inputmode="decimal" placeholder="Taxa fixa por venda (R$) — se houver">
+          <input id="c4-want" inputmode="decimal" placeholder="Quero receber líquido (R$) — opcional">
+        </div>
+        <div class="fin-out" id="c4-out"></div>
+      </div>
+      <div class="card">
+        <h4>Conta atrasada (multa e juros)</h4>
+        <p class="hint">Padrão comum: multa de 2% e juros de 1% ao mês, proporcional aos dias. Ajuste conforme o contrato.</p>
+        <div class="fin-form">
+          <input id="c5-val" inputmode="decimal" placeholder="Valor original (R$)">
+          <input id="c5-days" inputmode="numeric" placeholder="Dias de atraso">
+          <input id="c5-multa" inputmode="decimal" placeholder="Multa (%) — padrão 2">
+          <input id="c5-juros" inputmode="decimal" placeholder="Juros ao mês (%) — padrão 1">
+        </div>
+        <div class="fin-out" id="c5-out"></div>
+      </div>
     </div>
   </div>
 
@@ -1055,6 +1201,212 @@
   function scan(){ document.querySelectorAll('input[type="password"]').forEach(wrap); }
   scan();
   new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>
+<script>
+(function(){
+  const BRL = n => (isFinite(n) ? n : 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const PCT = n => (isFinite(n) ? n : 0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  function num(s){
+    s = String(s == null ? '' : s).trim().replace(/[R$\s%]/g,'');
+    if(!s) return NaN;
+    if(s.indexOf(',') >= 0) s = s.replace(/\./g,'').replace(',','.');
+    else if(!/^\d+\.\d{1,2}$/.test(s)) s = s.replace(/\./g,'');
+    return parseFloat(s);
+  }
+  const $ = id => document.getElementById(id);
+  const fmtDate = d => d ? d.split('-').reverse().join('/') : '';
+  const pad = n => String(n).padStart(2,'0');
+  const todayStr = () => { const t = new Date(); return t.getFullYear()+'-'+pad(t.getMonth()+1)+'-'+pad(t.getDate()); };
+  const monthStr = () => todayStr().slice(0,7);
+  function monthRange(m){
+    const [y,mo] = m.split('-').map(Number);
+    const next = mo === 12 ? (y+1)+'-01' : y+'-'+pad(mo+1);
+    return [m+'-01', next+'-01'];
+  }
+  function daysUntil(due){
+    const [y,m,d] = due.split('-').map(Number);
+    const t = new Date(); const t0 = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    return Math.round((new Date(y,m-1,d) - t0) / 86400000);
+  }
+  function addMonth(dateStr){
+    const [y,m,d] = dateStr.split('-').map(Number);
+    const ny = m === 12 ? y+1 : y, nm = m === 12 ? 1 : m+1;
+    const last = new Date(ny, nm, 0).getDate();
+    return ny+'-'+pad(nm)+'-'+pad(Math.min(d,last));
+  }
+  const setupMsg = show => { $('fin-setup-msg').style.display = show ? '' : 'none'; };
+
+  /* ----- sub-abas ----- */
+  document.querySelectorAll('.fin-subbtn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.fin-subbtn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    document.querySelectorAll('.fin-pane').forEach(p => p.style.display = p.dataset.finpane === b.dataset.fin ? '' : 'none');
+    if(b.dataset.fin === 'resumo') loadSummary();
+    if(b.dataset.fin === 'lanc') loadEntries();
+    if(b.dataset.fin === 'contas') loadBills();
+  }));
+  let finLoaded = false;
+  document.querySelector('.tab-btn[data-tab="financeiro"]').addEventListener('click', () => {
+    if(!finLoaded){ finLoaded = true; $('fin-month-r').value = monthStr(); $('fin-month-l').value = monthStr(); $('fe-date').value = todayStr(); loadSummary(); }
+  });
+
+  /* ----- resumo ----- */
+  async function loadSummary(){
+    const m = $('fin-month-r').value || monthStr();
+    const [a,b] = monthRange(m);
+    const { data, error } = await sb.from('fin_entries').select('kind,amount,category').gte('entry_date',a).lt('entry_date',b);
+    if(error){ setupMsg(true); $('fin-summary').innerHTML=''; $('fin-cats').innerHTML='<p class="hint">Sem dados.</p>'; }
+    else setupMsg(false);
+    const rows = data || [];
+    const ent = rows.filter(r=>r.kind==='entrada').reduce((s,r)=>s+Number(r.amount),0);
+    const sai = rows.filter(r=>r.kind==='saida').reduce((s,r)=>s+Number(r.amount),0);
+    $('fin-summary').innerHTML =
+      statCard('Entradas', BRL(ent)).replace(/<div class="stat-val"/, '<div class="stat-val fin-in"') +
+      statCard('Saídas', BRL(sai)).replace(/<div class="stat-val"/, '<div class="stat-val fin-outc"') +
+      statCard('Saldo do mês', BRL(ent-sai), ent-sai < 0 ? 'No vermelho' : 'No azul');
+    const byCat = {};
+    rows.filter(r=>r.kind==='saida').forEach(r => { const c = r.category || 'Sem categoria'; byCat[c] = (byCat[c]||0) + Number(r.amount); });
+    const list = Object.entries(byCat).sort((x,y)=>y[1]-x[1]);
+    $('fin-cats').innerHTML = list.length ? list.map(([c,v]) =>
+      `<div style="margin-bottom:10px;"><div class="fin-kv" style="border:0;padding:0;"><span>${esc(c)}</span><b>${BRL(v)}</b></div><div class="fin-bar"><span style="width:${sai ? Math.round(v/sai*100) : 0}%"></span></div></div>`).join('') : '<p class="hint">Nenhuma saída neste mês.</p>';
+    const { data: bills } = await sb.from('fin_bills').select('amount,due_date').eq('paid', false);
+    const open = bills || [];
+    const late = open.filter(x => daysUntil(x.due_date) < 0);
+    const soon = open.filter(x => { const d = daysUntil(x.due_date); return d >= 0 && d <= 7; });
+    const sum = arr => arr.reduce((s,x)=>s+Number(x.amount),0);
+    $('fin-due-summary').innerHTML =
+      `<div class="fin-kv"><span>Vencidas (${late.length})</span><b class="fin-outc">${BRL(sum(late))}</b></div>` +
+      `<div class="fin-kv"><span>Vencem nos próximos 7 dias (${soon.length})</span><b>${BRL(sum(soon))}</b></div>` +
+      `<div class="fin-kv"><span>Total em aberto (${open.length})</span><b>${BRL(sum(open))}</b></div>`;
+  }
+  $('fin-month-r').addEventListener('change', loadSummary);
+
+  /* ----- lançamentos ----- */
+  async function loadEntries(){
+    const m = $('fin-month-l').value || monthStr();
+    const [a,b] = monthRange(m);
+    const { data, error } = await sb.from('fin_entries').select('*').gte('entry_date',a).lt('entry_date',b).order('entry_date',{ascending:false}).order('created_at',{ascending:false});
+    if(error){ setupMsg(true); $('fin-entries-list').innerHTML = '<p class="hint">Não foi possível carregar.</p>'; return; }
+    setupMsg(false);
+    const rows = data || [];
+    const cats = [...new Set(rows.map(r=>r.category).filter(Boolean))];
+    $('fin-cat-list').innerHTML = cats.map(c=>`<option value="${escAttr(c)}">`).join('');
+    $('fin-entries-list').innerHTML = rows.length ? rows.map(r => `
+      <div class="fin-item"><div class="l"><div class="t">${esc(r.description)}</div><div class="hint">${fmtDate(r.entry_date)}${r.category ? ' · '+esc(r.category) : ''}</div></div>
+      <div class="r"><span class="${r.kind==='entrada'?'fin-in':'fin-outc'}">${r.kind==='entrada'?'+':'−'} ${BRL(Number(r.amount))}</span><button class="danger" data-del-entry="${escAttr(r.id)}">Excluir</button></div></div>`).join('') : '<p class="hint">Nenhum lançamento neste mês.</p>';
+    document.querySelectorAll('[data-del-entry]').forEach(btn => btn.addEventListener('click', async () => {
+      if(!confirm('Excluir este lançamento?')) return;
+      await sb.from('fin_entries').delete().eq('id', btn.dataset.delEntry); loadEntries();
+    }));
+  }
+  $('fin-month-l').addEventListener('change', loadEntries);
+  $('fe-add').addEventListener('click', async () => {
+    const err = $('fe-err'); err.textContent = '';
+    const desc = $('fe-desc').value.trim(), amount = num($('fe-amount').value), date = $('fe-date').value;
+    if(!desc){ err.textContent = 'Escreva uma descrição.'; return; }
+    if(!(amount > 0)){ err.textContent = 'Digite um valor maior que zero.'; return; }
+    if(!date){ err.textContent = 'Escolha a data.'; return; }
+    const { error } = await sb.from('fin_entries').insert({ kind: $('fe-kind').value, description: desc, category: $('fe-cat').value.trim() || null, amount, entry_date: date });
+    if(error){ err.textContent = 'Não foi possível salvar. Rode o SQL do financeiro no Supabase.'; setupMsg(true); return; }
+    $('fe-desc').value=''; $('fe-amount').value=''; $('fe-cat').value='';
+    $('fin-month-l').value = date.slice(0,7); loadEntries();
+  });
+
+  /* ----- contas a pagar ----- */
+  async function loadBills(){
+    const f = $('fb-filter').value;
+    let q = sb.from('fin_bills').select('*').order('due_date',{ascending: f !== 'paid'});
+    if(f === 'open') q = q.eq('paid', false); else if(f === 'paid') q = q.eq('paid', true);
+    const { data, error } = await q;
+    if(error){ setupMsg(true); $('fin-bills-list').innerHTML = '<p class="hint">Não foi possível carregar.</p>'; return; }
+    setupMsg(false);
+    const rows = data || [];
+    $('fin-bills-list').innerHTML = rows.length ? rows.map(r => {
+      let tag = '';
+      if(r.paid) tag = `<span class="fin-tag ok">Paga${r.paid_at ? ' em '+fmtDate(r.paid_at) : ''}</span>`;
+      else { const d = daysUntil(r.due_date);
+        tag = d < 0 ? `<span class="fin-tag late">Vencida há ${-d} dia(s)</span>` : d === 0 ? '<span class="fin-tag soon">Vence hoje</span>' : d <= 7 ? `<span class="fin-tag soon">Vence em ${d} dia(s)</span>` : `<span class="fin-tag">Vence em ${d} dias</span>`; }
+      return `<div class="fin-item"><div class="l"><div class="t">${esc(r.description)}${r.recurrence==='mensal' ? ' <span class="fin-tag">Mensal</span>' : ''}</div><div class="hint">Vencimento ${fmtDate(r.due_date)} ${tag}</div></div>
+      <div class="r"><b>${BRL(Number(r.amount))}</b>${r.paid ? '' : `<button data-pay="${escAttr(r.id)}">Paguei</button>`}<button class="danger" data-del-bill="${escAttr(r.id)}">Excluir</button></div></div>`;
+    }).join('') : '<p class="hint">Nenhuma conta aqui.</p>';
+    document.querySelectorAll('[data-pay]').forEach(btn => btn.addEventListener('click', async () => {
+      const bill = rows.find(x => x.id === btn.dataset.pay); if(!bill) return;
+      btn.disabled = true;
+      await sb.from('fin_bills').update({ paid: true, paid_at: todayStr() }).eq('id', bill.id);
+      await sb.from('fin_entries').insert({ kind:'saida', description: bill.description, category:'Contas pagas', amount: Number(bill.amount), entry_date: todayStr() });
+      if(bill.recurrence === 'mensal'){
+        await sb.from('fin_bills').insert({ description: bill.description, amount: Number(bill.amount), due_date: addMonth(bill.due_date), recurrence:'mensal' });
+      }
+      loadBills();
+    }));
+    document.querySelectorAll('[data-del-bill]').forEach(btn => btn.addEventListener('click', async () => {
+      if(!confirm('Excluir esta conta?')) return;
+      await sb.from('fin_bills').delete().eq('id', btn.dataset.delBill); loadBills();
+    }));
+  }
+  $('fb-filter').addEventListener('change', loadBills);
+  $('fb-add').addEventListener('click', async () => {
+    const err = $('fb-err'); err.textContent = '';
+    const desc = $('fb-desc').value.trim(), amount = num($('fb-amount').value), due = $('fb-due').value;
+    if(!desc){ err.textContent = 'Escreva uma descrição.'; return; }
+    if(!(amount > 0)){ err.textContent = 'Digite um valor maior que zero.'; return; }
+    if(!due){ err.textContent = 'Escolha o vencimento.'; return; }
+    const { error } = await sb.from('fin_bills').insert({ description: desc, amount, due_date: due, recurrence: $('fb-rec').value });
+    if(error){ err.textContent = 'Não foi possível salvar. Rode o SQL do financeiro no Supabase.'; setupMsg(true); return; }
+    $('fb-desc').value=''; $('fb-amount').value=''; $('fb-due').value=''; loadBills();
+  });
+
+  /* ----- calculadoras (rodam no navegador, não gravam nada) ----- */
+  const kv = (a,b,cls) => `<div class="fin-kv"><span>${a}</span><b${cls?` class="${cls}"`:''}>${b}</b></div>`;
+  const pmt = (pv,i,n) => i === 0 ? pv/n : pv*i/(1-Math.pow(1+i,-n));
+  function bind(ids, fn){ ids.forEach(id => $(id).addEventListener('input', fn)); fn(); }
+
+  bind(['c1-val','c1-n','c1-i'], () => {
+    const pv = num($('c1-val').value), n = Math.round(num($('c1-n').value)), i = (num($('c1-i').value)||0)/100;
+    if(!(pv>0) || !(n>0)){ $('c1-out').innerHTML = ''; return; }
+    const p = pmt(pv,i,n), tot = p*n;
+    $('c1-out').innerHTML = `<div class="big">${n}x de ${BRL(p)}</div>` + kv('Total pago', BRL(tot)) + kv('Juros pagos', BRL(tot-pv), 'fin-outc') + kv('Juros sobre o valor', PCT((tot/pv-1)*100));
+  });
+
+  bind(['c2-val','c2-n','c2-p'], () => {
+    const pv = num($('c2-val').value), n = Math.round(num($('c2-n').value)), p = num($('c2-p').value);
+    if(!(pv>0) || !(n>0) || !(p>0)){ $('c2-out').innerHTML = ''; return; }
+    if(p*n <= pv + 0.005){ $('c2-out').innerHTML = '<div>Sem juros: as parcelas somam '+BRL(p*n)+', igual ou menor que o valor à vista.</div>'; return; }
+    let lo = 0, hi = 1;
+    for(let k=0;k<200;k++){ const mid=(lo+hi)/2; if(pmt(pv,mid,n) < p) lo = mid; else hi = mid; }
+    const i = (lo+hi)/2;
+    $('c2-out').innerHTML = `<div class="big">${PCT(i*100)} ao mês</div>` + kv('Equivale a', PCT((Math.pow(1+i,12)-1)*100)+' ao ano') + kv('Total pago', BRL(p*n)) + kv('Juros pagos', BRL(p*n-pv), 'fin-outc');
+  });
+
+  bind(['c3-val','c3-n','c3-i','c3-sys'], () => {
+    const pv = num($('c3-val').value), n = Math.round(num($('c3-n').value)), i = (num($('c3-i').value)||0)/100, sys = $('c3-sys').value;
+    if(!(pv>0) || !(n>0) || n>600){ $('c3-out').innerHTML = ''; return; }
+    let saldo = pv, rows = [], totJ = 0, totP = 0; const fixed = pmt(pv,i,n);
+    for(let k=1;k<=n;k++){
+      const j = saldo*i; const am = sys==='price' ? fixed - j : pv/n; const par = j + am;
+      saldo = Math.max(0, saldo - am); totJ += j; totP += par;
+      rows.push(`<tr><td>${k}</td><td>${BRL(par)}</td><td>${BRL(j)}</td><td>${BRL(am)}</td><td>${BRL(saldo)}</td></tr>`);
+    }
+    $('c3-out').innerHTML = (sys==='price' ? `<div class="big">${n}x de ${BRL(fixed)}</div>` : `<div class="big">1ª parcela ${BRL(pv/n + pv*i)}</div>`) +
+      kv('Total pago', BRL(totP)) + kv('Total de juros', BRL(totJ), 'fin-outc') +
+      `<div class="fin-tblwrap"><table class="fin-tbl"><thead><tr><th>Mês</th><th>Parcela</th><th>Juros</th><th>Amortização</th><th>Saldo</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  });
+
+  bind(['c4-val','c4-pct','c4-fix','c4-want'], () => {
+    const v = num($('c4-val').value), pct = (num($('c4-pct').value)||0)/100, fix = num($('c4-fix').value)||0, want = num($('c4-want').value);
+    let html = '';
+    if(v > 0){ const fee = v*pct + fix; html += `<div class="big">Você recebe ${BRL(v-fee)}</div>` + kv('Taxa cobrada', BRL(fee), 'fin-outc') + kv('Taxa sobre a venda', PCT(fee/v*100)); }
+    if(want > 0 && pct < 1){ const g = (want + fix)/(1-pct); html += `<div style="margin-top:12px;">` + kv('Para receber '+BRL(want)+' líquidos, cobre', BRL(g)) + `</div>`; }
+    $('c4-out').innerHTML = html;
+  });
+
+  bind(['c5-val','c5-days','c5-multa','c5-juros'], () => {
+    const v = num($('c5-val').value), d = Math.round(num($('c5-days').value)), mu = ($('c5-multa').value.trim()==='' ? 2 : num($('c5-multa').value))/100, ju = ($('c5-juros').value.trim()==='' ? 1 : num($('c5-juros').value))/100;
+    if(!(v>0) || !(d>0)){ $('c5-out').innerHTML = ''; return; }
+    const multa = v*mu, juros = v*ju/30*d;
+    $('c5-out').innerHTML = `<div class="big">Total ${BRL(v+multa+juros)}</div>` + kv('Valor original', BRL(v)) + kv('Multa', BRL(multa), 'fin-outc') + kv('Juros de '+d+' dia(s)', BRL(juros), 'fin-outc');
+  });
 })();
 </script>
 </body>
