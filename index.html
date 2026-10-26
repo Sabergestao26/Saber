@@ -442,6 +442,12 @@
   .fr-card-meta b{ color: var(--ink); font-weight:600; }
   .fr-card-notes{ font-size:12.5px; color: var(--ink-soft); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
+  .fr-gated{ display:none !important; }
+  .fr-locked > *:not(.fr-lock-box){ display:none !important; }
+  .fr-lock-box{ max-width:520px; margin:40px auto; padding:22px 20px; text-align:center; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .fr-lock-box h3{ margin:0 0 8px; font-family:'Fraunces',serif; font-size:20px; color:var(--ink); }
+  .fr-lock-box h3 .fr-ico{ width:18px; height:18px; margin-right:8px; vertical-align:-3px; color:var(--ink-soft); }
+  .fr-lock-box p{ margin:0 0 16px; color:var(--ink-soft); font-size:14px; line-height:1.5; }
   .fr-empty{ max-width:520px; margin: 60px auto; text-align:center; color: var(--ink-soft); }
   .fr-empty h3{ font-family:'Fraunces', serif; color: var(--green-deep); font-size:20px; margin-bottom:8px; }
   .fr-empty button{
@@ -872,6 +878,7 @@
     <div id="fr-diary-content"></div>
     <div id="fr-weekly-goals-section"></div>
     <div id="fr-calendar-section"></div>
+    <div id="fr-diary-lock"></div>
   </div>
 
   <div id="fr-view-shopping" style="display:none">
@@ -1095,6 +1102,48 @@
   let currentUser = null;
   let currentProfile = null;
   let isAdmin = false;
+  let hasSubActive = false; // assinatura vigente (tabela subscriptions)
+  // Quem tem acesso completo: admin, profissional, código de acesso grátis ou
+  // assinatura vigente. Todo o resto usa só o básico (refeições, água e peso).
+  // Atenção: isso é a trava da tela; o banco também barra os artigos (ver
+  // sql-trava-gratuito.sql).
+  function hasFullAccess(){
+    return !!(isAdmin || hasSubActive || (currentProfile && (currentProfile.has_free_access || currentProfile.is_professional)));
+  }
+  function goToSubscription(){
+    closeOverlay();
+    switchView('settings');
+    settingsSubView = 'subscription';
+    renderSettingsView();
+  }
+  function lockBoxHtml(title, text){
+    return `<div class="fr-lock-box"><h3>${ico('lock')}${esc(title)}</h3><p>${esc(text)}</p><button type="button" class="fr-btn-primary fr-lock-go">Ver planos</button></div>`;
+  }
+  function wireLockBox(root){
+    root.querySelectorAll('.fr-lock-go').forEach(b=> b.addEventListener('click', goToSubscription));
+  }
+  // Troca o conteúdo de uma aba inteira por um aviso quando a pessoa não tem
+  // acesso. Devolve true se a aba está bloqueada.
+  function applyViewLock(viewId, title, text){
+    const c = document.getElementById(viewId);
+    if(!c) return false;
+    let box = c.querySelector(':scope > .fr-lock-box');
+    if(hasFullAccess()){
+      c.classList.remove('fr-locked');
+      if(box) box.remove();
+      return false;
+    }
+    c.classList.add('fr-locked');
+    if(!box){
+      c.insertAdjacentHTML('afterbegin', lockBoxHtml(title, text));
+      wireLockBox(c);
+    }
+    return true;
+  }
+  function openPaywallModal(title, text){
+    const overlay = buildOverlay(`<h3 class="fr-form-title">${esc(title)}</h3><p class="fr-hint" style="margin-bottom:16px;">${esc(text)}</p><button type="button" class="fr-btn-primary fr-lock-go" style="width:100%;">Ver planos</button>`);
+    wireLockBox(overlay);
+  }
   let profVerified = false; // verificação de documento (CRN/CREF) aprovada por um admin
 
   let recipes = [];
@@ -1168,6 +1217,7 @@
   // nos títulos de cartões onde ajudam a identificar a seção. Nos botões o
   // texto fala por si, sem desenho.
   const ICON_PATHS = {
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     scale:     '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10a4 4 0 0 1 8 0"/><path d="M12 10l2-2"/>',
     ruler:     '<path d="M3 17 17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>',
     clipboard: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/>',
@@ -1563,6 +1613,7 @@
         </div>
         <div class="fr-settings-section">
           <h4>Planos</h4>
+          <input type="text" id="fr-sub-coupon" placeholder="Cupom de desconto (opcional)" autocomplete="off" autocapitalize="characters" style="width:100%;box-sizing:border-box;margin-bottom:10px;">
           <div id="fr-sub-plans">${SUBSCRIPTION_PLANS.map(p => `
             <button type="button" class="fr-btn-ghost fr-sub-plan-btn" data-plan="${p.key}" style="width:100%;margin-bottom:8px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px;">
               <span>${esc(p.label)}${p.discountLabel ? `<br><span style="color:var(--green-deep);font-weight:600;font-size:12px;">${esc(p.discountLabel)}</span>` : ''}</span>
@@ -2527,9 +2578,15 @@
       const res = await fetch(`${SUPABASE_URL}/functions/v1/mp-create-preference`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: planKey, return_url_base: returnUrlBase })
+        body: JSON.stringify({ plan: planKey, return_url_base: returnUrlBase, coupon: (container.querySelector('#fr-sub-coupon')?.value || '').trim() })
       });
       const result = await res.json();
+      if(result && result.error === 'invalid_coupon'){
+        msgEl.innerHTML = `<p class="fr-hint" style="color:var(--rust);margin-top:6px;">Cupom inválido ou expirado.</p>`;
+        container.querySelectorAll('.fr-sub-plan-btn').forEach(b=>{ b.disabled = false; });
+        btn.innerHTML = originalLabel;
+        return;
+      }
       if(!res.ok || result.error || !result.init_point){
         // O motivo real (erro devolvido pelo Mercado Pago, por exemplo)
         // não aparece pra quem está assinando — só aqui no console, pra
@@ -2631,6 +2688,7 @@
       currentUser = null;
       currentProfile = null;
       isAdmin = false;
+      hasSubActive = false;
       authScreen.style.display = '';
       root.style.display = 'none';
     }
@@ -2684,6 +2742,10 @@
     currentProfile = data;
     isAdmin = !!(data && data.is_admin);
     profVerified = false;
+    {
+      const { data: subRow } = await sb.from('subscriptions').select('expires_at').eq('user_id', currentUser.id).maybeSingle();
+      hasSubActive = !!(subRow && subRow.expires_at && new Date(subRow.expires_at) > new Date());
+    }
     if(data && data.is_professional){
       const { data: pv } = await sb.from('professional_verifications').select('status').eq('user_id', currentUser.id).maybeSingle();
       profVerified = !!(pv && pv.status === 'approved');
@@ -2860,7 +2922,7 @@
   function renderPrimaryAction(){
     const btn = document.getElementById('fr-primary-action');
     if(currentView==='recipes'){
-      const canAdd = recipeScope==='shared' ? isAdmin : true;
+      const canAdd = hasFullAccess() && (recipeScope==='shared' ? isAdmin : true);
       if(!canAdd){ btn.style.display='none'; return; }
       btn.style.display='';
       btn.innerHTML = PLUS_SVG + (recipeScope==='shared' ? ' Nova receita' : ' Nova receita particular');
@@ -2898,11 +2960,14 @@
     document.getElementById('fr-view-settings').style.display = view==='settings' ? '' : 'none';
     renderViewTabs();
     renderPrimaryAction();
-    if(view==='recipes') renderScopeTabs();
+    const lockedRecipes  = applyViewLock('fr-view-recipes',  'Receitas para assinantes', 'O fichário de receitas fica disponível na assinatura. No plano gratuito você registra suas refeições, a água e o peso.');
+    const lockedShopping = applyViewLock('fr-view-shopping', 'Lista de compras para assinantes', 'A lista de compras fica disponível na assinatura. No plano gratuito você registra suas refeições, a água e o peso.');
+    const lockedArticles = applyViewLock('fr-view-articles', 'Artigos para assinantes', 'Os artigos ficam disponíveis na assinatura. No plano gratuito você registra suas refeições, a água e o peso.');
+    if(view==='recipes' && !lockedRecipes) renderScopeTabs();
     if(view==='diary') renderDiary();
-    if(view==='shopping') renderShoppingView();
+    if(view==='shopping' && !lockedShopping) renderShoppingView();
     if(view==='workouts') renderWorkoutsView();
-    if(view==='articles') renderArticlesView();
+    if(view==='articles' && !lockedArticles) renderArticlesView();
     if(view==='leitura') renderLeituraView();
     if(view==='ia') renderIAView();
     if(view==='settings') renderSettingsView();
@@ -4143,8 +4208,15 @@
     checkOwnAssessmentStatus();
 
     document.getElementById('fr-build-own').addEventListener('click', openExercisePickerModal);
-    document.getElementById('fr-take-assessment').addEventListener('click', openAssessmentModal);
-    document.getElementById('fr-import-file').addEventListener('click', openImportWorkoutModal);
+    // Treino gerado pelo app (avaliação) e importação de treino: só assinantes.
+    document.getElementById('fr-take-assessment').addEventListener('click', ()=>{
+      if(!hasFullAccess()){ openPaywallModal('Treino gerado pelo app', 'O treino montado pelo app a partir da sua avaliação fica disponível na assinatura. Você pode montar o seu treino manualmente sem pagar.'); return; }
+      openAssessmentModal();
+    });
+    document.getElementById('fr-import-file').addEventListener('click', ()=>{
+      if(!hasFullAccess()){ openPaywallModal('Importar treino de outro app', 'A importação de treino de outro app ou de arquivo fica disponível na assinatura. Você pode montar o seu treino manualmente sem pagar.'); return; }
+      openImportWorkoutModal();
+    });
     document.getElementById('fr-open-cardio').addEventListener('click', openCardioModal);
     workouts.forEach(w=>{
       const card = document.getElementById('fr-workout-card-'+w.id);
@@ -7164,9 +7236,23 @@
     await Promise.all([loadDiaryForDate(), loadTargetsOnce(), loadWaterForDate(), loadCaloriesBurnedForDate()]);
     renderDateNav();
     renderSummary();
-    renderMealSuggestion();
     renderDiaryList();
     renderWeightSection();
+    // No plano gratuito o diário só tem refeições, água e peso; o resto
+    // (sugestão de refeição, medidas, saúde, metas semanais, calendário e
+    // relatório semanal) fica escondido e substituído por um aviso.
+    const full = hasFullAccess();
+    ['fr-meal-suggestion','fr-tape-section','fr-health-section','fr-weekly-goals-section','fr-calendar-section'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.classList.toggle('fr-gated', !full);
+    });
+    const lockEl = document.getElementById('fr-diary-lock');
+    if(lockEl){
+      lockEl.innerHTML = full ? '' : lockBoxHtml('Mais recursos na assinatura', 'Sugestão de refeição, medidas, ficha de saúde, metas semanais, calendário e relatório semanal ficam disponíveis na assinatura.');
+      wireLockBox(lockEl);
+    }
+    if(!full) return;
+    renderMealSuggestion();
     renderTapeSection();
     renderHealthSection();
     renderWeeklyGoalsProgress();
@@ -7214,13 +7300,13 @@
           <button type="button" class="fr-water-btn" data-ml="500">+500ml</button>
         </div>
       </div>
-      <div class="fr-water-section">
+      ${hasFullAccess() ? `<div class="fr-water-section">
         <div class="fr-bar-label" style="margin-bottom:8px;"><span>${ico('flame')}Calorias gastas hoje</span></div>
         <div class="fr-cal-burn-row">
           <input type="number" min="0" id="fr-cal-burn-input" placeholder="ex.: 350" value="${currentDayCaloriesBurned ?? ''}">
           <button type="button" class="fr-water-btn" id="fr-cal-burn-save" style="flex:0 0 auto;">Salvar</button>
         </div>
-      </div>`;
+      </div>` : ''}`;
     if(!hasTargets){
       el.innerHTML = `
         <div class="fr-summary-kcal"><span class="val">${Math.round(totals.calories)}</span><span class="target">kcal registradas</span></div>
