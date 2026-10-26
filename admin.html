@@ -203,12 +203,12 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     <p class="hint" id="fin-setup-msg" style="display:none;color:var(--rust);margin-bottom:12px;">Para usar lançamentos e contas, rode o arquivo SQL do financeiro no Supabase (as calculadoras funcionam sem isso).</p>
 
     <div class="fin-pane" data-finpane="resumo">
+      <div class="card"><h4>Pagamentos a fazer</h4><p class="hint" style="margin-bottom:8px;">Contas vencidas e as dos próximos 30 dias, incluindo contas fixas e parcelas.</p><div id="fin-todo"><p class="hint">Carregando...</p></div></div>
       <div class="card">
         <div class="fin-row"><label class="fin-lbl">Mês</label><input type="month" id="fin-month-r" class="fin-sm"></div>
         <div class="grid" id="fin-summary"></div>
       </div>
       <div class="card"><h4>Saídas por categoria</h4><div id="fin-cats"><p class="hint">Carregando...</p></div></div>
-      <div class="card"><h4>Contas a pagar em aberto</h4><div id="fin-due-summary"></div></div>
     </div>
 
     <div class="fin-pane" data-finpane="lanc" style="display:none;">
@@ -221,8 +221,11 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
           <datalist id="fin-cat-list"></datalist>
           <input id="fe-amount" inputmode="decimal" placeholder="Valor (R$)">
           <input id="fe-date" type="date">
+          <input id="fe-n" inputmode="numeric" placeholder="Parcelas (só saída; 1 = à vista)">
+          <select id="fe-base"><option value="total">O valor é o total</option><option value="parcela">O valor é de cada parcela</option></select>
           <button id="fe-add">Adicionar</button>
         </div>
+        <p class="hint" id="fe-hint">Com parcelas, a 1ª entra aqui como paga hoje e as demais viram contas a pagar nos meses seguintes.</p>
         <div class="err" id="fe-err"></div>
       </div>
       <div class="card">
@@ -238,11 +241,21 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
           <input id="fb-desc" placeholder="Descrição (ex: Supabase, domínio, DAS, aluguel)">
           <input id="fb-amount" inputmode="decimal" placeholder="Valor (R$)">
           <input id="fb-due" type="date">
-          <select id="fb-rec"><option value="nenhuma">Pagamento único</option><option value="mensal">Repete todo mês</option></select>
+          <select id="fb-type">
+            <option value="unico">Pagamento único</option>
+            <option value="parcelado">Parcelado</option>
+            <option value="mensal">Conta fixa — todo mês</option>
+            <option value="anual">Conta fixa — todo ano</option>
+          </select>
+          <input id="fb-n" inputmode="numeric" placeholder="Número de parcelas" style="display:none;">
+          <select id="fb-base" style="display:none;"><option value="total">O valor é o total</option><option value="parcela">O valor é de cada parcela</option></select>
+          <input id="fb-cat" list="fin-cat-list" placeholder="Categoria (opcional)">
           <button id="fb-add">Adicionar</button>
         </div>
+        <p class="hint" id="fb-hint">O vencimento é o da 1ª parcela (ou da 1ª vez, nas contas fixas).</p>
         <div class="err" id="fb-err"></div>
       </div>
+      <div class="card"><h4>Contas fixas</h4><p class="hint" style="margin-bottom:8px;">Geram a conta do mês (ou do ano) sozinhas. Se excluir uma conta fixa, as próximas deixam de ser criadas.</p><div id="fin-fixed-list"><p class="hint">Carregando...</p></div></div>
       <div class="card">
         <div class="fin-row"><select id="fb-filter" class="fin-sm"><option value="open">Em aberto</option><option value="paid">Pagas</option><option value="all">Todas</option></select></div>
         <div id="fin-bills-list"><p class="hint">Carregando...</p></div>
@@ -1251,13 +1264,80 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     if(!finLoaded){ finLoaded = true; $('fin-month-r').value = monthStr(); $('fin-month-l').value = monthStr(); $('fe-date').value = todayStr(); loadSummary(); }
   });
 
+  /* ----- pagar uma conta (compartilhado) ----- */
+  async function payBill(bill){
+    await sb.from('fin_bills').update({ paid: true, paid_at: todayStr() }).eq('id', bill.id);
+    await sb.from('fin_entries').insert({ kind:'saida', description: bill.description, category: bill.category || 'Contas pagas', amount: Number(bill.amount), entry_date: todayStr() });
+    if(bill.recurrence === 'mensal' && !bill.fixed_id){
+      await sb.from('fin_bills').insert({ description: bill.description, amount: Number(bill.amount), due_date: addMonth(bill.due_date), recurrence:'mensal', category: bill.category || null });
+    }
+  }
+  function dueTag(r){
+    if(r.paid) return `<span class="fin-tag ok">Paga${r.paid_at ? ' em '+fmtDate(r.paid_at) : ''}</span>`;
+    const d = daysUntil(r.due_date);
+    return d < 0 ? `<span class="fin-tag late">Vencida há ${-d} dia(s)</span>` : d === 0 ? '<span class="fin-tag soon">Vence hoje</span>' : d <= 7 ? `<span class="fin-tag soon">Vence em ${d} dia(s)</span>` : `<span class="fin-tag">Vence em ${d} dias</span>`;
+  }
+  function billRow(r, withDelete){
+    const extra = r.installment_total ? ` <span class="fin-tag">${r.installment_no}/${r.installment_total}</span>` : (r.fixed_id || r.recurrence==='mensal') ? ' <span class="fin-tag">Fixa</span>' : '';
+    return `<div class="fin-item"><div class="l"><div class="t">${esc(r.description)}${extra}</div><div class="hint">Vencimento ${fmtDate(r.due_date)} ${dueTag(r)}${r.category ? ' · '+esc(r.category) : ''}</div></div>
+      <div class="r"><b>${BRL(Number(r.amount))}</b>${r.paid ? '' : `<button data-pay="${escAttr(r.id)}">Paguei</button>`}${withDelete ? `<button class="danger" data-del-bill="${escAttr(r.id)}">Excluir</button>` : ''}</div></div>`;
+  }
+  function wireBillButtons(rows, reload){
+    document.querySelectorAll('[data-pay]').forEach(btn => btn.addEventListener('click', async () => {
+      const bill = rows.find(x => x.id === btn.dataset.pay); if(!bill) return;
+      btn.disabled = true; await payBill(bill); reload();
+    }));
+    document.querySelectorAll('[data-del-bill]').forEach(btn => btn.addEventListener('click', async () => {
+      if(!confirm('Excluir esta conta?')) return;
+      await sb.from('fin_bills').delete().eq('id', btn.dataset.delBill); reload();
+    }));
+  }
+
+  /* ----- contas fixas: cria as contas dos próximos ~45 dias ----- */
+  function nextDue(dateStr, freq){
+    if(freq === 'anual'){ const [y,m,d] = dateStr.split('-').map(Number); const ny = y+1; const last = new Date(ny, m, 0).getDate(); return ny+'-'+pad(m)+'-'+pad(Math.min(d,last)); }
+    return addMonth(dateStr);
+  }
+  async function ensureFixedBills(){
+    const { data: fixed, error } = await sb.from('fin_fixed').select('*').eq('active', true);
+    if(error || !fixed || !fixed.length) return;
+    const t = new Date(); t.setDate(t.getDate()+45);
+    const horizon = t.getFullYear()+'-'+pad(t.getMonth()+1)+'-'+pad(t.getDate());
+    const t2 = new Date(); t2.setMonth(t2.getMonth()-2);
+    const floor = t2.getFullYear()+'-'+pad(t2.getMonth()+1)+'-'+pad(t2.getDate());
+    const rows = [];
+    fixed.forEach(f => {
+      let d = f.start_date, guard = 0;
+      while(d <= horizon && guard++ < 400){
+        if(d >= floor) rows.push({ fixed_id: f.id, description: f.description, amount: f.amount, due_date: d, recurrence: 'nenhuma', category: f.category || null });
+        d = nextDue(d, f.frequency);
+      }
+    });
+    if(rows.length) await sb.from('fin_bills').upsert(rows, { onConflict: 'fixed_id,due_date', ignoreDuplicates: true });
+  }
+
   /* ----- resumo ----- */
+  async function loadTodo(){
+    await ensureFixedBills();
+    const t = new Date(); t.setDate(t.getDate()+30);
+    const lim = t.getFullYear()+'-'+pad(t.getMonth()+1)+'-'+pad(t.getDate());
+    const { data, error } = await sb.from('fin_bills').select('*').eq('paid', false).lte('due_date', lim).order('due_date');
+    if(error){ setupMsg(true); $('fin-todo').innerHTML = '<p class="hint">Não foi possível carregar.</p>'; return; }
+    const rows = data || [];
+    const sum = a => a.reduce((s,x)=>s+Number(x.amount),0);
+    const late = rows.filter(r=>daysUntil(r.due_date)<0), week = rows.filter(r=>{const d=daysUntil(r.due_date);return d>=0&&d<=7}), later = rows.filter(r=>daysUntil(r.due_date)>7);
+    const grp = (title, arr, cls) => arr.length ? `<div class="fin-kv" style="border:0;margin-top:10px;"><b${cls?` class="${cls}"`:''}>${title}</b><b${cls?` class="${cls}"`:''}>${BRL(sum(arr))}</b></div>` + arr.map(r=>billRow(r,false)).join('') : '';
+    $('fin-todo').innerHTML = rows.length ? `<div class="fin-kv" style="border:0;"><span>Total a pagar (30 dias)</span><b class="big">${BRL(sum(rows))}</b></div>` +
+      grp('Vencidas', late, 'fin-outc') + grp('Próximos 7 dias', week) + grp('Depois, até 30 dias', later) : '<p class="hint">Nenhum pagamento pendente nos próximos 30 dias.</p>';
+    wireBillButtons(rows, () => { loadTodo(); loadSummary(); });
+  }
   async function loadSummary(){
+    loadTodo();
     const m = $('fin-month-r').value || monthStr();
     const [a,b] = monthRange(m);
     const { data, error } = await sb.from('fin_entries').select('kind,amount,category').gte('entry_date',a).lt('entry_date',b);
-    if(error){ setupMsg(true); $('fin-summary').innerHTML=''; $('fin-cats').innerHTML='<p class="hint">Sem dados.</p>'; }
-    else setupMsg(false);
+    if(error){ setupMsg(true); $('fin-summary').innerHTML=''; $('fin-cats').innerHTML='<p class="hint">Sem dados.</p>'; return; }
+    setupMsg(false);
     const rows = data || [];
     const ent = rows.filter(r=>r.kind==='entrada').reduce((s,r)=>s+Number(r.amount),0);
     const sai = rows.filter(r=>r.kind==='saida').reduce((s,r)=>s+Number(r.amount),0);
@@ -1270,17 +1350,23 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     const list = Object.entries(byCat).sort((x,y)=>y[1]-x[1]);
     $('fin-cats').innerHTML = list.length ? list.map(([c,v]) =>
       `<div style="margin-bottom:10px;"><div class="fin-kv" style="border:0;padding:0;"><span>${esc(c)}</span><b>${BRL(v)}</b></div><div class="fin-bar"><span style="width:${sai ? Math.round(v/sai*100) : 0}%"></span></div></div>`).join('') : '<p class="hint">Nenhuma saída neste mês.</p>';
-    const { data: bills } = await sb.from('fin_bills').select('amount,due_date').eq('paid', false);
-    const open = bills || [];
-    const late = open.filter(x => daysUntil(x.due_date) < 0);
-    const soon = open.filter(x => { const d = daysUntil(x.due_date); return d >= 0 && d <= 7; });
-    const sum = arr => arr.reduce((s,x)=>s+Number(x.amount),0);
-    $('fin-due-summary').innerHTML =
-      `<div class="fin-kv"><span>Vencidas (${late.length})</span><b class="fin-outc">${BRL(sum(late))}</b></div>` +
-      `<div class="fin-kv"><span>Vencem nos próximos 7 dias (${soon.length})</span><b>${BRL(sum(soon))}</b></div>` +
-      `<div class="fin-kv"><span>Total em aberto (${open.length})</span><b>${BRL(sum(open))}</b></div>`;
   }
   $('fin-month-r').addEventListener('change', loadSummary);
+
+  /* ----- parcelas: divide o valor em centavos exatos ----- */
+  function splitAmount(total, n){
+    const cents = Math.round(total*100), base = Math.floor(cents/n), rest = cents - base*n;
+    return Array.from({length:n}, (_,k) => (base + (k === n-1 ? rest : 0))/100);
+  }
+  function dueAt(first, k){
+    let d = first; for(let x=0;x<k;x++) d = addMonth(d); return d;
+  }
+  function installmentDates(first, n){
+    const [y,m,d] = first.split('-').map(Number); const out = [];
+    for(let k=0;k<n;k++){ const tm = m-1+k, ty = y+Math.floor(tm/12), mm = tm%12; const last = new Date(ty, mm+1, 0).getDate(); out.push(ty+'-'+pad(mm+1)+'-'+pad(Math.min(d,last))); }
+    return out;
+  }
+  function amountsFor(value, n, base){ return base === 'parcela' ? Array(n).fill(Math.round(value*100)/100) : splitAmount(value, n); }
 
   /* ----- lançamentos ----- */
   async function loadEntries(){
@@ -1293,7 +1379,7 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     const cats = [...new Set(rows.map(r=>r.category).filter(Boolean))];
     $('fin-cat-list').innerHTML = cats.map(c=>`<option value="${escAttr(c)}">`).join('');
     $('fin-entries-list').innerHTML = rows.length ? rows.map(r => `
-      <div class="fin-item"><div class="l"><div class="t">${esc(r.description)}</div><div class="hint">${fmtDate(r.entry_date)}${r.category ? ' · '+esc(r.category) : ''}</div></div>
+      <div class="fin-item"><div class="l"><div class="t">${esc(r.description)}</div><div class="hint">${fmtDate(r.entry_date)}${r.category ? ' · '+esc(r.category) : ''}${r.source_ref ? ' · automático' : ''}</div></div>
       <div class="r"><span class="${r.kind==='entrada'?'fin-in':'fin-outc'}">${r.kind==='entrada'?'+':'−'} ${BRL(Number(r.amount))}</span><button class="danger" data-del-entry="${escAttr(r.id)}">Excluir</button></div></div>`).join('') : '<p class="hint">Nenhum lançamento neste mês.</p>';
     document.querySelectorAll('[data-del-entry]').forEach(btn => btn.addEventListener('click', async () => {
       if(!confirm('Excluir este lançamento?')) return;
@@ -1301,20 +1387,48 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     }));
   }
   $('fin-month-l').addEventListener('change', loadEntries);
+  $('fe-kind').addEventListener('change', () => { const s = $('fe-kind').value === 'saida'; $('fe-n').style.display = s ? '' : 'none'; $('fe-base').style.display = s ? '' : 'none'; $('fe-hint').style.display = s ? '' : 'none'; });
   $('fe-add').addEventListener('click', async () => {
     const err = $('fe-err'); err.textContent = '';
-    const desc = $('fe-desc').value.trim(), amount = num($('fe-amount').value), date = $('fe-date').value;
+    const desc = $('fe-desc').value.trim(), amount = num($('fe-amount').value), date = $('fe-date').value, kind = $('fe-kind').value;
+    const n = kind === 'saida' ? Math.max(1, Math.round(num($('fe-n').value) || 1)) : 1;
+    const cat = $('fe-cat').value.trim() || null;
     if(!desc){ err.textContent = 'Escreva uma descrição.'; return; }
     if(!(amount > 0)){ err.textContent = 'Digite um valor maior que zero.'; return; }
     if(!date){ err.textContent = 'Escolha a data.'; return; }
-    const { error } = await sb.from('fin_entries').insert({ kind: $('fe-kind').value, description: desc, category: $('fe-cat').value.trim() || null, amount, entry_date: date });
-    if(error){ err.textContent = 'Não foi possível salvar. Rode o SQL do financeiro no Supabase.'; setupMsg(true); return; }
-    $('fe-desc').value=''; $('fe-amount').value=''; $('fe-cat').value='';
+    if(n > 120){ err.textContent = 'No máximo 120 parcelas.'; return; }
+    let error;
+    if(n === 1){
+      ({ error } = await sb.from('fin_entries').insert({ kind, description: desc, category: cat, amount, entry_date: date }));
+    } else {
+      const amts = amountsFor(amount, n, $('fe-base').value), dates = installmentDates(date, n), gid = crypto.randomUUID();
+      ({ error } = await sb.from('fin_entries').insert({ kind, description: desc+' (1/'+n+')', category: cat, amount: amts[0], entry_date: date }));
+      if(!error){
+        const bills = amts.slice(1).map((v,k) => ({ description: desc, amount: v, due_date: dates[k+1], recurrence:'nenhuma', category: cat, group_id: gid, installment_no: k+2, installment_total: n }));
+        ({ error } = await sb.from('fin_bills').insert(bills));
+      }
+    }
+    if(error){ err.textContent = 'Não foi possível salvar. Rode o SQL do financeiro (parte 2) no Supabase.'; setupMsg(true); return; }
+    $('fe-desc').value=''; $('fe-amount').value=''; $('fe-cat').value=''; $('fe-n').value='';
     $('fin-month-l').value = date.slice(0,7); loadEntries();
   });
 
   /* ----- contas a pagar ----- */
+  async function loadFixed(){
+    const { data, error } = await sb.from('fin_fixed').select('*').order('description');
+    if(error){ $('fin-fixed-list').innerHTML = '<p class="hint">Não foi possível carregar.</p>'; return; }
+    const rows = data || [];
+    $('fin-fixed-list').innerHTML = rows.length ? rows.map(f => `<div class="fin-item"><div class="l"><div class="t">${esc(f.description)} <span class="fin-tag">${f.frequency==='anual'?'Anual':'Mensal'}</span>${f.active ? '' : ' <span class="fin-tag">Pausada</span>'}</div><div class="hint">A partir de ${fmtDate(f.start_date)}${f.category ? ' · '+esc(f.category) : ''}</div></div>
+      <div class="r"><b>${BRL(Number(f.amount))}</b><button class="ghost" data-fix-toggle="${escAttr(f.id)}" data-active="${f.active}">${f.active ? 'Pausar' : 'Ativar'}</button><button class="danger" data-fix-del="${escAttr(f.id)}">Excluir</button></div></div>`).join('') : '<p class="hint">Nenhuma conta fixa ainda. Use "Conta fixa" no formulário acima.</p>';
+    document.querySelectorAll('[data-fix-toggle]').forEach(b => b.addEventListener('click', async () => { await sb.from('fin_fixed').update({ active: b.dataset.active !== 'true' }).eq('id', b.dataset.fixToggle); loadFixed(); }));
+    document.querySelectorAll('[data-fix-del]').forEach(b => b.addEventListener('click', async () => {
+      if(!confirm('Excluir esta conta fixa? As contas já criadas continuam; as próximas não serão criadas.')) return;
+      await sb.from('fin_fixed').delete().eq('id', b.dataset.fixDel); loadFixed();
+    }));
+  }
   async function loadBills(){
+    await ensureFixedBills();
+    loadFixed();
     const f = $('fb-filter').value;
     let q = sb.from('fin_bills').select('*').order('due_date',{ascending: f !== 'paid'});
     if(f === 'open') q = q.eq('paid', false); else if(f === 'paid') q = q.eq('paid', true);
@@ -1322,39 +1436,31 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     if(error){ setupMsg(true); $('fin-bills-list').innerHTML = '<p class="hint">Não foi possível carregar.</p>'; return; }
     setupMsg(false);
     const rows = data || [];
-    $('fin-bills-list').innerHTML = rows.length ? rows.map(r => {
-      let tag = '';
-      if(r.paid) tag = `<span class="fin-tag ok">Paga${r.paid_at ? ' em '+fmtDate(r.paid_at) : ''}</span>`;
-      else { const d = daysUntil(r.due_date);
-        tag = d < 0 ? `<span class="fin-tag late">Vencida há ${-d} dia(s)</span>` : d === 0 ? '<span class="fin-tag soon">Vence hoje</span>' : d <= 7 ? `<span class="fin-tag soon">Vence em ${d} dia(s)</span>` : `<span class="fin-tag">Vence em ${d} dias</span>`; }
-      return `<div class="fin-item"><div class="l"><div class="t">${esc(r.description)}${r.recurrence==='mensal' ? ' <span class="fin-tag">Mensal</span>' : ''}</div><div class="hint">Vencimento ${fmtDate(r.due_date)} ${tag}</div></div>
-      <div class="r"><b>${BRL(Number(r.amount))}</b>${r.paid ? '' : `<button data-pay="${escAttr(r.id)}">Paguei</button>`}<button class="danger" data-del-bill="${escAttr(r.id)}">Excluir</button></div></div>`;
-    }).join('') : '<p class="hint">Nenhuma conta aqui.</p>';
-    document.querySelectorAll('[data-pay]').forEach(btn => btn.addEventListener('click', async () => {
-      const bill = rows.find(x => x.id === btn.dataset.pay); if(!bill) return;
-      btn.disabled = true;
-      await sb.from('fin_bills').update({ paid: true, paid_at: todayStr() }).eq('id', bill.id);
-      await sb.from('fin_entries').insert({ kind:'saida', description: bill.description, category:'Contas pagas', amount: Number(bill.amount), entry_date: todayStr() });
-      if(bill.recurrence === 'mensal'){
-        await sb.from('fin_bills').insert({ description: bill.description, amount: Number(bill.amount), due_date: addMonth(bill.due_date), recurrence:'mensal' });
-      }
-      loadBills();
-    }));
-    document.querySelectorAll('[data-del-bill]').forEach(btn => btn.addEventListener('click', async () => {
-      if(!confirm('Excluir esta conta?')) return;
-      await sb.from('fin_bills').delete().eq('id', btn.dataset.delBill); loadBills();
-    }));
+    $('fin-bills-list').innerHTML = rows.length ? rows.map(r => billRow(r, true)).join('') : '<p class="hint">Nenhuma conta aqui.</p>';
+    wireBillButtons(rows, loadBills);
   }
   $('fb-filter').addEventListener('change', loadBills);
+  $('fb-type').addEventListener('change', () => { const p = $('fb-type').value === 'parcelado'; $('fb-n').style.display = p ? '' : 'none'; $('fb-base').style.display = p ? '' : 'none'; });
   $('fb-add').addEventListener('click', async () => {
     const err = $('fb-err'); err.textContent = '';
-    const desc = $('fb-desc').value.trim(), amount = num($('fb-amount').value), due = $('fb-due').value;
+    const desc = $('fb-desc').value.trim(), amount = num($('fb-amount').value), due = $('fb-due').value, type = $('fb-type').value, cat = $('fb-cat').value.trim() || null;
     if(!desc){ err.textContent = 'Escreva uma descrição.'; return; }
     if(!(amount > 0)){ err.textContent = 'Digite um valor maior que zero.'; return; }
     if(!due){ err.textContent = 'Escolha o vencimento.'; return; }
-    const { error } = await sb.from('fin_bills').insert({ description: desc, amount, due_date: due, recurrence: $('fb-rec').value });
-    if(error){ err.textContent = 'Não foi possível salvar. Rode o SQL do financeiro no Supabase.'; setupMsg(true); return; }
-    $('fb-desc').value=''; $('fb-amount').value=''; $('fb-due').value=''; loadBills();
+    let error;
+    if(type === 'parcelado'){
+      const n = Math.round(num($('fb-n').value));
+      if(!(n >= 2) || n > 120){ err.textContent = 'Digite o número de parcelas (de 2 a 120).'; return; }
+      const amts = amountsFor(amount, n, $('fb-base').value), dates = installmentDates(due, n), gid = crypto.randomUUID();
+      ({ error } = await sb.from('fin_bills').insert(amts.map((v,k) => ({ description: desc, amount: v, due_date: dates[k], recurrence:'nenhuma', category: cat, group_id: gid, installment_no: k+1, installment_total: n }))));
+    } else if(type === 'mensal' || type === 'anual'){
+      ({ error } = await sb.from('fin_fixed').insert({ description: desc, amount, start_date: due, frequency: type, category: cat }));
+    } else {
+      ({ error } = await sb.from('fin_bills').insert({ description: desc, amount, due_date: due, recurrence: 'nenhuma', category: cat }));
+    }
+    if(error){ err.textContent = 'Não foi possível salvar. Rode o SQL do financeiro (parte 2) no Supabase.'; setupMsg(true); return; }
+    $('fb-desc').value=''; $('fb-amount').value=''; $('fb-due').value=''; $('fb-n').value=''; $('fb-cat').value='';
+    loadBills();
   });
 
   /* ----- calculadoras (rodam no navegador, não gravam nada) ----- */
