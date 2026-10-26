@@ -117,6 +117,7 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     <button class="tab-btn" data-tab="profissionais">Profissionais<span class="tab-badge" id="badge-profissionais" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="conteudo">Conteúdo<span class="tab-badge" id="badge-conteudo" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="financeiro">Financeiro</button>
+    <button class="tab-btn" data-tab="codigos">Códigos</button>
     <button class="tab-btn" data-tab="config">Configurações</button>
   </div>
 
@@ -316,6 +317,24 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
         </div>
         <div class="fin-out" id="c5-out"></div>
       </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="codigos" style="display:none;">
+    <div class="card">
+      <h4>Novo código</h4>
+      <p class="hint" style="margin-bottom:10px;">Acesso grátis libera o app inteiro sem pagar (uso único). Desconto vale no pagamento da assinatura e pode ser usado mais de uma vez até vencer.</p>
+      <select id="pc-type"><option value="free_access">Acesso grátis</option><option value="discount">Desconto na assinatura</option></select>
+      <input id="pc-pct" type="number" min="1" max="100" inputmode="numeric" placeholder="Porcentagem de desconto (1 a 100)" style="display:none;">
+      <input id="pc-code" placeholder="Nome do código (deixe vazio para gerar automático)" style="text-transform:uppercase;">
+      <input id="pc-email" type="email" placeholder="E-mail de quem vai usar (vazio = qualquer pessoa)">
+      <input id="pc-days" type="number" min="1" inputmode="numeric" placeholder="Validade em dias (vazio = sem validade)">
+      <button id="pc-add">Criar código</button>
+      <div class="err" id="pc-err"></div>
+    </div>
+    <div class="card">
+      <h4>Códigos criados</h4>
+      <div id="pc-list"><p class="hint">Carregando...</p></div>
     </div>
   </div>
 
@@ -1154,6 +1173,59 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
   }
   document.getElementById('users-go').addEventListener('click', searchUsers);
   document.getElementById('users-q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); searchUsers(); } });
+
+  /* ---------- Códigos promocionais (acesso grátis e desconto) ---------- */
+  let promoLoaded = false;
+  function pcTypeLabel(c){ return c.benefit === 'discount' ? (c.discount_percent + '% de desconto') : 'Acesso grátis'; }
+  function pcStatus(c){
+    if(c.benefit === 'free_access' && c.redeemed_by) return 'Usado';
+    if(c.expires_at && new Date(c.expires_at) < new Date()) return 'Vencido';
+    return 'Disponível';
+  }
+  async function loadPromoCodes(){
+    const el = document.getElementById('pc-list');
+    const { data, error } = await sb.from('promo_codes').select('*').order('created_at', {ascending:false}).limit(100);
+    if(error){ el.innerHTML = '<p class="hint">Não foi possível carregar.</p>'; return; }
+    if(!data || !data.length){ el.innerHTML = '<p class="hint">Nenhum código criado ainda.</p>'; return; }
+    el.innerHTML = data.map(c => {
+      const st = pcStatus(c);
+      const meta = [pcTypeLabel(c), c.intended_email ? esc(c.intended_email) : 'qualquer pessoa', c.expires_at ? 'vence em ' + new Date(c.expires_at).toLocaleDateString('pt-BR') : 'sem validade'].join(' · ');
+      return '<div class="review-item"><div class="review-name">' + esc(c.code) + ' <span class="hint" style="font-weight:400;">· ' + st + '</span></div>'
+        + '<div class="review-meta">' + meta + '</div>'
+        + '<div class="review-actions"><button class="ghost" data-pc-copy="' + escAttr(c.code) + '">Copiar</button><button class="danger" data-pc-del="' + escAttr(c.id) + '">Excluir</button></div></div>';
+    }).join('');
+    el.querySelectorAll('[data-pc-copy]').forEach(b => b.addEventListener('click', async () => {
+      try{ await navigator.clipboard.writeText(b.dataset.pcCopy); b.textContent = 'Copiado'; setTimeout(()=> b.textContent = 'Copiar', 1500); }catch(e){ b.textContent = b.dataset.pcCopy; }
+    }));
+    el.querySelectorAll('[data-pc-del]').forEach(b => b.addEventListener('click', async () => {
+      if(!confirm('Excluir este código?')) return;
+      await sb.from('promo_codes').delete().eq('id', b.dataset.pcDel);
+      loadPromoCodes();
+    }));
+  }
+  document.getElementById('pc-type').addEventListener('change', function(){
+    document.getElementById('pc-pct').style.display = this.value === 'discount' ? '' : 'none';
+  });
+  document.getElementById('pc-add').addEventListener('click', async function(){
+    const err = document.getElementById('pc-err'); err.textContent = '';
+    const benefit = document.getElementById('pc-type').value;
+    const pct = parseInt(document.getElementById('pc-pct').value, 10);
+    if(benefit === 'discount' && !(pct >= 1 && pct <= 100)){ err.textContent = 'Digite uma porcentagem entre 1 e 100.'; return; }
+    let code = document.getElementById('pc-code').value.trim().toUpperCase().replace(/\s+/g, '');
+    if(!code) code = (benefit === 'discount' ? 'DESC' + pct + '-' : 'SABER-') + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const email = document.getElementById('pc-email').value.trim();
+    const days = parseInt(document.getElementById('pc-days').value, 10);
+    const row = { code, benefit, intended_email: email || null, created_by: currentUser.id };
+    if(benefit === 'discount') row.discount_percent = pct;
+    if(days > 0) row.expires_at = new Date(Date.now() + days * 86400000).toISOString();
+    this.disabled = true;
+    const { error } = await sb.from('promo_codes').insert(row);
+    this.disabled = false;
+    if(error){ err.textContent = error.code === '23505' ? 'Já existe um código com esse nome.' : 'Não foi possível criar. Rode o SQL do cupom de desconto no Supabase.'; return; }
+    ['pc-code','pc-email','pc-days','pc-pct'].forEach(id => document.getElementById(id).value = '');
+    loadPromoCodes();
+  });
+  document.querySelector('.tab-btn[data-tab="codigos"]').addEventListener('click', ()=>{ loadPromoCodes(); });
   document.querySelector('.tab-btn[data-tab="usuarios"]').addEventListener('click', ()=>{ if(!usersLoaded){ usersLoaded = true; searchUsers(); } });
 
   /* ---------- Login ---------- */
