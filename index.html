@@ -42,6 +42,7 @@
     --mustard: #BF8A2E;
     --plum: #5B3A52;
     --blue: #46687A;
+    --cardio: #2F7F86;
     --rust: #A8481F;
     --border: rgba(38,43,30,0.14);
     --shadow: 0 3px 10px rgba(38,43,30,0.10);
@@ -63,6 +64,7 @@
     --mustard: #D9A64C;
     --plum: #A784A0;
     --blue: #82A9BE;
+    --cardio: #6BC1C7;
     --rust: #DE7B4A;
     --border: rgba(237,230,211,0.16);
     --shadow: 0 3px 12px rgba(0,0,0,0.4);
@@ -8052,6 +8054,7 @@
       <div class="fr-cal-card">
         <div class="fr-cal-legend">
           <span><i style="background:var(--blue)"></i> Treino</span>
+          <span><i style="background:var(--cardio)"></i> Cardio</span>
           <span><i style="background:var(--green)"></i> Água (litros)</span>
           <span><i style="background:var(--mustard)"></i> Proteína (g)</span>
           <span><i style="background:var(--rust)"></i> Calorias consumidas</span>
@@ -8089,13 +8092,16 @@
     const endDate = `${calendarYear}-${pad(calendarMonth+1)}-${pad(daysInMonth)}`;
 
     await loadTargetsOnce();
-    const [{ data: completions }, { data: waters }, { data: logs }, { data: burns }, { data: sessions }] = await Promise.all([
+    const [{ data: completions }, { data: waters }, { data: logs }, { data: burns }, { data: sessions }, { data: cardios }] = await Promise.all([
       sb.from('workout_completions').select('date').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
       sb.from('water_logs').select('date, amount_ml').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
       sb.from('diary_logs').select('date, protein, calories').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
       sb.from('calories_burned_logs').select('date, amount').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate),
-      sb.from('workout_sessions').select('started_at, duration_seconds').eq('user_id', currentUser.id).not('duration_seconds', 'is', null).gte('started_at', startDate).lte('started_at', endDate+'T23:59:59')
+      sb.from('workout_sessions').select('started_at, duration_seconds').eq('user_id', currentUser.id).not('duration_seconds', 'is', null).gte('started_at', startDate).lte('started_at', endDate+'T23:59:59'),
+      sb.from('cardio_sessions').select('date, duration_seconds').eq('user_id', currentUser.id).gte('date', startDate).lte('date', endDate)
     ]);
+    const cardioByDay = {};
+    (cardios||[]).forEach(c=>{ cardioByDay[c.date] = (cardioByDay[c.date]||0) + n0(c.duration_seconds); });
 
     const trainedDays = new Set((completions||[]).map(c=>c.date));
     const waterByDay = {};
@@ -8131,6 +8137,7 @@
           const durLabel = durationByDay[dateStr] ? fmtDuration(durationByDay[dateStr]) : 'treino';
           lines.push(`<span class="fr-cal-metric"><i style="background:var(--blue)"></i><span style="color:var(--blue)">${durLabel}</span></span>`);
         }
+        if(cardioByDay[dateStr]) lines.push(`<span class="fr-cal-metric"><i style="background:var(--cardio)"></i><span style="color:var(--cardio)">${fmtDuration(cardioByDay[dateStr])}</span></span>`);
         if(waterByDay[dateStr]) lines.push(`<span class="fr-cal-metric"><i style="background:var(--green)"></i><span style="color:var(--green)">${(waterByDay[dateStr]/1000).toFixed(1)}L</span></span>`);
         if(proteinByDay[dateStr]) lines.push(`<span class="fr-cal-metric"><i style="background:var(--mustard)"></i><span style="color:var(--mustard)">${Math.round(proteinByDay[dateStr])}g</span></span>`);
         if(calByDay[dateStr]) lines.push(`<span class="fr-cal-metric"><i style="background:var(--rust)"></i><span style="color:var(--rust)">${Math.round(calByDay[dateStr])}kcal</span></span>`);
