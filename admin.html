@@ -130,13 +130,7 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     <div class="card">
       <h4>Assinaturas</h4>
       <div class="grid" id="stats-billing"></div>
-      <p class="hint" style="margin-top:10px;">Esses números ficam disponíveis assim que o sistema de assinatura paga for implementado.</p>
-    </div>
-
-    <div class="card">
-      <h4>Notas fiscais</h4>
-      <div class="grid" id="stats-invoices"></div>
-      <p class="hint" style="margin-top:10px;">Emissão de nota costuma ser controlada direto na plataforma de pagamento ou no sistema do contador — aqui pode entrar um resumo assim que essa integração existir.</p>
+      <p class="hint" style="margin-top:10px;">Contam só assinaturas pagas. Quem tem acesso por código promocional aparece em "Pessoas".</p>
     </div>
 
     <div class="card">
@@ -1102,6 +1096,18 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
   function statCard(label, val, note){
     return `<div class="stat-card${val===null?' placeholder':''}"><div class="stat-label">${label}</div><div class="stat-val">${val===null?'—':val}</div>${note?`<div class="stat-note">${note}</div>`:''}</div>`;
   }
+  async function loadBillingStats(){
+    const el = document.getElementById('stats-billing');
+    const { data: subs, error } = await sb.from('subscriptions').select('plan, expires_at');
+    if(error){ el.innerHTML = statCard('Assinantes ativos', null, 'Rode o SQL de permissões do painel'); return; }
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const list = subs || [];
+    const active = list.filter(x => x.expires_at && new Date(x.expires_at) > now);
+    const monthly = active.filter(x => x.plan === '1m');
+    const lapsed = list.filter(x => x.expires_at && new Date(x.expires_at) <= now && new Date(x.expires_at) >= first);
+    el.innerHTML = statCard('Assinantes ativos', active.length) + statCard('Plano mensal', monthly.length, 'entre os ativos') + statCard('Vencidas no mês', lapsed.length, 'não renovaram');
+  }
   async function loadDashboard(){
     const { data, error } = await sb.rpc('admin_dashboard_stats');
     if(error){
@@ -1113,9 +1119,7 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
       statCard('Novos (30 dias)', data.signups_last_30_days) + statCard('Profissionais cadastrados', data.total_professionals) +
       statCard('Vínculos profissional-cliente', data.total_client_links) + statCard('Acesso gratuito (código promo)', data.free_access_users) +
       statCard('Documentos de profissionais pendentes', data.pending_professional_docs) + statCard('Avaliações/reclamações pendentes', data.pending_professional_feedback);
-    document.getElementById('stats-billing').innerHTML =
-      statCard('Assinantes ativos', null, 'Aguardando sistema de pagamento') + statCard('Plano mensal', null, 'Aguardando sistema de pagamento') + statCard('Cancelamentos no mês', null, 'Aguardando sistema de pagamento');
-    document.getElementById('stats-invoices').innerHTML = statCard('Notas emitidas no mês', null, 'Aguardando integração fiscal');
+    loadBillingStats();
     document.getElementById('stats-content').innerHTML =
       statCard('Receitas no catálogo', data.total_recipes) + statCard('Treinos na biblioteca', data.total_library_workouts) + statCard('Treinos pessoais/atribuídos', data.total_personal_workouts);
     document.getElementById('stats-engagement').innerHTML =
