@@ -1411,14 +1411,16 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     loadTodo();
     const m = $('fin-month-r').value || monthStr();
     const [a,b] = monthRange(m);
-    const { data, error } = await sb.from('fin_entries').select('kind,amount,category').gte('entry_date',a).lt('entry_date',b);
+    const { data, error } = await sb.from('fin_entries').select('kind,amount,category,fee_amount').gte('entry_date',a).lt('entry_date',b);
     if(error){ setupMsg(true); $('fin-summary').innerHTML=''; $('fin-cats').innerHTML='<p class="hint">Sem dados.</p>'; return; }
     setupMsg(false);
     const rows = data || [];
     const ent = rows.filter(r=>r.kind==='entrada').reduce((s,r)=>s+Number(r.amount),0);
     const sai = rows.filter(r=>r.kind==='saida').reduce((s,r)=>s+Number(r.amount),0);
+    const taxas = rows.filter(r=>r.kind==='entrada').reduce((s,r)=>s+Number(r.fee_amount||0),0);
     $('fin-summary').innerHTML =
-      statCard('Entradas', BRL(ent)).replace(/<div class="stat-val"/, '<div class="stat-val fin-in"') +
+      statCard('Entradas', BRL(ent), taxas > 0 ? 'líquido, já sem as taxas' : '').replace(/<div class="stat-val"/, '<div class="stat-val fin-in"') +
+      (taxas > 0 ? statCard('Taxas do Mercado Pago', BRL(taxas), 'já descontadas das entradas') : '') +
       statCard('Saídas', BRL(sai)).replace(/<div class="stat-val"/, '<div class="stat-val fin-outc"') +
       statCard('Saldo do mês', BRL(ent-sai), ent-sai < 0 ? 'No vermelho' : 'No azul');
     const byCat = {};
@@ -1455,7 +1457,7 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     const cats = [...new Set(rows.map(r=>r.category).filter(Boolean))];
     $('fin-cat-list').innerHTML = cats.map(c=>`<option value="${escAttr(c)}">`).join('');
     $('fin-entries-list').innerHTML = rows.length ? rows.map(r => `
-      <div class="fin-item"><div class="l"><div class="t">${esc(r.description)}</div><div class="hint">${fmtDate(r.entry_date)}${r.category ? ' · '+esc(r.category) : ''}${r.source_ref ? ' · automático' : ''}</div></div>
+      <div class="fin-item"><div class="l"><div class="t">${esc(r.description)}</div><div class="hint">${fmtDate(r.entry_date)}${r.category ? ' · '+esc(r.category) : ''}${r.source_ref ? ' · automático' : ''}</div>${Number(r.fee_amount) > 0 ? `<div class="hint">Cliente pagou ${BRL(Number(r.gross_amount))} · taxa ${BRL(Number(r.fee_amount))} (já descontada)</div>` : ''}</div>
       <div class="r"><span class="${r.kind==='entrada'?'fin-in':'fin-outc'}">${r.kind==='entrada'?'+':'−'} ${BRL(Number(r.amount))}</span><button class="danger" data-del-entry="${escAttr(r.id)}">Excluir</button></div></div>`).join('') : '<p class="hint">Nenhum lançamento neste mês.</p>';
     document.querySelectorAll('[data-del-entry]').forEach(btn => btn.addEventListener('click', async () => {
       if(!confirm('Excluir este lançamento?')) return;
