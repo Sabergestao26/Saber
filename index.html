@@ -8045,16 +8045,18 @@
     const el = document.getElementById('fr-weekly-goals-section');
     if(!el) return;
     const hasAnyWeeklyGoal = targets && (targets.weekly_workout_days || targets.weekly_water_days || targets.weekly_protein_days || targets.weekly_calories_burned);
-    if(!hasAnyWeeklyGoal){ el.innerHTML = ''; return; }
-
     const end = todayStr();
     const start = shiftDateStr(end, -6);
-    const [{ data: completions }, { data: waters }, { data: logs }, { data: burns }] = await Promise.all([
+    const [{ data: completions }, { data: waters }, { data: logs }, { data: burns }, { data: cardios }] = await Promise.all([
       sb.from('workout_completions').select('date').eq('user_id', currentUser.id).gte('date', start).lte('date', end),
       sb.from('water_logs').select('date, amount_ml').eq('user_id', currentUser.id).gte('date', start).lte('date', end),
       sb.from('diary_logs').select('date, protein').eq('user_id', currentUser.id).gte('date', start).lte('date', end),
-      sb.from('calories_burned_logs').select('amount').eq('user_id', currentUser.id).gte('date', start).lte('date', end)
+      sb.from('calories_burned_logs').select('amount').eq('user_id', currentUser.id).gte('date', start).lte('date', end),
+      sb.from('cardio_sessions').select('date, duration_seconds').eq('user_id', currentUser.id).gte('date', start).lte('date', end)
     ]);
+    const cardioSeconds = (cardios||[]).reduce((s,c)=> s+n0(c.duration_seconds), 0);
+    const cardioDays = new Set((cardios||[]).map(c=>c.date)).size;
+    if(!hasAnyWeeklyGoal && !cardioSeconds){ el.innerHTML = ''; return; }
 
     const trainedDays = new Set((completions||[]).map(c=>c.date));
     const waterByDay = {}; (waters||[]).forEach(w=>{ waterByDay[w.date]=(waterByDay[w.date]||0)+n0(w.amount_ml); });
@@ -8072,10 +8074,18 @@
     }
 
     const cards = [];
-    if(targets.weekly_workout_days) cards.push({ label:'Treinos', val:trainedCount, goal:targets.weekly_workout_days, color:'var(--blue)' });
-    if(targets.weekly_water_days) cards.push({ label:'Dias com água OK', val:waterDaysHit, goal:targets.weekly_water_days, color:'var(--green)' });
-    if(targets.weekly_protein_days) cards.push({ label:'Dias com proteína OK', val:proteinDaysHit, goal:targets.weekly_protein_days, color:'var(--mustard)' });
-    if(targets.weekly_calories_burned) cards.push({ label:'Calorias gastas', val:Math.round(burnedTotal), goal:targets.weekly_calories_burned, color:'var(--rust)' });
+    if(targets && targets.weekly_workout_days) cards.push({ label:'Treinos', val:trainedCount, goal:targets.weekly_workout_days, color:'var(--blue)' });
+    if(targets && targets.weekly_water_days) cards.push({ label:'Dias com água OK', val:waterDaysHit, goal:targets.weekly_water_days, color:'var(--green)' });
+    if(targets && targets.weekly_protein_days) cards.push({ label:'Dias com proteína OK', val:proteinDaysHit, goal:targets.weekly_protein_days, color:'var(--mustard)' });
+    if(targets && targets.weekly_calories_burned) cards.push({ label:'Calorias gastas', val:Math.round(burnedTotal), goal:targets.weekly_calories_burned, color:'var(--rust)' });
+
+    const cardioMin = Math.round(cardioSeconds/60);
+    const cardioCard = cardioSeconds ? `
+          <div class="fr-weekly-goal-card">
+            <div class="fr-weekly-goal-label">Cardio</div>
+            <div class="fr-weekly-goal-val">${cardioMin} <span>min · ${cardioDays} ${cardioDays===1?'dia':'dias'}</span></div>
+            <div class="fr-bar-track"><div class="fr-bar-fill" style="width:100%;background:var(--cardio)"></div></div>
+          </div>` : '';
 
     el.innerHTML = `
       <div class="fr-section-label" style="max-width:1080px;margin:24px auto 12px;">Progresso da semana</div>
@@ -8085,7 +8095,7 @@
             <div class="fr-weekly-goal-label">${esc(c.label)}</div>
             <div class="fr-weekly-goal-val">${esc(c.val)} <span>/ ${esc(c.goal)}</span></div>
             <div class="fr-bar-track"><div class="fr-bar-fill" style="width:${Math.min(100,(c.val/c.goal)*100)}%;background:${c.color}"></div></div>
-          </div>`).join('')}
+          </div>`).join('')}${cardioCard}
       </div>
     `;
   }
