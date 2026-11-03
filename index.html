@@ -2833,7 +2833,6 @@
   function renderUserBar(){
     const label = document.getElementById('fr-user-label');
     const badges = [];
-    if(isAdmin) badges.push('<span class="fr-admin-badge">admin</span>');
     if(currentProfile && currentProfile.is_professional){
       badges.push(profVerified
         ? `<span class="fr-admin-badge" style="background:var(--blue)">${esc(currentProfile.professional_label || 'Profissional')}</span>`
@@ -2967,7 +2966,7 @@
   function renderPrimaryAction(){
     const btn = document.getElementById('fr-primary-action');
     if(currentView==='recipes'){
-      const canAdd = hasFullAccess() && (recipeScope==='shared' ? isAdmin : true);
+      const canAdd = hasFullAccess() && recipeScope==='personal';
       if(!canAdd){ btn.style.display='none'; return; }
       btn.style.display='';
       btn.innerHTML = PLUS_SVG + (recipeScope==='shared' ? ' Nova receita' : ' Nova receita particular');
@@ -2977,7 +2976,7 @@
       btn.innerHTML = PLUS_SVG + ' Registrar alimento';
       btn.onclick = openLogModal;
     } else if(currentView==='workouts'){
-      const canAdd = isAdmin || (currentProfile && currentProfile.is_professional);
+      const canAdd = !!(currentProfile && currentProfile.is_professional);
       if(!canAdd){ btn.style.display='none'; return; }
       btn.style.display='';
       btn.innerHTML = PLUS_SVG + ' Novo treino';
@@ -7165,7 +7164,8 @@
   }
   function activeRecipeList(){ return recipeScope==='shared' ? recipes.filter(r=> recipeKindOf(r)===sharedKind) : personalRecipes; }
   function activeRecipesLoaded(){ return recipeScope==='shared' ? recipesLoaded : personalRecipesLoaded; }
-  function canEditActiveScope(){ return recipeScope==='shared' ? isAdmin : true; }
+  // Receitas compartilhadas e treinos da biblioteca são cadastrados no painel de administração.
+  function canEditActiveScope(){ return recipeScope==='shared' ? false : true; }
 
   /* ---------- Recipes ---------- */
   function renderTabs(){
@@ -7195,8 +7195,8 @@
     const canAdd = canEditActiveScope();
     if(list.length===0){
       if(activeRecipeList().length===0){
-        const emptyTitle = recipeScope==='personal' ? 'Você ainda não tem receitas particulares' : (isAdmin ? 'Seu fichário está vazio' : 'Ainda não há receitas');
-        const emptyDesc = recipeScope==='personal' ? 'Cadastre aqui receitas que só você vai ver, como as que seu nutricionista passar.' : (isAdmin ? 'Cadastre as receitas das suas marmitas e refeições para buscar pelo nome sempre que precisar.' : 'Assim que forem cadastradas, as receitas aparecem aqui.');
+        const emptyTitle = recipeScope==='personal' ? 'Você ainda não tem receitas particulares' : 'Ainda não há receitas';
+        const emptyDesc = recipeScope==='personal' ? 'Cadastre aqui receitas que só você vai ver, como as que seu nutricionista passar.' : 'Assim que forem cadastradas, as receitas aparecem aqui.';
         content.innerHTML = `
           <div class="fr-empty">
             <h3>${emptyTitle}</h3>

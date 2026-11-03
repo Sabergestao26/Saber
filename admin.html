@@ -91,6 +91,25 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
 .fin-tbl th,.fin-tbl td{text-align:right;padding:5px 6px;border-top:1px solid var(--border);}
 .fin-tbl th:first-child,.fin-tbl td:first-child{text-align:left;}
 .fin-tblwrap{max-height:320px;overflow:auto;}
+
+/* ---------- Conteúdo (admin) ---------- */
+.ct-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--border);}
+.ct-item:first-child{border-top:0;}
+.ct-item .l{min-width:0;} .ct-item .t{font-weight:600;overflow-wrap:anywhere;}
+.ct-item .r button{width:auto;padding:6px 12px;font-size:12.5px;}
+.ct-overlay{position:fixed;inset:0;background:rgba(38,43,30,.55);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 12px;}
+.ct-modal{position:relative;background:var(--paper,#fffdf7);border-radius:14px;width:100%;max-width:560px;padding:22px 20px;margin:auto 0;}
+.ct-x{position:absolute;top:8px;right:10px;width:34px;height:34px;padding:0;background:none;color:var(--ink);font-size:24px;line-height:1;}
+.ct-l{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin:12px 0 4px;}
+.ct-modal textarea{font-family:'Inter',sans-serif;font-size:14px;padding:10px 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box;resize:vertical;}
+.ct-modal input,.ct-modal select{box-sizing:border-box;margin-bottom:0;}
+.ct-check{display:flex;align-items:center;gap:8px;margin:14px 0;font-size:14px;} .ct-check input{width:auto;}
+.ct-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;}
+.ct-row4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
+.ct-ing{display:grid;grid-template-columns:80px 120px 1fr 38px;gap:6px;margin-bottom:6px;}
+.ct-ing .x{padding:0;width:38px;}
+.ct-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;} .ct-actions button{width:auto;}
+@media(max-width:520px){.ct-ing{grid-template-columns:70px 1fr 38px;}.ct-ing .n{grid-column:1/-1;order:5;}.ct-row4{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
@@ -182,10 +201,21 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
   </div>
 
   <div class="tab-panel" data-panel="conteudo" style="display:none;">
-    <div class="card">
-      <h4>Sugestões de alimentos</h4>
-      <div id="suggestions-area"><p class="hint">Carregando...</p></div>
+    <div class="fin-sub">
+      <button class="fin-subbtn ct-subbtn active" data-ct="sugestoes">Sugestões</button>
+      <button class="fin-subbtn ct-subbtn" data-ct="artigos">Artigos</button>
+      <button class="fin-subbtn ct-subbtn" data-ct="receitas">Receitas</button>
+      <button class="fin-subbtn ct-subbtn" data-ct="treinos">Treinos</button>
     </div>
+    <div class="ct-pane" data-ctpane="sugestoes">
+      <div class="card">
+        <h4>Sugestões de alimentos</h4>
+        <div id="suggestions-area"><p class="hint">Carregando...</p></div>
+      </div>
+    </div>
+    <div class="ct-pane" data-ctpane="artigos" style="display:none;"><div class="card"><h4>Artigos</h4><div id="ct-articles"></div></div></div>
+    <div class="ct-pane" data-ctpane="receitas" style="display:none;"><div class="card"><h4>Receitas compartilhadas</h4><div id="ct-recipes"></div></div></div>
+    <div class="ct-pane" data-ctpane="treinos" style="display:none;"><div class="card"><h4>Treinos da biblioteca</h4><div id="ct-workouts"></div></div></div>
   </div>
 
   <div class="tab-panel" data-panel="financeiro" style="display:none;">
@@ -1269,6 +1299,232 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     location.reload();
   });
   checkSession();
+
+  /* ---------- Conteúdo: artigos, receitas e treinos da biblioteca (só admin) ---------- */
+  const CT_ART_CATS = { musculacao:'Musculação', cardio:'Cardio', proteina:'Proteína', fibra:'Fibra', agua:'Água', vida_saudavel:'Vida saudável' };
+  const CT_REC_CATS = { cafe:'Café da manhã', almoco:'Almoço', jantar:'Jantar', lanche:'Lanche', marmita:'Marmita/Freezer', doces:'Doces' };
+  const CT_UNITS = ['g','kg','ml','l','unidade','xícara','colher de sopa','colher de chá','dente','pitada','a gosto'];
+  const ctNum = v => (v === '' || v == null) ? null : Number(v);
+
+  function ctModal(html){
+    const old = document.getElementById('ct-overlay'); if(old) old.remove();
+    const o = document.createElement('div');
+    o.id = 'ct-overlay'; o.className = 'ct-overlay';
+    o.innerHTML = `<div class="ct-modal"><button type="button" class="ct-x" aria-label="Fechar">&times;</button>${html}</div>`;
+    document.body.appendChild(o);
+    o.addEventListener('click', e=>{ if(e.target === o) o.remove(); });
+    o.querySelector('.ct-x').addEventListener('click', ()=> o.remove());
+    return o;
+  }
+  function ctClose(){ const o = document.getElementById('ct-overlay'); if(o) o.remove(); }
+  function ctConfirm(text, okLabel, onOk){
+    const o = ctModal(`<h4>Confirmar</h4><p style="margin:0 0 16px;line-height:1.5;">${esc(text)}</p><div class="ct-actions"><button type="button" class="ghost" id="ct-no">Cancelar</button><button type="button" class="danger" id="ct-ok">${esc(okLabel)}</button></div>`);
+    o.querySelector('#ct-no').addEventListener('click', ctClose);
+    o.querySelector('#ct-ok').addEventListener('click', async ()=>{ ctClose(); await onOk(); });
+  }
+  function ctErr(e){ console.error(e); alert('Não foi possível concluir: ' + ((e && e.message) || 'erro desconhecido')); }
+
+  // sub-abas
+  document.querySelectorAll('.ct-subbtn').forEach(b=> b.addEventListener('click', ()=>{
+    document.querySelectorAll('.ct-subbtn').forEach(x=> x.classList.toggle('active', x === b));
+    const key = b.getAttribute('data-ct');
+    document.querySelectorAll('.ct-pane').forEach(p=> p.style.display = (p.getAttribute('data-ctpane') === key) ? '' : 'none');
+    if(key === 'artigos') ctLoadArticles();
+    if(key === 'receitas') ctLoadRecipes();
+    if(key === 'treinos') ctLoadWorkouts();
+  }));
+
+  /* ----- Artigos ----- */
+  async function ctLoadArticles(){
+    const el = document.getElementById('ct-articles');
+    el.innerHTML = '<p class="hint">Carregando...</p>';
+    const { data, error } = await sb.from('articles').select('*').order('created_at', { ascending:false });
+    if(error){ el.innerHTML = '<p class="err">Não foi possível carregar os artigos.</p>'; return; }
+    const list = data || [];
+    el.innerHTML = `<div style="margin-bottom:12px;"><button type="button" id="ct-art-new" style="width:auto;">Novo artigo</button></div>` +
+      (list.length ? list.map(a=>`<div class="ct-item"><div class="l"><div class="t">${esc(a.title)}</div><div class="hint">${esc(CT_ART_CATS[a.category] || a.category)} · ${a.published ? 'Publicado' : 'Rascunho (não aparece no app)'}</div></div><div class="r"><button type="button" class="ghost" data-edit="${escAttr(a.id)}">Editar</button></div></div>`).join('') : '<p class="hint">Nenhum artigo ainda.</p>');
+    el.querySelector('#ct-art-new').addEventListener('click', ()=> ctArticleForm(null));
+    el.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=> ctArticleForm(list.find(x=> x.id === b.getAttribute('data-edit')))));
+  }
+  function ctArticleForm(a){
+    const isEdit = !!a; a = a || { category:'vida_saudavel', published:true };
+    const o = ctModal(`<h4>${isEdit ? 'Editar artigo' : 'Novo artigo'}</h4>
+      <label class="ct-l">Categoria</label><select id="ct-a-cat">${Object.keys(CT_ART_CATS).map(k=>`<option value="${k}" ${a.category===k?'selected':''}>${esc(CT_ART_CATS[k])}</option>`).join('')}</select>
+      <label class="ct-l">Título</label><input type="text" id="ct-a-title" value="${escAttr(a.title||'')}">
+      <label class="ct-l">Resumo (aparece na lista)</label><textarea id="ct-a-sum" rows="3">${esc(a.summary||'')}</textarea>
+      <label class="ct-l">Texto do artigo</label><textarea id="ct-a-content" rows="12">${esc(a.content||'')}</textarea>
+      <label class="ct-check"><input type="checkbox" id="ct-a-pub" ${a.published?'checked':''}> Publicado (visível no app)</label>
+      <div id="ct-msg" class="err"></div>
+      <div class="ct-actions">${isEdit ? '<button type="button" class="danger" id="ct-del" style="flex:0 0 auto;width:auto;">Excluir</button>' : ''}<button type="button" class="ghost" id="ct-cancel">Cancelar</button><button type="button" id="ct-save">Salvar</button></div>`);
+    o.querySelector('#ct-cancel').addEventListener('click', ctClose);
+    o.querySelector('#ct-save').addEventListener('click', async function(){
+      const payload = { category:o.querySelector('#ct-a-cat').value, title:o.querySelector('#ct-a-title').value.trim(), summary:o.querySelector('#ct-a-sum').value.trim(), content:o.querySelector('#ct-a-content').value, published:o.querySelector('#ct-a-pub').checked };
+      if(!payload.title){ o.querySelector('#ct-msg').textContent = 'Dê um título ao artigo.'; return; }
+      this.disabled = true;
+      const r = isEdit ? await sb.from('articles').update(payload).eq('id', a.id) : await sb.from('articles').insert(payload);
+      if(r.error){ this.disabled = false; o.querySelector('#ct-msg').textContent = 'Não foi possível salvar: ' + r.error.message; return; }
+      ctClose(); ctLoadArticles();
+    });
+    const del = o.querySelector('#ct-del');
+    if(del) del.addEventListener('click', ()=> ctConfirm(`Excluir o artigo "${a.title}"? Não dá para desfazer.`, 'Excluir', async ()=>{
+      const { error } = await sb.from('articles').delete().eq('id', a.id);
+      if(error) return ctErr(error);
+      ctLoadArticles();
+    }));
+  }
+
+  /* ----- Receitas compartilhadas ----- */
+  async function ctLoadRecipes(){
+    const el = document.getElementById('ct-recipes');
+    el.innerHTML = '<p class="hint">Carregando...</p>';
+    const { data, error } = await sb.from('recipes').select('*').order('name');
+    if(error){ el.innerHTML = '<p class="err">Não foi possível carregar as receitas.</p>'; return; }
+    const list = data || [];
+    el.innerHTML = `<div style="margin-bottom:12px;"><button type="button" id="ct-rec-new" style="width:auto;">Nova receita</button></div>
+      <input type="text" id="ct-rec-q" placeholder="Buscar receita" style="margin-bottom:10px;"><div id="ct-rec-list"></div>`;
+    const draw = ()=>{
+      const q = (el.querySelector('#ct-rec-q').value || '').toLowerCase();
+      const shown = list.filter(r=> (r.name||'').toLowerCase().includes(q));
+      el.querySelector('#ct-rec-list').innerHTML = shown.length ? shown.map(r=>`<div class="ct-item"><div class="l"><div class="t">${esc(r.name)}</div><div class="hint">${esc(CT_REC_CATS[r.category] || r.category || '')} · ${r.kind === 'tradicional' ? 'Tradicional' : 'Fitness'}</div></div><div class="r"><button type="button" class="ghost" data-edit="${escAttr(r.id)}">Editar</button></div></div>`).join('') : '<p class="hint">Nenhuma receita encontrada.</p>';
+      el.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=> ctRecipeForm(list.find(x=> x.id === b.getAttribute('data-edit')))));
+    };
+    el.querySelector('#ct-rec-q').addEventListener('input', draw);
+    el.querySelector('#ct-rec-new').addEventListener('click', ()=> ctRecipeForm(null));
+    draw();
+  }
+  function ctIngRow(i){
+    i = i || { item:'', quantity:'', unit:'g' };
+    return `<div class="ct-ing"><input type="number" step="0.01" min="0" class="q" placeholder="Qtd" value="${escAttr(i.quantity ?? '')}"><select class="u">${CT_UNITS.map(u=>`<option ${i.unit===u?'selected':''}>${esc(u)}</option>`).join('')}</select><input type="text" class="n" placeholder="Ingrediente" value="${escAttr(i.item||'')}"><button type="button" class="ghost x" aria-label="Remover">&times;</button></div>`;
+  }
+  function ctRecipeForm(r){
+    const isEdit = !!r; r = r || { category:'almoco', kind:'fitness', portions:1 };
+    const ings = (r.ingredients_structured && r.ingredients_structured.length) ? r.ingredients_structured : [null];
+    const o = ctModal(`<h4>${isEdit ? 'Editar receita' : 'Nova receita'}</h4>
+      <label class="ct-l">Nome do prato</label><input type="text" id="ct-r-name" value="${escAttr(r.name||'')}">
+      <div class="ct-row"><div><label class="ct-l">Categoria</label><select id="ct-r-cat">${Object.keys(CT_REC_CATS).map(k=>`<option value="${k}" ${r.category===k?'selected':''}>${esc(CT_REC_CATS[k])}</option>`).join('')}</select></div>
+        <div><label class="ct-l">Tipo</label><select id="ct-r-kind"><option value="fitness" ${r.kind!=='tradicional'?'selected':''}>Fitness</option><option value="tradicional" ${r.kind==='tradicional'?'selected':''}>Tradicional</option></select></div>
+        <div><label class="ct-l">Porções</label><input type="number" min="1" id="ct-r-por" value="${escAttr(r.portions ?? 1)}"></div></div>
+      <label class="ct-l">Valores por porção</label>
+      <div class="ct-row4"><input type="number" min="0" id="ct-r-cal" placeholder="Kcal" value="${escAttr(r.calories ?? '')}"><input type="number" min="0" id="ct-r-prot" placeholder="Proteína g" value="${escAttr(r.protein ?? '')}"><input type="number" min="0" id="ct-r-carb" placeholder="Carbo g" value="${escAttr(r.carbs ?? '')}"><input type="number" min="0" id="ct-r-fat" placeholder="Gordura g" value="${escAttr(r.fat ?? '')}"></div>
+      <input type="number" min="0" step="0.1" id="ct-r-fib" placeholder="Fibra g" value="${escAttr(r.fiber ?? '')}">
+      <label class="ct-l">Ingredientes</label><div id="ct-ings">${ings.map(ctIngRow).join('')}</div>
+      <button type="button" class="ghost" id="ct-ing-add" style="margin:6px 0 4px;">+ Adicionar ingrediente</button>
+      <label class="ct-l">Modo de preparo</label><textarea id="ct-r-inst" rows="6">${esc(r.instructions||'')}</textarea>
+      <label class="ct-l">Notas / congelamento</label><textarea id="ct-r-notes" rows="3">${esc(r.notes||'')}</textarea>
+      <div id="ct-msg" class="err"></div>
+      <div class="ct-actions">${isEdit ? '<button type="button" class="danger" id="ct-del" style="flex:0 0 auto;width:auto;">Excluir</button>' : ''}<button type="button" class="ghost" id="ct-cancel">Cancelar</button><button type="button" id="ct-save">Salvar</button></div>`);
+    const box = o.querySelector('#ct-ings');
+    const wire = ()=> box.querySelectorAll('.x').forEach(b=> b.onclick = ()=>{ b.parentElement.remove(); if(!box.children.length) box.insertAdjacentHTML('beforeend', ctIngRow(null)), wire(); });
+    wire();
+    o.querySelector('#ct-ing-add').addEventListener('click', ()=>{ box.insertAdjacentHTML('beforeend', ctIngRow(null)); wire(); });
+    o.querySelector('#ct-cancel').addEventListener('click', ctClose);
+    o.querySelector('#ct-save').addEventListener('click', async function(){
+      const name = o.querySelector('#ct-r-name').value.trim();
+      if(!name){ o.querySelector('#ct-msg').textContent = 'Dê um nome à receita.'; return; }
+      const rows = [...box.querySelectorAll('.ct-ing')].map(n=>({ item:n.querySelector('.n').value.trim(), quantity: ctNum(n.querySelector('.q').value), unit:n.querySelector('.u').value })).filter(x=> x.item);
+      const payload = { name, category:o.querySelector('#ct-r-cat').value, kind:o.querySelector('#ct-r-kind').value, portions:ctNum(o.querySelector('#ct-r-por').value),
+        calories:ctNum(o.querySelector('#ct-r-cal').value), protein:ctNum(o.querySelector('#ct-r-prot').value), carbs:ctNum(o.querySelector('#ct-r-carb').value), fat:ctNum(o.querySelector('#ct-r-fat').value), fiber:ctNum(o.querySelector('#ct-r-fib').value),
+        ingredients_structured:rows, instructions:o.querySelector('#ct-r-inst').value, notes:o.querySelector('#ct-r-notes').value };
+      this.disabled = true;
+      if(!isEdit) payload.created_by = currentUser.id;
+      const res = isEdit ? await sb.from('recipes').update(payload).eq('id', r.id) : await sb.from('recipes').insert(payload);
+      if(res.error){ this.disabled = false; o.querySelector('#ct-msg').textContent = 'Não foi possível salvar: ' + res.error.message; return; }
+      ctClose(); ctLoadRecipes();
+    });
+    const del = o.querySelector('#ct-del');
+    if(del) del.addEventListener('click', ()=> ctConfirm(`Excluir a receita "${r.name}" para todos os usuários? Não dá para desfazer.`, 'Excluir', async ()=>{
+      const { error } = await sb.from('recipes').delete().eq('id', r.id);
+      if(error) return ctErr(error);
+      ctLoadRecipes();
+    }));
+  }
+
+  /* ----- Treinos da biblioteca (gerais, sem cliente) ----- */
+  async function ctLoadWorkouts(){
+    const el = document.getElementById('ct-workouts');
+    el.innerHTML = '<p class="hint">Carregando...</p>';
+    const { data, error } = await sb.from('workouts').select('*').is('assigned_to_user_id', null).order('created_at', { ascending:false });
+    if(error){ el.innerHTML = '<p class="err">Não foi possível carregar os treinos.</p>'; return; }
+    const list = data || [];
+    el.innerHTML = `<p class="hint" style="margin-bottom:10px;">Treinos gerais, que todos os usuários veem. Treinos de clientes continuam sendo feitos pelo profissional responsável.</p><div style="margin-bottom:12px;"><button type="button" id="ct-wk-new" style="width:auto;">Novo treino</button></div>` +
+      (list.length ? list.map(w=>`<div class="ct-item"><div class="l"><div class="t">${esc(w.name)}</div></div><div class="r"><button type="button" class="ghost" data-open="${escAttr(w.id)}">Abrir</button></div></div>`).join('') : '<p class="hint">Nenhum treino geral ainda.</p>');
+    el.querySelector('#ct-wk-new').addEventListener('click', ()=> ctWorkoutForm(null));
+    el.querySelectorAll('[data-open]').forEach(b=> b.addEventListener('click', ()=> ctWorkoutManager(list.find(x=> x.id === b.getAttribute('data-open')))));
+  }
+  function ctWorkoutForm(w){
+    const o = ctModal(`<h4>Novo treino geral</h4>
+      <label class="ct-l">Nome do treino</label><input type="text" id="ct-w-name" placeholder="ex.: Treino A — Superiores">
+      <label class="ct-l">Observações</label><textarea id="ct-w-notes" rows="3"></textarea>
+      <div id="ct-msg" class="err"></div>
+      <div class="ct-actions"><button type="button" class="ghost" id="ct-cancel">Cancelar</button><button type="button" id="ct-save">Salvar e adicionar exercícios</button></div>`);
+    o.querySelector('#ct-cancel').addEventListener('click', ctClose);
+    o.querySelector('#ct-save').addEventListener('click', async function(){
+      const name = o.querySelector('#ct-w-name').value.trim();
+      if(!name){ o.querySelector('#ct-msg').textContent = 'Dê um nome ao treino.'; return; }
+      this.disabled = true;
+      const { data, error } = await sb.from('workouts').insert({ name, notes:o.querySelector('#ct-w-notes').value, assigned_to_user_id:null, created_by:currentUser.id }).select().single();
+      if(error){ this.disabled = false; o.querySelector('#ct-msg').textContent = 'Não foi possível salvar: ' + error.message; return; }
+      ctClose(); ctLoadWorkouts(); ctWorkoutManager(data);
+    });
+  }
+  async function ctWorkoutManager(w){
+    const o = ctModal(`<h4>${esc(w.name)}</h4>
+      <div class="ct-row" style="grid-template-columns:1fr auto;"><input type="text" id="ct-w-name" value="${escAttr(w.name)}"><button type="button" class="ghost" id="ct-w-rename" style="width:auto;">Renomear</button></div>
+      <button type="button" id="ct-ex-new" style="margin:10px 0;">Adicionar exercício</button>
+      <div id="ct-ex-list"><p class="hint">Carregando...</p></div>
+      <div class="ct-actions" style="margin-top:14px;"><button type="button" class="danger" id="ct-del" style="flex:0 0 auto;width:auto;">Excluir treino</button><button type="button" class="ghost" id="ct-done">Concluir</button></div>`);
+    o.querySelector('#ct-done').addEventListener('click', ()=>{ ctClose(); ctLoadWorkouts(); });
+    o.querySelector('#ct-w-rename').addEventListener('click', async ()=>{
+      const name = o.querySelector('#ct-w-name').value.trim(); if(!name) return;
+      const { error } = await sb.from('workouts').update({ name }).eq('id', w.id);
+      if(error) return ctErr(error);
+      w.name = name; o.querySelector('h4').textContent = name;
+    });
+    o.querySelector('#ct-ex-new').addEventListener('click', ()=> ctExerciseForm(w, null));
+    o.querySelector('#ct-del').addEventListener('click', ()=> ctConfirm(`Excluir o treino "${w.name}" e todos os exercícios dele? Não dá para desfazer.`, 'Excluir', async ()=>{
+      const { error } = await sb.from('workouts').delete().eq('id', w.id);
+      if(error) return ctErr(error);
+      ctLoadWorkouts();
+    }));
+    const { data, error } = await sb.from('workout_exercises').select('*').eq('workout_id', w.id).order('position');
+    const box = o.querySelector('#ct-ex-list');
+    if(error){ box.innerHTML = '<p class="err">Não foi possível carregar os exercícios.</p>'; return; }
+    const exs = data || [];
+    box.innerHTML = exs.length ? exs.map((x,i)=>`<div class="ct-item"><div class="l"><div class="t">${i+1}. ${esc(x.name)}</div><div class="hint">${esc(x.sets ?? '')} x ${esc(x.reps || '')}${x.rest_seconds != null ? ' · ' + esc(x.rest_seconds) + 's' : ''}</div></div><div class="r"><button type="button" class="ghost" data-edit="${escAttr(x.id)}">Editar</button></div></div>`).join('') : '<p class="hint">Nenhum exercício ainda.</p>';
+    box.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=> ctExerciseForm(w, exs.find(x=> x.id === b.getAttribute('data-edit')), exs.length)));
+  }
+  function ctExerciseForm(w, ex, total){
+    const isEdit = !!ex; ex = ex || { name:'', sets:'', reps:'', rest_seconds:'', video_url:'', notes:'' };
+    const o = ctModal(`<h4>${isEdit ? 'Editar exercício' : 'Novo exercício'}</h4>
+      <label class="ct-l">Nome</label><input type="text" id="ct-e-name" value="${escAttr(ex.name||'')}">
+      <div class="ct-row"><div><label class="ct-l">Séries</label><input type="number" min="0" id="ct-e-sets" value="${escAttr(ex.sets ?? '')}"></div><div><label class="ct-l">Repetições</label><input type="text" id="ct-e-reps" placeholder="ex.: 10-12" value="${escAttr(ex.reps||'')}"></div><div><label class="ct-l">Descanso (s)</label><input type="number" min="0" id="ct-e-rest" value="${escAttr(ex.rest_seconds ?? '')}"></div></div>
+      <label class="ct-l">Link do vídeo de demonstração</label><input type="url" id="ct-e-video" placeholder="https://..." value="${escAttr(ex.video_url||'')}">
+      <label class="ct-l">Observações</label><textarea id="ct-e-notes" rows="3">${esc(ex.notes||'')}</textarea>
+      <div id="ct-msg" class="err"></div>
+      <div class="ct-actions">${isEdit ? '<button type="button" class="danger" id="ct-del" style="flex:0 0 auto;width:auto;">Excluir</button>' : ''}<button type="button" class="ghost" id="ct-cancel">Voltar</button><button type="button" id="ct-save">Salvar</button></div>`);
+    o.querySelector('#ct-cancel').addEventListener('click', ()=> ctWorkoutManager(w));
+    o.querySelector('#ct-save').addEventListener('click', async function(){
+      const name = o.querySelector('#ct-e-name').value.trim();
+      if(!name){ o.querySelector('#ct-msg').textContent = 'Dê um nome ao exercício.'; return; }
+      const payload = { name, sets:ctNum(o.querySelector('#ct-e-sets').value), reps:o.querySelector('#ct-e-reps').value.trim(), rest_seconds:ctNum(o.querySelector('#ct-e-rest').value), video_url:o.querySelector('#ct-e-video').value.trim() || null, notes:o.querySelector('#ct-e-notes').value };
+      this.disabled = true;
+      let res;
+      if(isEdit) res = await sb.from('workout_exercises').update(payload).eq('id', ex.id);
+      else {
+        const { count } = await sb.from('workout_exercises').select('id', { count:'exact', head:true }).eq('workout_id', w.id);
+        res = await sb.from('workout_exercises').insert({ ...payload, workout_id:w.id, position:(count || 0) + 1 });
+      }
+      if(res.error){ this.disabled = false; o.querySelector('#ct-msg').textContent = 'Não foi possível salvar: ' + res.error.message; return; }
+      ctWorkoutManager(w);
+    });
+    const del = o.querySelector('#ct-del');
+    if(del) del.addEventListener('click', ()=> ctConfirm(`Excluir o exercício "${ex.name}"?`, 'Excluir', async ()=>{
+      const { error } = await sb.from('workout_exercises').delete().eq('id', ex.id);
+      if(error) return ctErr(error);
+      ctWorkoutManager(w);
+    }));
+  }
+
 </script>
 
 <script>
