@@ -134,7 +134,7 @@ button.us-sm{width:auto;padding:5px 10px;font-size:12px;}
 table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
 .us-t th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;}
 .us-t th.on{color:var(--green-deep);}
-.us-t td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;}
+.us-t td{white-space:nowrap;padding:10px;border-bottom:1px solid var(--border);vertical-align:top;}
 .us-t tbody tr{cursor:pointer;} .us-t tbody tr:hover{background:var(--surface);}
 .us-nm{font-weight:600;}
 .us-pos{color:var(--green-deep);font-weight:600;} .us-neg{color:var(--rust);font-weight:600;}
@@ -1570,7 +1570,8 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
   function usBRL(v){
     v = usNum(v);
     if(v === 0) return 'R$ 0,00';
-    if(Math.abs(v) < 0.01) return (v < 0 ? '-' : '') + 'menos de R$ 0,01';
+    if(Math.abs(v) < 0.0001) return (v < 0 ? '-' : '') + 'menos de R$ 0,0001';
+    if(Math.abs(v) < 0.01) return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL', minimumFractionDigits:4, maximumFractionDigits:4 });
     return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
   }
   function usBytes(b){
@@ -1754,7 +1755,7 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
         <p class="hint" style="margin-bottom:12px;">${trackedDays ? `O registro de uso começou há ${usFmtInt(trackedDays)} ${trackedDays === 1 ? 'dia' : 'dias'}, então aberturas e chamadas de funções ainda são parciais.` : 'O registro de aberturas e chamadas começa quando a nova versão do app for aberta pelas pessoas.'}</p>
         <div class="grid">${groupHtml}</div>
         <p style="margin-top:12px;font-size:14px;line-height:1.5;">${esc(breakeven)}</p>
-        ${pag.length ? `<p class="hint" style="margin-top:6px;">Cada pagante deixa em média ${esc(usBRL(marginPag))} por mês depois do próprio custo${costFree > 0 && marginPag > 0 ? `; isso paga o custo de cerca de ${usFmtInt(marginPag / costFree)} gratuitos` : ''}.</p>` : ''}
+        ${pag.length ? `<p class="hint" style="margin-top:6px;">Cada pagante deixa em média ${esc(usBRL(marginPag))} por mês depois do próprio custo${costFree > 0 && marginPag > 0 ? (marginPag / costFree > 1000 ? '; isso é muito mais do que o custo de todos os gratuitos juntos' : `; isso paga o custo de cerca de ${usFmtInt(marginPag / costFree)} gratuitos`) : ''}.</p>` : ''}
         <p class="hint" style="margin-top:10px;">Hoje o Saber está no plano ${esc(usPlanLabel())}${usPlan() === 'free' ? ', então você não paga nada em dinheiro pelo uso. Os valores em reais mostram o custo equivalente, se cada recurso fosse cobrado pelo preço do plano Pro. Servem para comparar pessoas e decidir se compensa.' : '.'} A receita é o valor mensal líquido (já sem a taxa do Mercado Pago).</p>
       </div>
 
