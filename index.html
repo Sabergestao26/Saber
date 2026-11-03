@@ -442,6 +442,77 @@
   .fr-card-meta b{ color: var(--ink); font-weight:600; }
   .fr-card-notes{ font-size:12.5px; color: var(--ink-soft); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
+  /* ---------- Estudos ---------- */
+  .fr-st{ max-width:860px; margin:0 auto; }
+  .fr-st-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .fr-st-head h2{ font-family:'Fraunces',serif; font-size:24px; margin:0; color:var(--ink); flex:1; min-width:180px; line-height:1.2; }
+  .fr-st-crumb{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); background:none; border:none; padding:0; cursor:pointer; }
+  .fr-st-crumb:hover{ color:var(--ink); }
+  .fr-st-lead{ color:var(--ink-soft); font-size:14px; line-height:1.5; margin:0 0 18px; }
+  .fr-st-list{ display:flex; flex-direction:column; gap:10px; }
+  .fr-st-item{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; cursor:pointer; text-align:left; width:100%; font:inherit; color:inherit; }
+  .fr-st-item:hover{ border-color:var(--green-deep); }
+  .fr-st-item b{ font-family:'Fraunces',serif; font-size:17px; display:block; margin-bottom:2px; }
+  .fr-st-item small{ color:var(--ink-soft); font-size:12.5px; }
+  .fr-st-bar{ height:5px; background:var(--border); border-radius:4px; margin-top:8px; overflow:hidden; }
+  .fr-st-bar i{ display:block; height:100%; background:var(--green-deep); }
+  .fr-st-subtabs{ display:flex; gap:6px; flex-wrap:wrap; margin:0 0 16px; }
+  .fr-st-ideia{ border-left:4px solid var(--green-deep); background:var(--note-bg); padding:11px 14px; border-radius:0 var(--radius) var(--radius) 0; margin:0 0 14px; font-size:14.5px; line-height:1.5; }
+  .fr-st-ideia b{ display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--green-deep); margin-bottom:2px; }
+  .fr-st-resume{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--note-bg); border:1px solid var(--mustard); border-radius:var(--radius); padding:10px 14px; margin-bottom:14px; font-size:14px; }
+  .fr-st-resume span{ flex:1; min-width:180px; }
+  .fr-st-search{ display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .fr-st-search input{ flex:1; }
+  .fr-st-found{ font-size:12.5px; color:var(--ink-soft); margin:0 0 10px; }
+  .fr-st-mod{ font-family:'Fraunces',serif; font-size:20px; margin:26px 0 4px; padding-bottom:6px; border-bottom:2px solid var(--ink); }
+  .fr-st-mod small{ display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); font-weight:500; }
+  .fr-st-sec{ padding:16px 0 18px; border-bottom:1px solid var(--border); position:relative; }
+  .fr-st-sec.parou{ background:linear-gradient(90deg,var(--note-bg),transparent 75%); margin:0 -12px; padding-left:12px; padding-right:12px; border-radius:var(--radius); }
+  .fr-st-sec.parou::before{ content:"VOCÊ PAROU AQUI"; position:absolute; top:-9px; left:12px; background:var(--mustard); color:#fff; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.08em; padding:2px 8px; border-radius:4px; }
+  .fr-st-sec-head{ display:flex; gap:10px; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:8px; }
+  .fr-st-sec-head h3{ font-family:'Fraunces',serif; font-size:17px; margin:0; flex:1; min-width:180px; }
+  .fr-st-chips{ display:flex; gap:6px; }
+  .fr-st-chip{ border:1px solid var(--border); background:var(--card); color:var(--ink-soft); border-radius:999px; padding:3px 10px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; }
+  .fr-st-chip:hover{ color:var(--ink); border-color:var(--ink); }
+  .fr-st-chip.lida{ background:var(--ok-bg); color:var(--green-deep); border-color:var(--green-deep); }
+  .fr-st-chip.parei{ background:var(--mustard); color:#fff; border-color:var(--mustard); }
+  .fr-st-body{ font-size:15px; line-height:1.6; }
+  .fr-st-body p{ margin:0 0 10px; }
+  .fr-st-body ul,.fr-st-body ol{ margin:0 0 10px; padding-left:22px; }
+  .fr-st-body li{ margin-bottom:4px; }
+  .fr-st-body h4{ font-size:15px; margin:12px 0 4px; }
+  .fr-st-body table{ display:block; overflow-x:auto; border-collapse:collapse; margin:6px 0 12px; font-size:13.5px; max-width:100%; }
+  .fr-st-body th{ background:var(--paper-deep); text-align:left; padding:7px 9px; border:1px solid var(--border); }
+  .fr-st-body td{ padding:7px 9px; border:1px solid var(--border); vertical-align:top; background:var(--card); }
+  .fr-st-box-alerta,.fr-st-box-dica,.fr-st-box-exemplo{ border-radius:8px; padding:9px 12px; margin:8px 0 12px; font-size:14px; }
+  .fr-st-box-alerta{ background:var(--note-bg); border:1px solid var(--mustard); }
+  .fr-st-box-dica{ background:var(--ok-bg); }
+  .fr-st-box-exemplo{ background:var(--paper-deep); border:1px dashed var(--border); }
+  .fr-st-fluxo{ font-family:'IBM Plex Mono',monospace; font-size:13px; background:var(--paper-deep); border-radius:6px; padding:8px 10px; margin:6px 0 10px; overflow-x:auto; }
+  .fr-st-formula{ font-family:'IBM Plex Mono',monospace; font-size:13px; background:var(--paper-deep); border-radius:6px; padding:2px 8px; }
+  .fr-st-score{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 12px; }
+  .fr-st-score span{ font-family:'IBM Plex Mono',monospace; font-size:12px; background:var(--card); border:1px solid var(--border); border-radius:6px; padding:4px 10px; }
+  .fr-st-q{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:14px; }
+  .fr-st-q .orig{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); }
+  .fr-st-q .enun{ margin:6px 0 10px; font-size:15px; line-height:1.5; }
+  .fr-st-alt{ display:flex; gap:10px; width:100%; text-align:left; border:1px solid var(--border); background:var(--paper); border-radius:8px; padding:8px 11px; margin-bottom:6px; font:inherit; font-size:14.5px; color:inherit; cursor:pointer; align-items:flex-start; }
+  .fr-st-alt:hover:not(:disabled){ border-color:var(--green-deep); }
+  .fr-st-alt:disabled{ cursor:default; }
+  .fr-st-alt .l{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; min-width:18px; padding-top:2px; }
+  .fr-st-alt.certa{ background:var(--ok-bg); border-color:var(--green-deep); }
+  .fr-st-alt.errada{ background:var(--err-bg); border-color:var(--rust); }
+  .fr-st-fb{ border-radius:8px; padding:9px 12px; font-size:14px; margin-top:6px; line-height:1.5; }
+  .fr-st-fb.ok{ background:var(--ok-bg); } .fr-st-fb.no{ background:var(--err-bg); }
+  .fr-st-fb b{ display:block; }
+  .fr-st-duv{ margin-bottom:14px; }
+  .fr-st-duv .p{ background:var(--note-bg); border-radius:10px 10px 10px 2px; padding:8px 12px; font-weight:600; font-size:14px; }
+  .fr-st-duv .r{ padding:8px 4px 0; font-size:14.5px; line-height:1.55; white-space:pre-wrap; }
+  .fr-st-note{ width:100%; min-height:320px; border:1px solid var(--border); border-radius:8px; padding:12px; background:var(--note-bg); line-height:1.7; font:inherit; font-size:15px; color:var(--ink); resize:vertical; }
+  .fr-st-status{ font-size:12px; color:var(--ink-soft); margin-top:6px; }
+  .fr-st-ask{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+  .fr-st-ask textarea{ min-height:70px; }
+  .fr-st-busy{ display:flex; align-items:center; gap:10px; color:var(--ink-soft); font-size:14px; padding:14px 0; }
+
   .fr-gated{ display:none !important; }
   .fr-locked > *:not(.fr-lock-box){ display:none !important; }
   .fr-lock-box{ max-width:520px; margin:40px auto; padding:22px 20px; text-align:center; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
@@ -903,6 +974,8 @@
     <div class="fr-tabs" id="fr-leitura-tabs"></div>
     <div id="fr-leitura-content"></div>
   </div>
+
+  <div id="fr-view-estudos" style="display:none"><div id="fr-estudos-content"></div></div>
 
   <div id="fr-view-settings" style="display:none">
     <div id="fr-settings-content"></div>
@@ -2649,7 +2722,7 @@
       hasBooted = false;
       currentUser = null;
       currentProfile = null;
-      isAdmin = false;
+      isAdmin = false; stLoaded = false; stTopic = null; stState = { mode:'home', subjectId:null, topicId:null, tab:'resumo', query:'' };
       hasSubActive = false;
       authScreen.style.display = '';
       root.style.display = 'none';
@@ -2873,7 +2946,7 @@
 
   /* ---------- View switching ---------- */
   function renderViewTabs(){
-    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['articles','Artigos'], ['leitura','Leitura'], ['ia','Dúvidas rápidas'], ['settings','Configurações']];
+    const tabs = [['diary','Diário do Dia'], ['recipes','Receitas'], ['shopping','Lista de Compras'], ['workouts','Treinos'], ['articles','Artigos'], ['leitura','Leitura'], ['ia','Dúvidas rápidas']].concat(isAdmin ? [['estudos','Estudos']] : [], [['settings','Configurações']]);
     document.getElementById('fr-view-tabs').innerHTML = tabs.map(t=>
       `<button class="fr-view-tab ${currentView===t[0]?'active':''}" data-view="${t[0]}">${t[1]}</button>`
     ).join('');
@@ -2919,6 +2992,7 @@
     document.getElementById('fr-view-articles').style.display = view==='articles' ? '' : 'none';
     document.getElementById('fr-view-leitura').style.display = view==='leitura' ? '' : 'none';
     document.getElementById('fr-view-ia').style.display = view==='ia' ? '' : 'none';
+    document.getElementById('fr-view-estudos').style.display = view==='estudos' ? '' : 'none';
     document.getElementById('fr-view-settings').style.display = view==='settings' ? '' : 'none';
     renderViewTabs();
     renderPrimaryAction();
@@ -2932,7 +3006,432 @@
     if(view==='articles' && !lockedArticles) renderArticlesView();
     if(view==='leitura') renderLeituraView();
     if(view==='ia') renderIAView();
+    if(view==='estudos') renderEstudosView();
     if(view==='settings') renderSettingsView();
+  }
+
+  /* ---------- Estudos (liberado só para administradores por enquanto) ---------- */
+  // O resumo, as questões e as respostas às dúvidas vêm da Edge Function study-ai.
+  // Para abrir a todos os assinantes: trocar isAdmin por hasFullAccess() aqui e as
+  // políticas do banco (sql-estudos.sql) de is_admin_user() para has_full_access().
+  let stSubjects = [], stTopics = [], stLoaded = false;
+  let stState = { mode:'home', subjectId:null, topicId:null, tab:'resumo', query:'' };
+  let stTopic = null, stQuestions = [], stDoubts = [];
+  let stBusy = false, stNoteTimer = null;
+
+  const ST_TAGS = { P:1, UL:1, OL:1, LI:1, B:1, STRONG:1, I:1, EM:1, TABLE:1, THEAD:1, TBODY:1, TR:1, TH:1, TD:1, H4:1, BR:1, DIV:1, SPAN:1 };
+  const ST_CLASSES = { 'box alerta':'fr-st-box-alerta', 'box dica':'fr-st-box-dica', 'box exemplo':'fr-st-box-exemplo', 'fluxo':'fr-st-fluxo', 'formula':'fr-st-formula' };
+  // O HTML do resumo vem da IA: só passam as tags e classes da lista acima.
+  function stSanitize(html){
+    const doc = new DOMParser().parseFromString('<div>' + String(html || '') + '</div>', 'text/html');
+    const root = doc.body.firstChild;
+    (function walk(node){
+      Array.from(node.childNodes).forEach(ch=>{
+        if(ch.nodeType === 3) return;
+        if(ch.nodeType !== 1){ ch.remove(); return; }
+        if(!ST_TAGS[ch.tagName]){ ch.replaceWith(doc.createTextNode(ch.textContent)); return; }
+        const cls = (ch.getAttribute('class') || '').trim();
+        Array.from(ch.attributes).forEach(a=> ch.removeAttribute(a.name));
+        if((ch.tagName === 'DIV' || ch.tagName === 'SPAN') && ST_CLASSES[cls]) ch.className = ST_CLASSES[cls];
+        walk(ch);
+      });
+    })(root);
+    return root.innerHTML;
+  }
+  function stPlain(html){ const d = document.createElement('div'); d.innerHTML = stSanitize(html); return d.textContent || ''; }
+  function stSections(topic){
+    const out = [];
+    ((topic && topic.summary && topic.summary.modulos) || []).forEach((m, mi)=>{
+      (m.secoes || []).forEach((s, si)=> out.push({ id:`m${mi+1}-s${si+1}`, mi, si, mod:m, sec:s }));
+    });
+    return out;
+  }
+  function stSummaryText(topic){
+    const s = topic.summary || {};
+    return [s.ideia || ''].concat((s.modulos || []).map(m=> '## ' + m.titulo + '\n' + (m.secoes || []).map(x=> '### ' + x.t + '\n' + stPlain(x.h)).join('\n'))).join('\n\n');
+  }
+  function stProgressOf(topic){
+    const total = stSections(topic).length;
+    const lidas = (topic.progress && topic.progress.lidas) || [];
+    return { total, done: Math.min(total, lidas.length), pct: total ? Math.round(100 * Math.min(total, lidas.length) / total) : 0 };
+  }
+
+  async function stCallAI(payload){
+    const { data: sd } = await sb.auth.getSession();
+    const token = sd && sd.session && sd.session.access_token;
+    if(!token) throw new Error('unauthorized');
+    let res, body;
+    try{
+      res = await fetch(`${SUPABASE_URL}/functions/v1/study-ai`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token },
+        body: JSON.stringify(payload)
+      });
+      body = await res.json().catch(()=> ({}));
+    }catch(e){ throw new Error('network'); }
+    if(!res.ok || !body.ok) throw new Error(body.error || 'unexpected');
+    return body.data;
+  }
+  function stErrText(e){
+    const m = (e && e.message) || '';
+    return ({
+      not_configured:'A chave da IA ainda não foi configurada no servidor.',
+      forbidden:'Esta área não está liberada para o seu perfil.',
+      unauthorized:'Entre de novo no app e tente outra vez.',
+      text_too_short:'Escreva um pouco mais para a IA ter o que trabalhar.',
+      text_too_long:'O texto passou do limite de 60.000 caracteres. Divida em partes.',
+      network:'Sem conexão com o servidor. Tente de novo.',
+      bad_json:'A IA devolveu algo fora do formato. Tente de novo.',
+      ai_failed:'A IA não respondeu agora. Tente de novo em instantes.'
+    })[m] || 'Não foi possível concluir agora. Tente de novo.';
+  }
+
+  async function stLoad(force){
+    if(stLoaded && !force) return;
+    const [s, t] = await Promise.all([
+      sb.from('study_subjects').select('*').order('created_at'),
+      sb.from('study_topics').select('id,subject_id,title,summary,progress,created_at').order('created_at')
+    ]);
+    if(s.error || t.error) throw new Error('load_failed');
+    stSubjects = s.data || []; stTopics = t.data || []; stLoaded = true;
+  }
+
+  async function renderEstudosView(){
+    const el = document.getElementById('fr-estudos-content');
+    if(!el) return;
+    if(!isAdmin){
+      el.innerHTML = `<div class="fr-empty"><h3>Estudos</h3><p>Esta área ainda não está disponível para o seu perfil.</p></div>`;
+      return;
+    }
+    if(!stLoaded){
+      el.innerHTML = `<div class="fr-loading">Carregando estudos...</div>`;
+      try{ await stLoad(); }
+      catch(e){ el.innerHTML = `<div class="fr-empty"><h3>Não deu para abrir os estudos</h3><p>Confira se o SQL de estudos (sql-estudos.sql) foi rodado no Supabase.</p></div>`; return; }
+    }
+    if(stState.mode === 'topic' && stTopic) return stRenderTopic();
+    if(stState.mode === 'subject') return stRenderSubject();
+    stState.mode = 'home';
+    stRenderHome();
+  }
+
+  function stConfirm(text, okLabel, onOk){
+    const o = buildOverlay(`
+      <h3 class="fr-form-title">Confirmar</h3>
+      <p style="font-size:14.5px;line-height:1.5;margin:0 0 18px;">${esc(text)}</p>
+      <div class="fr-form-actions"><button type="button" class="fr-btn-ghost" id="st-c-no">Cancelar</button><button type="button" class="fr-btn-danger" id="st-c-ok">${esc(okLabel)}</button></div>`);
+    o.querySelector('#st-c-no').addEventListener('click', closeOverlay);
+    o.querySelector('#st-c-ok').addEventListener('click', async ()=>{ closeOverlay(); await onOk(); });
+  }
+
+  /* ----- Início: lista de matérias ----- */
+  function stRenderHome(){
+    const el = document.getElementById('fr-estudos-content');
+    el.innerHTML = `
+      <div class="fr-st">
+        <div class="fr-st-head"><h2>Estudos</h2><button type="button" class="fr-btn-primary" id="st-new-subject">Nova matéria</button></div>
+        <p class="fr-st-lead">Cole o conteúdo que você está estudando e receba um resumo detalhado, com busca, anotações, questões para responder e um espaço para tirar dúvidas. Por enquanto, só o seu perfil vê esta área.</p>
+        ${stSubjects.length ? `<div class="fr-st-list">${stSubjects.map(s=>{
+          const ts = stTopics.filter(t=> t.subject_id === s.id);
+          return `<button type="button" class="fr-st-item" data-id="${escAttr(s.id)}"><b>${esc(s.name)}</b><small>${ts.length} ${ts.length===1?'tema':'temas'}</small></button>`;
+        }).join('')}</div>` : `<div class="fr-empty" style="margin:30px auto;"><h3>Nenhuma matéria ainda</h3><p>Crie a primeira, por exemplo "Gestão de TI", e adicione os temas que você está estudando.</p></div>`}
+      </div>`;
+    el.querySelector('#st-new-subject').addEventListener('click', ()=>{
+      const o = buildOverlay(`
+        <h3 class="fr-form-title">Nova matéria</h3>
+        <div class="fr-field"><label for="st-s-name">Nome da matéria</label><input type="text" id="st-s-name" maxlength="80" placeholder="Ex.: Gestão de TI"></div>
+        <div class="fr-form-actions"><button type="button" class="fr-btn-ghost" id="st-s-no">Cancelar</button><button type="button" class="fr-btn-primary" id="st-s-ok">Criar</button></div>`);
+      o.querySelector('#st-s-no').addEventListener('click', closeOverlay);
+      o.querySelector('#st-s-ok').addEventListener('click', async function(){
+        const name = o.querySelector('#st-s-name').value.trim();
+        if(!name){ showToast('Dê um nome para a matéria.', 'err'); return; }
+        this.disabled = true;
+        const { data, error } = await sb.from('study_subjects').insert({ name }).select().single();
+        if(error){ this.disabled = false; showToast('Não foi possível criar agora.', 'err'); return; }
+        stSubjects.push(data); closeOverlay();
+        stState = { mode:'subject', subjectId:data.id, topicId:null, tab:'resumo', query:'' };
+        stRenderSubject();
+      });
+    });
+    el.querySelectorAll('.fr-st-item').forEach(b=> b.addEventListener('click', ()=>{
+      stState = { mode:'subject', subjectId:b.getAttribute('data-id'), topicId:null, tab:'resumo', query:'' };
+      stRenderSubject();
+    }));
+  }
+
+  /* ----- Matéria: lista de temas ----- */
+  function stRenderSubject(){
+    const el = document.getElementById('fr-estudos-content');
+    const subj = stSubjects.find(s=> s.id === stState.subjectId);
+    if(!subj){ stState.mode = 'home'; stRenderHome(); return; }
+    const ts = stTopics.filter(t=> t.subject_id === subj.id);
+    el.innerHTML = `
+      <div class="fr-st">
+        <button type="button" class="fr-st-crumb" id="st-back">&larr; Matérias</button>
+        <div class="fr-st-head" style="margin-top:8px;"><h2>${esc(subj.name)}</h2><button type="button" class="fr-btn-primary" id="st-new-topic">Novo tema</button></div>
+        ${ts.length ? `<div class="fr-st-list">${ts.map(t=>{
+          const p = stProgressOf(t);
+          return `<button type="button" class="fr-st-item" data-id="${escAttr(t.id)}"><b>${esc(t.title)}</b><small>${p.total} ${p.total===1?'seção':'seções'} · ${p.done} ${p.done===1?'lida':'lidas'}</small><div class="fr-st-bar"><i style="width:${p.pct}%"></i></div></button>`;
+        }).join('')}</div>` : `<div class="fr-empty" style="margin:30px auto;"><h3>Nenhum tema ainda</h3><p>Adicione o primeiro tema colando o texto da aula, do livro ou da apostila.</p></div>`}
+        <div style="margin-top:22px;"><button type="button" class="fr-btn-danger" id="st-del-subject">Excluir matéria</button></div>
+      </div>`;
+    el.querySelector('#st-back').addEventListener('click', ()=>{ stState.mode = 'home'; stRenderHome(); });
+    el.querySelector('#st-new-topic').addEventListener('click', ()=> stOpenNewTopic(subj));
+    el.querySelector('#st-del-subject').addEventListener('click', ()=>{
+      stConfirm(`Excluir a matéria "${subj.name}" e todos os temas, questões, anotações e dúvidas dela? Não dá para desfazer.`, 'Excluir', async ()=>{
+        const { error } = await sb.from('study_subjects').delete().eq('id', subj.id);
+        if(error){ showToast('Não foi possível excluir agora.', 'err'); return; }
+        stSubjects = stSubjects.filter(s=> s.id !== subj.id);
+        stTopics = stTopics.filter(t=> t.subject_id !== subj.id);
+        stState.mode = 'home'; stRenderHome();
+      });
+    });
+    el.querySelectorAll('.fr-st-item').forEach(b=> b.addEventListener('click', ()=> stOpenTopic(b.getAttribute('data-id'))));
+  }
+
+  function stOpenNewTopic(subj){
+    const MAXC = 60000;
+    const o = buildOverlay(`
+      <h3 class="fr-form-title">Novo tema</h3>
+      <div class="fr-field"><label for="st-t-title">Título do tema</label><input type="text" id="st-t-title" maxlength="150" placeholder="Ex.: Gestão de dados e projetos de TI"></div>
+      <div class="fr-field"><label for="st-t-text">Conteúdo para resumir</label><textarea id="st-t-text" rows="10" maxlength="${MAXC}" placeholder="Cole aqui o texto da aula, do livro ou da apostila"></textarea><div class="fr-hint" id="st-t-count">0 de ${MAXC.toLocaleString('pt-BR')} caracteres</div></div>
+      <div class="fr-hint">O texto é enviado à IA só para montar o resumo. Confira o resultado com o material da aula antes da prova.</div>
+      <div id="st-t-msg" class="fr-hint" style="color:var(--rust);margin-top:10px;" hidden></div>
+      <div class="fr-form-actions"><button type="button" class="fr-btn-ghost" id="st-t-no">Cancelar</button><button type="button" class="fr-btn-primary" id="st-t-go">Gerar resumo</button></div>`);
+    const ta = o.querySelector('#st-t-text'), cnt = o.querySelector('#st-t-count'), msg = o.querySelector('#st-t-msg');
+    ta.addEventListener('input', ()=>{ cnt.textContent = `${ta.value.length.toLocaleString('pt-BR')} de ${MAXC.toLocaleString('pt-BR')} caracteres`; });
+    o.querySelector('#st-t-no').addEventListener('click', closeOverlay);
+    o.querySelector('#st-t-go').addEventListener('click', async function(){
+      const title = o.querySelector('#st-t-title').value.trim();
+      const text = ta.value.trim();
+      msg.hidden = true;
+      if(text.length < 200){ msg.textContent = 'Cole um texto maior (pelo menos 200 caracteres).'; msg.hidden = false; return; }
+      this.disabled = true; this.textContent = 'Gerando resumo... pode levar até 1 minuto';
+      try{
+        const data = await stCallAI({ action:'summarize', text, title });
+        const summary = { ideia: String(data.ideia || ''), modulos: (data.modulos || []).map(m=>({ titulo:String(m.titulo || ''), secoes:(m.secoes || []).map(s=>({ t:String(s.t || ''), h:stSanitize(s.h || '') })) })) };
+        const { data: row, error } = await sb.from('study_topics').insert({ subject_id:subj.id, title: title || String(data.titulo || 'Tema sem título'), source_text:text, summary }).select().single();
+        if(error) throw new Error('save_failed');
+        stTopics.push({ id:row.id, subject_id:row.subject_id, title:row.title, summary:row.summary, progress:row.progress, created_at:row.created_at });
+        closeOverlay();
+        await stOpenTopic(row.id);
+      }catch(e){
+        this.disabled = false; this.textContent = 'Gerar resumo';
+        msg.textContent = e.message === 'save_failed' ? 'O resumo foi gerado, mas não deu para salvar. Tente de novo.' : stErrText(e);
+        msg.hidden = false;
+      }
+    });
+  }
+
+  /* ----- Tema ----- */
+  async function stOpenTopic(id){
+    const el = document.getElementById('fr-estudos-content');
+    el.innerHTML = `<div class="fr-loading">Abrindo tema...</div>`;
+    const [t, q, d] = await Promise.all([
+      sb.from('study_topics').select('*').eq('id', id).single(),
+      sb.from('study_questions').select('*').eq('topic_id', id).order('created_at'),
+      sb.from('study_doubts').select('*').eq('topic_id', id).order('created_at')
+    ]);
+    if(t.error || !t.data){ showToast('Não foi possível abrir o tema.', 'err'); stRenderSubject(); return; }
+    stTopic = t.data; stQuestions = q.data || []; stDoubts = d.data || [];
+    stState = { mode:'topic', subjectId:t.data.subject_id, topicId:id, tab:'resumo', query:'' };
+    stRenderTopic();
+  }
+
+  function stRenderTopic(){
+    const el = document.getElementById('fr-estudos-content');
+    const subj = stSubjects.find(s=> s.id === stState.subjectId);
+    const tabs = [['resumo','Resumo'], ['questoes','Questões'], ['duvidas','Dúvidas'], ['rascunho','Rascunho']];
+    el.innerHTML = `
+      <div class="fr-st">
+        <button type="button" class="fr-st-crumb" id="st-back">&larr; ${esc(subj ? subj.name : 'Matéria')}</button>
+        <div class="fr-st-head" style="margin-top:8px;"><h2>${esc(stTopic.title)}</h2></div>
+        <div class="fr-st-subtabs">${tabs.map(x=>`<button type="button" class="fr-tab ${stState.tab===x[0]?'active':''}" data-tab="${x[0]}">${x[1]}</button>`).join('')}</div>
+        <div id="st-body"></div>
+        <div style="margin-top:26px;"><button type="button" class="fr-btn-danger" id="st-del-topic">Excluir tema</button></div>
+      </div>`;
+    el.querySelector('#st-back').addEventListener('click', ()=>{ stState.mode = 'subject'; stTopic = null; stRenderSubject(); });
+    el.querySelectorAll('.fr-st-subtabs .fr-tab').forEach(b=> b.addEventListener('click', ()=>{ stState.tab = b.getAttribute('data-tab'); stRenderTopic(); }));
+    el.querySelector('#st-del-topic').addEventListener('click', ()=>{
+      stConfirm(`Excluir o tema "${stTopic.title}" com resumo, questões, anotações e dúvidas? Não dá para desfazer.`, 'Excluir', async ()=>{
+        const { error } = await sb.from('study_topics').delete().eq('id', stTopic.id);
+        if(error){ showToast('Não foi possível excluir agora.', 'err'); return; }
+        stTopics = stTopics.filter(t=> t.id !== stTopic.id);
+        stTopic = null; stState.mode = 'subject'; stRenderSubject();
+      });
+    });
+    const body = el.querySelector('#st-body');
+    if(stState.tab === 'questoes') stRenderQuestions(body);
+    else if(stState.tab === 'duvidas') stRenderDoubts(body);
+    else if(stState.tab === 'rascunho') stRenderNotes(body);
+    else stRenderResumo(body);
+  }
+
+  async function stSaveProgress(){
+    stTopic.progress = stTopic.progress || {};
+    const { error } = await sb.from('study_topics').update({ progress: stTopic.progress, updated_at: new Date().toISOString() }).eq('id', stTopic.id);
+    if(error) showToast('Não foi possível salvar o progresso.', 'err');
+    const row = stTopics.find(t=> t.id === stTopic.id); if(row) row.progress = stTopic.progress;
+  }
+
+  function stRenderResumo(body){
+    const secs = stSections(stTopic);
+    const prog = stTopic.progress || {};
+    const parou = prog.parou && secs.find(s=> s.id === prog.parou);
+    const p = stProgressOf(stTopic);
+    body.innerHTML = `
+      ${stTopic.summary && stTopic.summary.ideia ? `<div class="fr-st-ideia"><b>Ideia central</b>${esc(stTopic.summary.ideia)}</div>` : ''}
+      <p class="fr-hint" style="margin:0 0 12px;">${p.done} de ${p.total} seções lidas</p>
+      <div class="fr-st-bar" style="margin:-6px 0 14px;"><i style="width:${p.pct}%"></i></div>
+      ${parou ? `<div class="fr-st-resume"><span>Você parou em <b>${esc(parou.sec.t)}</b>.</span><button type="button" class="fr-btn-primary" id="st-go-parou">Continuar de onde parei</button></div>` : ''}
+      <div class="fr-st-search"><div class="fr-field" style="flex:1;margin:0;"><input type="text" id="st-search" placeholder="Pesquisar neste tema" value="${escAttr(stState.query)}" aria-label="Pesquisar neste tema"></div></div>
+      <p class="fr-st-found" id="st-found"></p>
+      <div id="st-list"></div>`;
+    const input = body.querySelector('#st-search');
+    input.addEventListener('input', ()=>{ stState.query = input.value; stRenderList(); });
+    const go = body.querySelector('#st-go-parou');
+    if(go) go.addEventListener('click', ()=>{ const t = document.getElementById('st-sec-' + prog.parou); if(t) t.scrollIntoView({ behavior:'smooth', block:'start' }); });
+    stRenderList();
+  }
+
+  function stRenderList(){
+    const list = document.getElementById('st-list'), found = document.getElementById('st-found');
+    if(!list) return;
+    const secs = stSections(stTopic);
+    const prog = stTopic.progress || {};
+    const lidas = prog.lidas || [];
+    const q = normalize(stState.query.trim());
+    const shown = q ? secs.filter(s=> normalize(s.sec.t + ' ' + stPlain(s.sec.h)).includes(q)) : secs;
+    found.textContent = q ? `${shown.length} ${shown.length===1?'seção encontrada':'seções encontradas'}` : '';
+    if(!secs.length){ list.innerHTML = `<div class="fr-empty" style="margin:20px auto;"><p>Este tema ainda não tem resumo.</p></div>`; return; }
+    if(!shown.length){ list.innerHTML = `<div class="fr-empty" style="margin:20px auto;"><p>Nada encontrado para essa busca.</p></div>`; return; }
+    let html = '', lastMod = -1;
+    shown.forEach(s=>{
+      if(s.mi !== lastMod){ lastMod = s.mi; html += `<h2 class="fr-st-mod"><small>Módulo ${s.mi + 1}</small>${esc(s.mod.titulo)}</h2>`; }
+      const lida = lidas.includes(s.id), isParou = prog.parou === s.id;
+      html += `<section class="fr-st-sec${isParou?' parou':''}" id="st-sec-${s.id}">
+        <div class="fr-st-sec-head"><h3>${esc(s.sec.t)}</h3>
+          <div class="fr-st-chips"><button type="button" class="fr-st-chip${lida?' lida':''}" data-act="lida" data-id="${s.id}">${lida?'Lida ✓':'Marcar como lida'}</button><button type="button" class="fr-st-chip${isParou?' parei':''}" data-act="parou" data-id="${s.id}">${isParou?'Parei aqui ✓':'Parei aqui'}</button></div></div>
+        <div class="fr-st-body">${stSanitize(s.sec.h)}</div></section>`;
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('.fr-st-chip').forEach(b=> b.addEventListener('click', async ()=>{
+      const id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+      stTopic.progress = stTopic.progress || {};
+      const pr = stTopic.progress;
+      pr.lidas = pr.lidas || [];
+      if(act === 'lida') pr.lidas = pr.lidas.includes(id) ? pr.lidas.filter(x=> x !== id) : pr.lidas.concat(id);
+      else pr.parou = pr.parou === id ? null : id;
+      const y = window.scrollY;
+      await stSaveProgress();
+      stRenderTopic();
+      window.scrollTo(0, y);
+    }));
+  }
+
+  /* ----- Questões ----- */
+  function stRenderQuestions(body){
+    const answered = stQuestions.filter(q=> q.answered_index != null);
+    const hits = answered.filter(q=> q.answered_index === q.correct_index).length;
+    const letters = 'ABCDEFGH';
+    body.innerHTML = `
+      <div class="fr-st-score"><span>${stQuestions.length} ${stQuestions.length===1?'questão':'questões'}</span><span>${answered.length} respondidas</span><span>${hits} certas</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <button type="button" class="fr-btn-primary" id="st-gen-q">Gerar 5 questões</button>
+        ${answered.length ? `<button type="button" class="fr-btn-ghost" id="st-reset-q">Refazer todas</button>` : ''}
+      </div>
+      <div id="st-q-msg" class="fr-hint" style="color:var(--rust);margin-bottom:10px;" hidden></div>
+      ${stQuestions.length ? stQuestions.map((q, i)=>{
+        const opts = Array.isArray(q.options) ? q.options : [];
+        const done = q.answered_index != null;
+        const ok = done && q.answered_index === q.correct_index;
+        return `<div class="fr-st-q" data-i="${i}"><div class="orig">Questão ${i + 1}${q.origin ? ' · ' + esc(q.origin) : ''}</div>
+          <div class="enun">${esc(q.prompt)}</div>
+          ${opts.map((o, j)=>`<button type="button" class="fr-st-alt${done && j === q.correct_index ? ' certa' : ''}${done && j === q.answered_index && !ok ? ' errada' : ''}" data-j="${j}" ${done?'disabled':''}><span class="l">${letters[j] || ''}</span><span>${esc(o)}</span></button>`).join('')}
+          ${done ? `<div class="fr-st-fb ${ok?'ok':'no'}"><b>${ok ? 'Acertou!' : 'Não foi dessa vez.'}</b>${esc(q.explanation || '')}</div>` : ''}</div>`;
+      }).join('') : `<div class="fr-empty" style="margin:20px auto;"><p>Ainda não há questões. Toque em "Gerar 5 questões" para a IA criar a partir do resumo.</p></div>`}`;
+    const msg = body.querySelector('#st-q-msg');
+    body.querySelector('#st-gen-q').addEventListener('click', async function(){
+      if(!stSections(stTopic).length){ msg.textContent = 'Este tema ainda não tem resumo.'; msg.hidden = false; return; }
+      msg.hidden = true; this.disabled = true; this.textContent = 'Gerando questões...';
+      try{
+        const data = await stCallAI({ action:'questions', summary: stSummaryText(stTopic), count:5, existing: stQuestions.map(q=> q.prompt) });
+        const rows = (data.questoes || []).filter(x=> x && x.enunciado && Array.isArray(x.alternativas) && x.alternativas.length >= 2 && Number.isInteger(x.correta) && x.correta >= 0 && x.correta < x.alternativas.length)
+          .map(x=>({ topic_id:stTopic.id, prompt:String(x.enunciado), options:x.alternativas.map(String), correct_index:x.correta, explanation:String(x.explicacao || ''), origin:'Gerada pela IA' }));
+        if(!rows.length) throw new Error('bad_json');
+        const { data: ins, error } = await sb.from('study_questions').insert(rows).select();
+        if(error) throw new Error('save_failed');
+        stQuestions = stQuestions.concat(ins);
+        stRenderTopic();
+      }catch(e){
+        this.disabled = false; this.textContent = 'Gerar 5 questões';
+        msg.textContent = e.message === 'save_failed' ? 'As questões foram geradas, mas não deu para salvar. Tente de novo.' : stErrText(e); msg.hidden = false;
+      }
+    });
+    const reset = body.querySelector('#st-reset-q');
+    if(reset) reset.addEventListener('click', async ()=>{
+      const { error } = await sb.from('study_questions').update({ answered_index:null, answered_at:null }).eq('topic_id', stTopic.id);
+      if(error){ showToast('Não foi possível refazer agora.', 'err'); return; }
+      stQuestions.forEach(q=>{ q.answered_index = null; q.answered_at = null; });
+      stRenderTopic();
+    });
+    body.querySelectorAll('.fr-st-q').forEach(card=>{
+      const q = stQuestions[Number(card.getAttribute('data-i'))];
+      card.querySelectorAll('.fr-st-alt').forEach(b=> b.addEventListener('click', async ()=>{
+        const j = Number(b.getAttribute('data-j'));
+        const when = new Date().toISOString();
+        const { error } = await sb.from('study_questions').update({ answered_index:j, answered_at:when }).eq('id', q.id);
+        if(error){ showToast('Não foi possível salvar a resposta.', 'err'); return; }
+        q.answered_index = j; q.answered_at = when;
+        const y = window.scrollY; stRenderTopic(); window.scrollTo(0, y);
+      }));
+    });
+  }
+
+  /* ----- Dúvidas ----- */
+  function stRenderDoubts(body){
+    body.innerHTML = `
+      <p class="fr-st-lead">Escreva uma dúvida sobre este tema. A resposta usa o resumo como base e avisa quando precisar de conhecimento geral.</p>
+      ${stDoubts.length ? stDoubts.map(d=>`<div class="fr-st-duv"><div class="p">${esc(d.question)}</div><div class="r">${esc(d.answer)}</div></div>`).join('') : `<div class="fr-empty" style="margin:10px auto 18px;"><p>Nenhuma dúvida ainda.</p></div>`}
+      <div class="fr-st-ask">
+        <div class="fr-field" style="margin:0;"><label for="st-d-txt">Sua dúvida</label><textarea id="st-d-txt" maxlength="1000" placeholder="Ex.: qual a diferença entre SIG e SAD?"></textarea></div>
+        <div id="st-d-msg" class="fr-hint" style="color:var(--rust);" hidden></div>
+        <div><button type="button" class="fr-btn-primary" id="st-d-go">Perguntar</button></div>
+      </div>`;
+    const msg = body.querySelector('#st-d-msg');
+    body.querySelector('#st-d-go').addEventListener('click', async function(){
+      const q = body.querySelector('#st-d-txt').value.trim();
+      msg.hidden = true;
+      if(q.length < 3){ msg.textContent = 'Escreva a dúvida.'; msg.hidden = false; return; }
+      this.disabled = true; this.textContent = 'Pensando...';
+      try{
+        const data = await stCallAI({ action:'doubt', question:q, context: stSummaryText(stTopic) });
+        const { data: row, error } = await sb.from('study_doubts').insert({ topic_id:stTopic.id, question:q, answer:String(data.answer || '') }).select().single();
+        if(error) throw new Error('save_failed');
+        stDoubts.push(row); stRenderTopic();
+      }catch(e){
+        this.disabled = false; this.textContent = 'Perguntar';
+        msg.textContent = e.message === 'save_failed' ? 'A resposta veio, mas não deu para salvar. Tente de novo.' : stErrText(e); msg.hidden = false;
+      }
+    });
+  }
+
+  /* ----- Rascunho (anotações, salvam sozinhas) ----- */
+  function stRenderNotes(body){
+    body.innerHTML = `
+      <p class="fr-st-lead">Anote com suas palavras, faça esquemas, escreva o que não entendeu. Salva sozinho.</p>
+      <textarea class="fr-st-note" id="st-note" placeholder="Meu resumo deste tema...">${esc(stTopic.notes || '')}</textarea>
+      <div class="fr-st-status" id="st-note-status"></div>`;
+    const ta = body.querySelector('#st-note'), status = body.querySelector('#st-note-status');
+    ta.addEventListener('input', ()=>{
+      status.textContent = 'Salvando...';
+      clearTimeout(stNoteTimer);
+      const topicId = stTopic.id, value = ta.value;
+      stNoteTimer = setTimeout(async ()=>{
+        const { error } = await sb.from('study_topics').update({ notes:value, updated_at:new Date().toISOString() }).eq('id', topicId);
+        if(stTopic && stTopic.id === topicId && !error) stTopic.notes = value;
+        status.textContent = error ? 'Não foi possível salvar. Confira a conexão.' : 'Salvo ✓';
+      }, 800);
+    });
   }
 
   /* ---------- Dúvidas rápidas (perguntas e respostas prontas) ---------- */
