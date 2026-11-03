@@ -513,6 +513,14 @@
   .fr-st-ask textarea{ min-height:70px; }
   .fr-st-busy{ display:flex; align-items:center; gap:10px; color:var(--ink-soft); font-size:14px; padding:14px 0; }
 
+  .fr-art-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+  .fr-art-card{ position:relative; aspect-ratio:1/1; border-radius:14px; overflow:hidden; cursor:pointer; border:0; padding:0; text-align:left; background:var(--ink); color:#fff; display:flex; flex-direction:column; justify-content:flex-end; background-size:cover; background-position:center; box-shadow:0 1px 0 rgba(0,0,0,0.06); transition:transform .15s; }
+  .fr-art-card:hover{ transform:translateY(-2px); }
+  .fr-art-card:focus-visible{ outline:2px solid var(--green-deep); outline-offset:2px; }
+  .fr-art-card::before{ content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0) 100%); }
+  .fr-art-card .t{ position:relative; padding:12px; font-family:'Fraunces',serif; font-weight:600; font-size:15px; line-height:1.25; }
+  .fr-art-card .c{ position:absolute; top:10px; left:10px; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.04em; text-transform:uppercase; background:rgba(255,255,255,0.92); color:var(--ink); border-radius:999px; padding:3px 8px; }
+  .fr-art-cover{ width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:10px; margin:0 0 14px; display:block; }
   .fr-gated{ display:none !important; }
   .fr-locked > *:not(.fr-lock-box){ display:none !important; }
   .fr-lock-box{ max-width:520px; margin:40px auto; padding:22px 20px; text-align:center; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
@@ -3673,15 +3681,12 @@
       el.innerHTML = `<div class="fr-empty-diary"><h3>Em breve</h3><p>Artigos sobre ${esc((ARTICLE_CATS[activeArticleCat]||ARTICLE_CATS.todos).label.toLowerCase())}, revisados pela nossa equipe, vão aparecer aqui.</p></div>`;
       return;
     }
-    el.innerHTML = filtered.map(a=>{
+    el.innerHTML = `<div class="fr-art-grid">` + filtered.map(a=>{
       const cat = ARTICLE_CATS[a.category] || ARTICLE_CATS.todos;
-      return `
-        <div class="fr-client-row" data-id="${a.id}">
-          <span class="fr-client-name">${esc(a.title)} <span style="color:${cat.color};font-family:'IBM Plex Mono',monospace;font-size:10px;">· ${esc(cat.label)}</span></span>
-          <span class="fr-client-arrow">›</span>
-        </div>`;
-    }).join('');
-    el.querySelectorAll('.fr-client-row').forEach(row=>{
+      const bg = a.image_url ? `background-image:url('${escAttr(a.image_url)}');background-color:${cat.color};` : `background-color:${cat.color};`;
+      return `<button type="button" class="fr-art-card" data-id="${escAttr(a.id)}" style="${bg}"><span class="c">${esc(cat.label)}</span><span class="t">${esc(a.title)}</span></button>`;
+    }).join('') + `</div>`;
+    el.querySelectorAll('.fr-art-card').forEach(row=>{
       row.addEventListener('click', ()=>{
         const article = filtered.find(a=>a.id===row.getAttribute('data-id'));
         if(article) openArticleDetail(article);
@@ -3692,6 +3697,7 @@
   function openArticleDetail(article){
     const cat = ARTICLE_CATS[article.category] || ARTICLE_CATS.todos;
     buildOverlay(`
+      ${article.image_url ? `<img class="fr-art-cover" src="${escAttr(article.image_url)}" alt="" loading="lazy">` : ''}
       <div class="fr-detail-tab" style="background:${cat.color}">${esc(cat.label)}</div>
       <h2 class="fr-detail-name">${esc(article.title)}</h2>
       ${article.summary ? `<div class="fr-hint">${esc(article.summary)}</div>` : ''}
