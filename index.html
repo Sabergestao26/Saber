@@ -1164,6 +1164,7 @@
     proteina:       { label:'Proteína',       color:'#3F6B4A' },
     fibra:          { label:'Fibra',          color:'#2E4F37' },
     agua:           { label:'Água',           color:'#46687A' },
+    receitas:       { label:'Receitas',       color:'#8C5A2B' },
     vida_saudavel:  { label:'Vida saudável',  color:'#BF8A2E' }
   };
   let articles = [];
@@ -3720,7 +3721,7 @@
     if(t.includes('mexa-se') || t.includes('dia a dia')) return 'andar';
     if(t.includes('equilibrio') || t.includes('65 anos')) return 'equilibrio';
     if(t.includes('gravidez')) return 'gravidez';
-    const byCat = { musculacao:'forca', cardio:'cardio', proteina:'ovos', fibra:'trigo', agua:'agua', vida_saudavel:'maca' };
+    const byCat = { musculacao:'forca', cardio:'cardio', proteina:'ovos', fibra:'trigo', agua:'agua', receitas:'prato', vida_saudavel:'maca' };
     return byCat[a.category] || 'maca';
   }
   function artIllustration(a){
@@ -3730,6 +3731,7 @@
   }
   function artPhotoUrl(a){
     if(a.image_url) return a.image_url;
+    if(a.cover_image_url) return a.cover_image_url;
     const id = ART_PHOTOS[artMotifFor(a)];
     return id ? `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=70` : '';
   }
