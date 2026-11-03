@@ -513,15 +513,13 @@
   .fr-st-ask textarea{ min-height:70px; }
   .fr-st-busy{ display:flex; align-items:center; gap:10px; color:var(--ink-soft); font-size:14px; padding:14px 0; }
 
-  .fr-art-feed{ display:flex; flex-direction:column; gap:22px; max-width:640px; margin:0 auto; }
-  .fr-art-item{ background:var(--paper, #fffdf7); border:1px solid rgba(38,43,30,0.12); border-radius:16px; overflow:hidden; }
-  .fr-art-pic{ width:100%; aspect-ratio:16/9; display:block; object-fit:cover; background:#ddd; }
-  .fr-art-pic svg{ width:100%; height:100%; display:block; }
-  .fr-art-info{ padding:16px 18px 18px; }
-  .fr-art-cat{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; }
-  .fr-art-info h3{ font-family:'Fraunces',serif; font-weight:600; font-size:20px; line-height:1.25; margin:6px 0 8px; }
-  .fr-art-info p.s{ font-size:14.5px; line-height:1.55; margin:0 0 12px; color:var(--ink-soft); }
-  .fr-art-body{ margin:4px 0 14px; padding-top:14px; border-top:1px solid rgba(38,43,30,0.12); }
+  .fr-art-feed{ display:flex; flex-direction:column; gap:22px; max-width:760px; margin:0 auto; }
+  .fr-art-sec h2{ font-family:'Fraunces',serif; font-weight:600; font-size:18px; margin:0 0 10px; }
+  .fr-art-rowscroll{ display:flex; flex-direction:row; gap:12px; overflow-x:auto; padding-bottom:8px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; }
+  .fr-art-card{ flex:0 0 132px; width:132px; scroll-snap-align:start; background:none; border:0; padding:0; text-align:left; cursor:pointer; font:inherit; color:inherit; }
+  .fr-art-pic{ width:132px; height:132px; display:block; border-radius:12px; background:#ddd; overflow:hidden; }
+  .fr-art-pic svg, .fr-art-pic img{ width:100%; height:100%; display:block; object-fit:cover; }
+  .fr-art-card h3{ font-family:'Fraunces',serif; font-weight:600; font-size:13px; line-height:1.25; margin:6px 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   .fr-art-cover{ width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:10px; margin:0 0 14px; display:block; }
   .fr-gated{ display:none !important; }
   .fr-locked > *:not(.fr-lock-box){ display:none !important; }
@@ -3739,7 +3737,7 @@
     const url = artPhotoUrl(a);
     const fallback = `<div class="fr-art-pic" role="img" aria-hidden="true">${artIllustration(a)}</div>`;
     if(!url) return fallback;
-    return `<div class="fr-art-pic" data-fb="${escAttr(String(a.id))}"><img src="${escAttr(url)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentNode.innerHTML=artIllustration(articles.find(x=>String(x.id)===this.parentNode.getAttribute('data-fb'))||{})"></div>`;
+    return `<div class="fr-art-pic" data-fb="${escAttr(String(a.id))}"><img src="${escAttr(url)}" alt="" loading="lazy" onerror="this.parentNode.innerHTML=artIllustration(articles.find(x=>String(x.id)===this.parentNode.getAttribute('data-fb'))||{})"></div>`;
   }
 
   function renderArticlesList(){
@@ -3748,25 +3746,20 @@
       el.innerHTML = `<div class="fr-empty-diary"><h3>Em breve</h3><p>Artigos sobre saúde, treino e alimentação, revisados pela nossa equipe, vão aparecer aqui.</p></div>`;
       return;
     }
-    el.innerHTML = `<div class="fr-art-feed">` + articles.map(a=>{
-      const cat = ARTICLE_CATS[a.category] || ARTICLE_CATS.todos;
-      return `<article class="fr-art-item" data-id="${escAttr(a.id)}">
-        ${artPicHtml(a)}
-        <div class="fr-art-info">
-          <span class="fr-art-cat" style="color:${cat.color}">${esc(cat.label)}</span>
-          <h3>${esc(a.title)}</h3>
-          ${a.summary ? `<p class="s">${esc(a.summary)}</p>` : ''}
-          <div class="fr-art-body" hidden>${a.content ? `<div class="fr-detail-pre">${esc(a.content)}</div>` : ''}</div>
-          <button type="button" class="fr-btn-ghost fr-art-toggle" aria-expanded="false">Ler artigo</button>
-        </div></article>`;
+    const order = Object.keys(ARTICLE_CATS).filter(k=>k!=='todos');
+    const keys = order.filter(k=>articles.some(a=>a.category===k)).concat(
+      [...new Set(articles.map(a=>a.category))].filter(k=>!order.includes(k)));
+    el.innerHTML = `<div class="fr-art-feed">` + keys.map(k=>{
+      const cat = ARTICLE_CATS[k] || ARTICLE_CATS.todos;
+      const list = articles.filter(a=>a.category===k);
+      return `<section class="fr-art-sec"><h2 style="color:${cat.color}">${esc(cat.label)}</h2><div class="fr-art-rowscroll">` +
+        list.map(a=>`<button type="button" class="fr-art-card" data-id="${escAttr(a.id)}">${artPicHtml(a)}<h3>${esc(a.title)}</h3></button>`).join('') +
+        `</div></section>`;
     }).join('') + `</div>`;
-    el.querySelectorAll('.fr-art-toggle').forEach(btn=>{
+    el.querySelectorAll('.fr-art-card').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        const body = btn.parentElement.querySelector('.fr-art-body');
-        const open = body.hidden;
-        body.hidden = !open;
-        btn.textContent = open ? 'Fechar artigo' : 'Ler artigo';
-        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        const art = articles.find(x=>String(x.id)===btn.getAttribute('data-id'));
+        if(art) openArticleDetail(art);
       });
     });
   }
