@@ -1182,6 +1182,27 @@
   let leituraTimerTick = null;
 
   let currentUser = null;
+
+  /* Registro de uso (só conta aberturas do app e chamadas de funções; alimenta o painel de custos da administração) */
+  function logUsage(kind){
+    try{
+      if(!currentUser) return;
+      const q = sb.from('usage_events').insert({ user_id: currentUser.id, kind: kind });
+      if(q && q.then) q.then(function(){}, function(){});
+    }catch(e){}
+  }
+  (function(){
+    const baseFetch = window.fetch;
+    if(typeof baseFetch !== 'function') return;
+    window.fetch = function(input){
+      try{
+        const u = typeof input === 'string' ? input : ((input && input.url) || '');
+        const m = u.match(/\/functions\/v1\/([a-z0-9-]+)/);
+        if(m) logUsage('fn:' + m[1]);
+      }catch(e){}
+      return baseFetch.apply(this, arguments);
+    };
+  })();
   let currentProfile = null;
   let isAdmin = false;
   let hasSubActive = false; // assinatura vigente (tabela subscriptions)
@@ -2725,6 +2746,7 @@
       currentUser = session.user;
       if(!hasBooted){
         hasBooted = true;
+        logUsage('abertura');
         boot();
       }
     } else {

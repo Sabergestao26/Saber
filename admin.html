@@ -110,6 +110,34 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
 .ct-ing .x{padding:0;width:38px;}
 .ct-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;} .ct-actions button{width:auto;}
 @media(max-width:520px){.ct-ing{grid-template-columns:70px 1fr 38px;}.ct-ing .n{grid-column:1/-1;order:5;}.ct-row4{grid-template-columns:1fr 1fr;}}
+
+/* ---------- Custos e limites ---------- */
+.us-alert{border-radius:10px;padding:14px 16px;margin:0 0 18px;border:1px solid;}
+.us-alert.us-proximo{background:#fbf3df;border-color:#e0c47a;color:#5b4410;}
+.us-alert.us-critico{background:#fbe9e0;border-color:#e2a98f;color:#6a2a10;}
+.us-alert.us-excedido{background:#f6dcd6;border-color:#cf7f70;color:#6b1d12;}
+.us-alert-t{font-weight:700;margin-bottom:6px;}
+.us-alert-l{font-size:13.5px;line-height:1.5;}
+.us-alert button{width:auto;margin-top:10px;padding:8px 14px;font-size:13px;}
+.us-lim{padding:12px 0;border-top:1px solid var(--border);} .us-lim:first-of-type{border-top:0;}
+.us-lim-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+.us-lim-n{font-weight:600;font-size:14px;}
+.us-lim-s{font-size:12.5px;font-weight:700;white-space:nowrap;}
+.us-t-ok{color:var(--green-deep);} .us-t-proximo{color:#9a6b00;} .us-t-critico,.us-t-excedido{color:var(--rust);}
+.us-bar{height:8px;background:var(--border);border-radius:999px;overflow:hidden;margin:8px 0 6px;}
+.us-fill{height:100%;border-radius:999px;}
+.us-f-ok{background:var(--green-deep);} .us-f-proximo{background:#BF8A2E;} .us-f-critico,.us-f-excedido{background:var(--rust);}
+.us-lim-f{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:13px;}
+button.us-sm{width:auto;padding:5px 10px;font-size:12px;}
+.us-planrow,.us-filter{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.us-tw{overflow-x:auto;}
+table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
+.us-t th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;}
+.us-t th.on{color:var(--green-deep);}
+.us-t td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;}
+.us-t tbody tr{cursor:pointer;} .us-t tbody tr:hover{background:var(--surface);}
+.us-nm{font-weight:600;}
+.us-pos{color:var(--green-deep);font-weight:600;} .us-neg{color:var(--rust);font-weight:600;}
 </style>
 </head>
 <body>
@@ -129,6 +157,8 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
   <h1>Painel de gestão</h1>
   <p class="hint" style="margin-bottom:20px;">Visão geral de uso, cadastros e conteúdo — separado do app que as pessoas usam.</p>
 
+  <div id="us-alert" class="us-alert" style="display:none;"></div>
+
   <div class="tabs">
     <button class="tab-btn active" data-tab="resumo">Resumo</button>
     <button class="tab-btn" data-tab="clientes">Clientes<span class="tab-badge" id="badge-clientes" style="display:none;"></span></button>
@@ -136,6 +166,7 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
     <button class="tab-btn" data-tab="profissionais">Profissionais<span class="tab-badge" id="badge-profissionais" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="conteudo">Conteúdo<span class="tab-badge" id="badge-conteudo" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="financeiro">Financeiro</button>
+    <button class="tab-btn" data-tab="custos">Custos<span class="tab-badge" id="badge-custos" style="display:none;"></span></button>
     <button class="tab-btn" data-tab="codigos">Códigos</button>
     <button class="tab-btn" data-tab="config">Configurações</button>
   </div>
@@ -342,6 +373,10 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
         <div class="fin-out" id="c5-out"></div>
       </div>
     </div>
+  </div>
+
+  <div class="tab-panel" data-panel="custos" style="display:none;">
+    <div id="us-body"><p class="hint">Carregando...</p></div>
   </div>
 
   <div class="tab-panel" data-panel="codigos" style="display:none;">
@@ -1283,6 +1318,7 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
       renderAssessmentsArea();
       renderSuggestionsArea();
       renderProblemsArea();
+      if(typeof usLoad === 'function') usLoad();
     }
   }
   document.getElementById('login-btn').addEventListener('click', async ()=>{
@@ -1523,6 +1559,290 @@ input.fin-sm,select.fin-sm{width:auto;margin-bottom:0;}
       if(error) return ctErr(error);
       ctWorkoutManager(w);
     }));
+  }
+
+
+  /* ---------- Custos e limites (só admin) ---------- */
+  const US = { report:null, settings:{}, limits:[], metrics:[], rows:[], group:'todos', sortKey:'cost', sortDir:-1, timer:null };
+  const usNum = (v, d) => { const n = Number(v); return isFinite(n) ? n : (d || 0); };
+  const usFmtInt = n => Math.round(n).toLocaleString('pt-BR');
+  function usFmtNum(n){ return Number(n).toLocaleString('pt-BR', { maximumFractionDigits: n >= 100 ? 0 : (n >= 10 ? 1 : 2) }); }
+  function usBRL(v){
+    v = usNum(v);
+    if(v === 0) return 'R$ 0,00';
+    if(Math.abs(v) < 0.01) return (v < 0 ? '-' : '') + 'menos de R$ 0,01';
+    return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+  }
+  function usBytes(b){
+    b = usNum(b);
+    if(b < 1024) return Math.round(b) + ' B';
+    if(b < 1048576) return (b/1024).toFixed(1).replace('.', ',') + ' KB';
+    if(b < 1073741824) return (b/1048576).toFixed(1).replace('.', ',') + ' MB';
+    return (b/1073741824).toFixed(2).replace('.', ',') + ' GB';
+  }
+  const usDate = s => s ? new Date(s).toLocaleDateString('pt-BR') : 'nunca';
+  const US_FN_NAMES = {
+    'fn:import-workout-file':'Importar treino por arquivo', 'fn:import-body-measurements-file':'Importar medidas por arquivo',
+    'fn:withings-sync':'Sincronizar balança Withings', 'fn:withings-callback':'Conectar balança Withings',
+    'fn:mp-create-preference':'Iniciar pagamento', 'fn:notify-chat-message':'Aviso de mensagem', 'fn:notify-professional-report':'Aviso de relatório',
+    'fn:notify-admins-pending-review':'Aviso para a equipe', 'fn:send-rest-notification':'Aviso de descanso', 'fn:delete-account':'Excluir conta',
+    'fn:study-ai':'Estudos com IA', 'fn:login-phone':'Entrar por telefone'
+  };
+
+  async function usLoad(){
+    const body = document.getElementById('us-body');
+    if(body && !US.report) body.innerHTML = '<p class="hint">Carregando...</p>';
+    const [rep, set, lim] = await Promise.all([
+      sb.rpc('admin_usage_report'),
+      sb.from('usage_settings').select('key,value'),
+      sb.from('usage_limits').select('*').order('sort')
+    ]);
+    if(rep.error || set.error || lim.error){
+      console.error(rep.error || set.error || lim.error);
+      if(body) body.innerHTML = '<p class="err">Não foi possível carregar os custos. Rode o SQL de custos e limites no Supabase (arquivo sql-custos.sql).</p>';
+      return;
+    }
+    US.report = rep.data;
+    US.settings = {}; (set.data || []).forEach(r => US.settings[r.key] = r.value);
+    US.limits = lim.data || [];
+    usCompute();
+    usRenderBanner();
+    usRender();
+    if(!US.timer) US.timer = setInterval(() => { usLoad(); }, 10 * 60 * 1000);
+  }
+
+  function usPlan(){ return US.settings.plan === 'pro' ? 'pro' : 'free'; }
+  function usPlanLabel(){ return usPlan() === 'pro' ? 'Pro' : 'Gratuito'; }
+
+  function usCompute(){
+    const r = US.report, S = US.settings;
+    const mbData = usNum(S.mb_data_per_open, 0.8), mbSite = usNum(S.mb_site_per_open, 0.6);
+    const auto = {
+      db: r.db_bytes / 1048576,
+      storage: r.storage_bytes / 1048576,
+      mau: r.mau,
+      fn: r.fn_30d,
+      egress: r.opens_30d * mbData / 1024,
+      pages_bw: r.opens_30d * mbSite / 1024
+    };
+    const warn = usNum(S.warn_pct, 70), crit = usNum(S.crit_pct, 90);
+    US.metrics = US.limits.map(l => {
+      const used = l.mode === 'manual' ? usNum(l.manual_value) : usNum(auto[l.key]);
+      const limit = usNum(usPlan() === 'pro' ? l.limit_pro : l.limit_free);
+      const pct = limit > 0 ? used / limit * 100 : 0;
+      const status = pct >= 100 ? 'excedido' : (pct >= crit ? 'critico' : (pct >= warn ? 'proximo' : 'ok'));
+      return { ...l, used, limit, pct, status };
+    });
+
+    // custos por pessoa
+    const fx = usNum(S.usd_brl, 5.5);
+    const pDb = usNum(S.price_db_gb_usd), pSt = usNum(S.price_storage_gb_usd), pEg = usNum(S.price_egress_gb_usd), pFn = usNum(S.price_fn_million_usd);
+    const fixed = usNum(S.fixed_cost_brl);
+    const users = r.users || [];
+    const sum = k => users.reduce((a, u) => a + usNum(u[k]), 0);
+    const sDb = sum('db_bytes'), sOp = sum('opens_30d'), sFn = sum('fn_30d');
+    US.rows = users.map(u => {
+      let grp;
+      if(u.is_admin) grp = 'equipe';
+      else if(u.sub_active && u.pay_count > 0 && usNum(u.paid_gross) > 0) grp = 'pagante';
+      else if(u.sub_active || u.has_free_access || u.is_professional) grp = 'liberado';
+      else grp = 'gratuito';
+      const egGB = usNum(u.opens_30d) * mbData / 1024;
+      const parts = {
+        db: usNum(u.db_bytes) / 1073741824 * pDb * fx,
+        storage: usNum(u.storage_bytes) / 1073741824 * pSt * fx,
+        egress: egGB * pEg * fx,
+        fn: usNum(u.fn_30d) / 1e6 * pFn * fx
+      };
+      const variable = parts.db + parts.storage + parts.egress + parts.fn;
+      const shares = [];
+      if(sDb > 0) shares.push(usNum(u.db_bytes) / sDb);
+      if(sOp > 0) shares.push(usNum(u.opens_30d) / sOp);
+      if(sFn > 0) shares.push(usNum(u.fn_30d) / sFn);
+      const share = shares.length ? shares.reduce((a, b) => a + b, 0) / shares.length : (users.length ? 1 / users.length : 0);
+      const fixedPart = fixed * share;
+      const cost = variable + fixedPart;
+      const revenue = grp === 'pagante' ? usNum(u.monthly_net) : 0;
+      return { ...u, grp, parts, variable, fixedPart, cost, revenue, result: revenue - cost };
+    });
+  }
+
+  function usRenderBanner(){
+    const el = document.getElementById('us-alert'), badge = document.getElementById('badge-custos');
+    const alerts = US.metrics.filter(m => m.status !== 'ok');
+    if(badge){ badge.textContent = alerts.length; badge.style.display = alerts.length ? '' : 'none'; }
+    if(!el) return;
+    if(!alerts.length){ el.style.display = 'none'; el.innerHTML = ''; return; }
+    const worst = alerts.some(a => a.status === 'excedido') ? 'excedido' : (alerts.some(a => a.status === 'critico') ? 'critico' : 'proximo');
+    const title = worst === 'excedido' ? 'Limite do plano ultrapassado' : (worst === 'critico' ? 'Limite do plano quase no fim' : 'Atenção: perto do limite do plano');
+    el.className = 'us-alert us-' + worst;
+    el.innerHTML = `<div class="us-alert-t">${esc(title)}</div>` +
+      alerts.sort((a, b) => b.pct - a.pct).map(m => `<div class="us-alert-l">${esc(m.source)} · ${esc(m.label)}: ${usFmtNum(m.pct)}% do plano ${esc(usPlanLabel())} (${usFmtNum(m.used)} de ${usFmtNum(m.limit)} ${esc(m.unit)})</div>`).join('') +
+      `<button type="button" class="ghost" id="us-alert-open">Ver custos e limites</button>`;
+    el.style.display = '';
+    el.querySelector('#us-alert-open').addEventListener('click', () => document.querySelector('.tab-btn[data-tab="custos"]').click());
+  }
+
+  function usStatusText(s){ return s === 'excedido' ? 'Ultrapassou' : (s === 'critico' ? 'Quase no limite' : (s === 'proximo' ? 'Perto do limite' : 'Dentro do limite')); }
+
+  function usRender(){
+    const body = document.getElementById('us-body');
+    if(!body) return;
+    const S = US.settings, r = US.report;
+    const rows = US.rows;
+    const g = k => rows.filter(x => x.grp === k);
+    const tot = a => a.reduce((s, x) => s + x.cost, 0);
+    const pag = g('pagante'), gra = g('gratuito'), lib = g('liberado'), eq = g('equipe');
+    const revenue = pag.reduce((s, x) => s + x.revenue, 0);
+    const costAll = tot(rows);
+    const trackedDays = r.tracking_since ? Math.max(1, Math.round((Date.now() - new Date(r.tracking_since)) / 86400000)) : 0;
+
+    // limites
+    const limHtml = US.metrics.map(m => {
+      const w = Math.min(100, m.pct);
+      return `<div class="us-lim"><div class="us-lim-h"><div><div class="us-lim-n">${esc(m.label)}</div><div class="hint">${esc(m.source)}${m.mode === 'manual' ? ' · valor informado por você' : ''}</div></div>
+        <div class="us-lim-s us-t-${m.status}">${esc(usStatusText(m.status))}</div></div>
+        <div class="us-bar"><div class="us-fill us-f-${m.status}" style="width:${w}%"></div></div>
+        <div class="us-lim-f"><span>${usFmtNum(m.used)} de ${usFmtNum(m.limit)} ${esc(m.unit)} (${usFmtNum(m.pct)}%)</span>${m.mode === 'manual' ? `<button type="button" class="ghost us-sm" data-us-edit="${escAttr(m.key)}">Atualizar valor</button>` : ''}</div>
+        ${m.note ? `<div class="hint" style="margin-top:4px;">${esc(m.note)}</div>` : ''}</div>`;
+    }).join('');
+
+    // grupos
+    const card = (t, v, n) => `<div class="stat-card"><div class="stat-label">${esc(t)}</div><div class="stat-val" style="font-size:22px;">${v}</div>${n ? `<div class="stat-note">${n}</div>` : ''}</div>`;
+    const avg = (a) => a.length ? tot(a) / a.length : 0;
+    const marginPag = pag.length ? (revenue - tot(pag)) / pag.length : 0;
+    const costFree = avg(gra) || 0;
+    let breakeven = '';
+    if(pag.length && gra.length + lib.length > 0){
+      const burden = tot(gra) + tot(lib);
+      breakeven = burden <= 0 ? 'Os gratuitos e liberados quase não geram custo hoje.' :
+        (revenue - tot(pag) >= burden ? `Os pagantes cobrem o custo dos gratuitos e liberados (sobram ${usBRL(revenue - tot(pag) - burden)} por mês).` :
+        `Os pagantes ainda não cobrem o custo dos gratuitos e liberados (faltam ${usBRL(burden - (revenue - tot(pag)))} por mês).`);
+    } else if(!pag.length){ breakeven = 'Ainda não há pagantes para comparar com o custo dos gratuitos.'; }
+    const groupHtml =
+      card('Pagantes', usFmtInt(pag.length), `Receita: ${usBRL(revenue)}/mês<br>Custo: ${usBRL(tot(pag))}<br>Resultado: ${usBRL(revenue - tot(pag))}`) +
+      card('Gratuitos', usFmtInt(gra.length), `Custo total: ${usBRL(tot(gra))}<br>Por pessoa: ${usBRL(costFree)}`) +
+      card('Acesso liberado', usFmtInt(lib.length), `Código promocional, profissionais e cortesias<br>Custo total: ${usBRL(tot(lib))}`) +
+      card('Equipe', usFmtInt(eq.length), `Custo: ${usBRL(tot(eq))}<br>Não entra na comparação`) +
+      card('Resultado do mês', usBRL(revenue - costAll), `Receita dos pagantes menos o custo de todo mundo`);
+
+    // tabela
+    const filt = US.group === 'todos' ? rows.slice() : rows.filter(x => x.grp === US.group);
+    const keyf = { name: x => (x.name || x.email || '').toLowerCase(), grp: x => x.grp, last: x => x.last_sign_in || '', opens: x => x.opens_30d, fn: x => x.fn_30d, data: x => usNum(x.db_bytes) + usNum(x.storage_bytes), cost: x => x.cost, revenue: x => x.revenue, result: x => x.result }[US.sortKey] || (x => x.cost);
+    filt.sort((a, b) => { const A = keyf(a), B = keyf(b); return (A > B ? 1 : A < B ? -1 : 0) * US.sortDir; });
+    const grpName = { pagante:'Pagante', gratuito:'Gratuito', liberado:'Acesso liberado', equipe:'Equipe' };
+    const th = (k, t) => `<th data-us-sort="${k}" class="${US.sortKey === k ? 'on' : ''}">${t}${US.sortKey === k ? (US.sortDir > 0 ? ' ↑' : ' ↓') : ''}</th>`;
+    const tbl = `<div class="us-tw"><table class="us-t"><thead><tr>${th('name','Pessoa')}${th('grp','Grupo')}${th('last','Último acesso')}${th('opens','Aberturas (30 dias)')}${th('fn','Chamadas de funções (30 dias)')}${th('data','Dados guardados')}${th('cost','Custo por mês')}${th('revenue','Receita por mês')}${th('result','Resultado')}</tr></thead><tbody>` +
+      (filt.length ? filt.map(x => `<tr data-us-user="${escAttr(x.id)}"><td><div class="us-nm">${esc(x.name || x.email)}</div>${x.name ? `<div class="hint">${esc(x.email)}</div>` : ''}</td><td>${esc(grpName[x.grp])}</td><td>${esc(usDate(x.last_sign_in))}</td><td>${usFmtInt(x.opens_30d)}</td><td>${usFmtInt(x.fn_30d)}</td><td>${esc(usBytes(usNum(x.db_bytes) + usNum(x.storage_bytes)))}</td><td>${esc(usBRL(x.cost))}</td><td>${x.grp === 'pagante' ? esc(usBRL(x.revenue)) : '-'}</td><td class="${x.grp === 'pagante' ? (x.result >= 0 ? 'us-pos' : 'us-neg') : ''}">${x.grp === 'pagante' ? esc(usBRL(x.result)) : '-'}</td></tr>`).join('') : '<tr><td colspan="9" class="hint">Ninguém neste grupo.</td></tr>') +
+      '</tbody></table></div>';
+
+    const opt = (v, t) => `<option value="${v}" ${US.group === v ? 'selected' : ''}>${t}</option>`;
+    const setIn = (k, label, step) => `<div><label class="ct-l">${esc(label)}</label><input type="number" step="${step || 'any'}" min="0" data-us-set="${k}" value="${escAttr(S[k] ?? '')}"></div>`;
+
+    body.innerHTML = `
+      <div class="card">
+        <h4>Limites do plano atual</h4>
+        <div class="us-planrow"><span class="hint">Plano em uso:</span>
+          <select id="us-plan" class="fin-sm"><option value="free" ${usPlan() === 'free' ? 'selected' : ''}>Gratuito</option><option value="pro" ${usPlan() === 'pro' ? 'selected' : ''}>Pro (US$ 25 por mês)</option></select>
+          <span class="hint">Avisamos a partir de ${usFmtInt(usNum(S.warn_pct, 70))}% (perto do limite) e ${usFmtInt(usNum(S.crit_pct, 90))}% (quase no limite). Atualizado ${new Date(r.generated_at).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}.</span></div>
+        ${limHtml}
+        <p class="hint" style="margin-top:10px;">Dois itens não aparecem aqui porque o Supabase não deixa o app medir: o tráfego real de saída e as chamadas automáticas do Mercado Pago. O tráfego é uma estimativa. Confira o valor real no painel do Supabase (Usage) de vez em quando e ajuste o "MB por abertura" abaixo até os dois ficarem parecidos.</p>
+      </div>
+
+      <div class="card">
+        <h4>Resumo por grupo</h4>
+        <p class="hint" style="margin-bottom:12px;">${trackedDays ? `O registro de uso começou há ${usFmtInt(trackedDays)} ${trackedDays === 1 ? 'dia' : 'dias'}, então aberturas e chamadas de funções ainda são parciais.` : 'O registro de aberturas e chamadas começa quando a nova versão do app for aberta pelas pessoas.'}</p>
+        <div class="grid">${groupHtml}</div>
+        <p style="margin-top:12px;font-size:14px;line-height:1.5;">${esc(breakeven)}</p>
+        ${pag.length ? `<p class="hint" style="margin-top:6px;">Cada pagante deixa em média ${esc(usBRL(marginPag))} por mês depois do próprio custo${costFree > 0 && marginPag > 0 ? `; isso paga o custo de cerca de ${usFmtInt(marginPag / costFree)} gratuitos` : ''}.</p>` : ''}
+        <p class="hint" style="margin-top:10px;">Hoje o Saber está no plano ${esc(usPlanLabel())}${usPlan() === 'free' ? ', então você não paga nada em dinheiro pelo uso. Os valores em reais mostram o custo equivalente, se cada recurso fosse cobrado pelo preço do plano Pro. Servem para comparar pessoas e decidir se compensa.' : '.'} A receita é o valor mensal líquido (já sem a taxa do Mercado Pago).</p>
+      </div>
+
+      <div class="card">
+        <h4>Gasto por pessoa</h4>
+        <div class="us-filter"><select id="us-group" class="fin-sm">${opt('todos', 'Todas as pessoas')}${opt('pagante', 'Só pagantes')}${opt('gratuito', 'Só gratuitos')}${opt('liberado', 'Só acesso liberado')}${opt('equipe', 'Só equipe')}</select><span class="hint">Toque numa pessoa para ver o detalhe. Toque no título da coluna para ordenar.</span></div>
+        ${tbl}
+      </div>
+
+      <div class="card">
+        <h4>Premissas dos cálculos</h4>
+        <p class="hint" style="margin-bottom:8px;">Estes valores mudam o cálculo dos custos. Os preços unitários seguem o plano Pro do Supabase; confira no site deles de tempos em tempos.</p>
+        <div class="ct-row">
+          ${setIn('usd_brl', 'Dólar (R$)')}${setIn('warn_pct', 'Avisar a partir de (%)', 1)}${setIn('crit_pct', 'Alerta forte a partir de (%)', 1)}
+          ${setIn('mb_data_per_open', 'MB de dados por abertura do app')}${setIn('mb_site_per_open', 'MB do site por abertura')}${setIn('fixed_cost_brl', 'Custo fixo mensal (R$)')}
+          ${setIn('price_db_gb_usd', 'Banco: US$ por GB')}${setIn('price_storage_gb_usd', 'Arquivos: US$ por GB')}${setIn('price_egress_gb_usd', 'Tráfego: US$ por GB')}${setIn('price_fn_million_usd', 'Funções: US$ por milhão')}
+        </div>
+        <p class="hint" style="margin-top:8px;">O custo fixo mensal (por exemplo, a mensalidade do plano Pro) é dividido entre as pessoas pelo uso de cada uma. No plano Gratuito deixe zero.</p>
+        <div class="ct-actions"><button type="button" id="us-save-set">Salvar premissas</button></div>
+        <div id="us-set-msg" class="hint"></div>
+      </div>`;
+
+    body.querySelector('#us-plan').addEventListener('change', async function(){
+      const v = this.value;
+      await usSaveSettings({ plan: v, ...(v === 'pro' && !usNum(S.fixed_cost_brl) ? { fixed_cost_brl: String((25 * usNum(S.usd_brl, 5.5)).toFixed(2)) } : {}), ...(v === 'free' ? { fixed_cost_brl: '0' } : {}) });
+    });
+    body.querySelector('#us-group').addEventListener('change', function(){ US.group = this.value; usRender(); });
+    body.querySelectorAll('[data-us-sort]').forEach(h => h.addEventListener('click', () => {
+      const k = h.getAttribute('data-us-sort');
+      if(US.sortKey === k) US.sortDir = -US.sortDir; else { US.sortKey = k; US.sortDir = (k === 'name' || k === 'grp') ? 1 : -1; }
+      usRender();
+    }));
+    body.querySelectorAll('[data-us-user]').forEach(tr => tr.addEventListener('click', () => usUserDetail(tr.getAttribute('data-us-user'))));
+    body.querySelectorAll('[data-us-edit]').forEach(b => b.addEventListener('click', () => usEditManual(b.getAttribute('data-us-edit'))));
+    body.querySelector('#us-save-set').addEventListener('click', async function(){
+      const upd = {}; body.querySelectorAll('[data-us-set]').forEach(i => { if(i.value !== '') upd[i.getAttribute('data-us-set')] = String(i.value); });
+      this.disabled = true; await usSaveSettings(upd); this.disabled = false;
+    });
+  }
+
+  async function usSaveSettings(obj){
+    const rows = Object.keys(obj).map(k => ({ key:k, value:obj[k], updated_at:new Date().toISOString() }));
+    const { error } = await sb.from('usage_settings').upsert(rows);
+    if(error){ ctErr(error); return; }
+    await usLoad();
+  }
+
+  function usEditManual(key){
+    const m = US.metrics.find(x => x.key === key); if(!m) return;
+    const o = ctModal(`<h4>${esc(m.label)}</h4><label class="ct-l">Valor atual (${esc(m.unit)})</label><input type="number" step="any" min="0" id="us-man" value="${escAttr(m.used)}"><div class="ct-actions"><button type="button" class="ghost" id="us-man-no">Cancelar</button><button type="button" id="us-man-ok">Salvar</button></div>`);
+    o.querySelector('#us-man-no').addEventListener('click', ctClose);
+    o.querySelector('#us-man-ok').addEventListener('click', async () => {
+      const v = Number(o.querySelector('#us-man').value);
+      if(!isFinite(v) || v < 0) return;
+      const { error } = await sb.from('usage_limits').update({ manual_value: v }).eq('key', key);
+      if(error){ ctErr(error); return; }
+      ctClose(); usLoad();
+    });
+  }
+
+  function usUserDetail(id){
+    const u = US.rows.find(x => x.id === id); if(!u) return;
+    const kv = (k, v) => `<div class="fin-kv"><span>${esc(k)}</span><span>${v}</span></div>`;
+    const fnList = Object.keys(u.fn_by || {}).sort((a, b) => u.fn_by[b] - u.fn_by[a]).map(k => kv(US_FN_NAMES[k] || k.replace('fn:', ''), usFmtInt(u.fn_by[k]))).join('') || '<div class="hint">Nenhuma chamada registrada nos últimos 30 dias.</div>';
+    const grpName = { pagante:'Pagante', gratuito:'Gratuito', liberado:'Acesso liberado', equipe:'Equipe' };
+    const o = ctModal(`<h4>${esc(u.name || u.email)}</h4>
+      <div class="hint" style="margin-bottom:10px;">${esc(u.email)} · ${esc(grpName[u.grp])} · cadastro em ${esc(usDate(u.created_at))}</div>
+      <div class="fin-out">
+        ${kv('Último acesso', esc(usDate(u.last_sign_in)))}
+        ${kv('Aberturas do app (30 dias)', usFmtInt(u.opens_30d))}
+        ${kv('Registros no banco', usFmtInt(u.rows))}
+        ${kv('Espaço no banco (estimado)', esc(usBytes(u.db_bytes)))}
+        ${kv('Arquivos guardados', esc(usBytes(u.storage_bytes)))}
+      </div>
+      <h4 style="margin-top:16px;font-size:15px;">Custo estimado por mês</h4>
+      <div class="fin-out">
+        ${kv('Banco de dados', esc(usBRL(u.parts.db)))}
+        ${kv('Arquivos', esc(usBRL(u.parts.storage)))}
+        ${kv('Tráfego (estimado)', esc(usBRL(u.parts.egress)))}
+        ${kv('Chamadas de funções', esc(usBRL(u.parts.fn)))}
+        ${kv('Parte do custo fixo', esc(usBRL(u.fixedPart)))}
+        ${kv('<strong>Custo total</strong>', `<strong>${esc(usBRL(u.cost))}</strong>`)}
+      </div>
+      <h4 style="margin-top:16px;font-size:15px;">Chamadas de funções (30 dias)</h4>
+      <div class="fin-out">${fnList}</div>
+      ${u.pay_count ? `<h4 style="margin-top:16px;font-size:15px;">Pagamentos</h4><div class="fin-out">${kv('Pagamentos aprovados', usFmtInt(u.pay_count))}${kv('Total pago', esc(usBRL(u.paid_gross)))}${kv('Taxas do Mercado Pago', esc(usBRL(u.paid_fee)))}${kv('Líquido recebido', esc(usBRL(u.paid_net)))}${kv('Receita mensal líquida', esc(usBRL(u.monthly_net)))}${u.grp === 'pagante' ? kv('<strong>Resultado por mês</strong>', `<strong class="${u.result >= 0 ? 'us-pos' : 'us-neg'}">${esc(usBRL(u.result))}</strong>`) : ''}</div>` : ''}
+      <div class="ct-actions"><button type="button" class="ghost" id="us-det-close">Fechar</button></div>`);
+    o.querySelector('#us-det-close').addEventListener('click', ctClose);
   }
 
 </script>
