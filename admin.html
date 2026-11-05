@@ -411,6 +411,16 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     </div>
 
     <div class="card">
+      <h4>Alterar senha</h4>
+      <p class="hint" style="margin-bottom:10px;">A nova senha vale para o app e para este painel, porque a conta é a mesma.</p>
+      <input type="password" id="pw-current" placeholder="Senha atual" autocomplete="current-password">
+      <input type="password" id="pw-new" placeholder="Nova senha (mínimo de 8 caracteres)" autocomplete="new-password">
+      <input type="password" id="pw-new2" placeholder="Confirmar nova senha" autocomplete="new-password">
+      <button id="pw-save" style="max-width:240px;">Salvar nova senha</button>
+      <div id="pw-msg" class="hint" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
       <h4>Conta</h4>
       <button class="danger" id="logout-btn" style="max-width:200px;">Sair</button>
     </div>
@@ -1561,6 +1571,25 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     }));
   }
 
+
+    /* ---------- Alterar senha ---------- */
+  document.getElementById('pw-save').addEventListener('click', async function(){
+    const btn = this, msg = document.getElementById('pw-msg');
+    const cur = document.getElementById('pw-current').value, n1 = document.getElementById('pw-new').value, n2 = document.getElementById('pw-new2').value;
+    const show = (t, ok) => { msg.textContent = t; msg.style.color = ok ? 'var(--green-deep)' : 'var(--rust)'; };
+    if(!cur){ show('Digite a senha atual.', false); return; }
+    if(n1.length < 8){ show('A nova senha precisa ter pelo menos 8 caracteres.', false); return; }
+    if(n1 !== n2){ show('As duas senhas novas não são iguais.', false); return; }
+    if(n1 === cur){ show('A nova senha precisa ser diferente da atual.', false); return; }
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    const chk = await sb.auth.signInWithPassword({ email: currentUser.email, password: cur });
+    if(chk.error){ btn.disabled = false; btn.textContent = 'Salvar nova senha'; show('A senha atual está incorreta.', false); return; }
+    const { error } = await sb.auth.updateUser({ password: n1 });
+    btn.disabled = false; btn.textContent = 'Salvar nova senha';
+    if(error){ show(error.message || 'Não foi possível trocar a senha.', false); return; }
+    ['pw-current','pw-new','pw-new2'].forEach(id => document.getElementById(id).value = '');
+    show('Senha alterada com sucesso.', true);
+  });
 
   /* ---------- Custos e limites (só admin) ---------- */
   const US = { report:null, settings:{}, limits:[], metrics:[], rows:[], group:'todos', sortKey:'cost', sortDir:-1, timer:null };
