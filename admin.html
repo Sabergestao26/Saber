@@ -1247,8 +1247,18 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
           <div style="font-weight:600;">${esc(u.full_name || 'Sem nome cadastrado')}${tags ? ` <span class="hint">(${esc(tags)})</span>` : ''}</div>
           <div class="hint">${esc(u.email || '—')}</div>
           <div class="hint">Tel.: ${esc(fmtPhone(u.phone))} &nbsp;·&nbsp; CPF: ${esc(u.cpf_masked || '—')} &nbsp;·&nbsp; Desde ${esc(new Date(u.created_at).toLocaleDateString('pt-BR'))}</div>
+          ${u.is_admin ? '' : `<button type="button" class="ghost" data-setpw="${escAttr(u.id)}" data-setpw-name="${escAttr(u.full_name || u.email || '')}" style="width:auto;padding:6px 12px;margin-top:6px;font-size:13px;">Definir nova senha</button>`}
         </div>`;
       }).join('');
+    area.querySelectorAll('[data-setpw]').forEach(b => b.addEventListener('click', () => setUserPassword(b.dataset.setpw, b.dataset.setpwName)));
+  }
+  async function setUserPassword(id, name){
+    const pw = prompt('Nova senha para ' + name + ' (mínimo 8 caracteres).\nDepois, passe essa senha para a pessoa e peça para ela trocar em Configurações > Dados da conta.');
+    if(pw === null) return;
+    if(pw.length < 8){ alert('A senha precisa ter pelo menos 8 caracteres.'); return; }
+    const { error } = await sb.rpc('admin_set_user_password', { p_user: id, p_password: pw });
+    if(error){ alert('Não foi possível alterar: ' + (error.message || '') + '\nSe for a primeira vez, rode o SQL de senha no Supabase.'); return; }
+    alert('Senha de ' + name + ' alterada. Ela já pode entrar com a nova senha.');
   }
   document.getElementById('users-go').addEventListener('click', searchUsers);
   document.getElementById('users-q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); searchUsers(); } });
