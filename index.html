@@ -1459,10 +1459,10 @@
       return;
     }
     this.disabled = true;
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href.split('#')[0] });
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
     this.disabled = false;
     if(error){ showAuthMessage(error.message, 'err'); return; }
-    showAuthMessage('Enviamos um link pro seu e-mail. Abra ele nesse mesmo aparelho pra criar uma nova senha.', 'ok');
+    showAuthMessage('Enviamos um link pro seu e-mail. Abra ele (olhe também o spam) pra criar uma nova senha.', 'ok');
   });
 
   /* ---------- CPF / telefone (cadastro e login) ---------- */
@@ -2737,9 +2737,27 @@
   }
 
   let hasBooted = false;
+  // Link de redefinição: o Supabase abre o app já com sessão, e sem esta trava o app
+  // entrava direto (ou ficava em branco) em vez de mostrar a tela "Nova senha".
+  let recoveryMode = /(^|[#&?])type=recovery\b/.test(window.location.hash + window.location.search);
+  (function(){
+    const h = window.location.hash + '&' + window.location.search;
+    if(/error_code=|error=access_denied|error_description=/.test(h)){
+      const expired = /otp_expired|expired/i.test(h);
+      try{ history.replaceState(null, '', window.location.pathname); }catch(e){}
+      setTimeout(function(){
+        showAuthMessage(expired ? 'Esse link de redefinição já foi usado ou venceu. Alguns e-mails abrem o link sozinhos antes de você. Digite seu e-mail e toque em "Esqueci minha senha" pra receber um link novo, e abra só o mais recente.' : 'Não foi possível abrir o link. Peça outro em "Esqueci minha senha".', 'err');
+      }, 300);
+    }
+  })();
   sb.auth.onAuthStateChange((event, session)=>{
     if(event === 'PASSWORD_RECOVERY'){
-      openSetNewPasswordModal();
+      recoveryMode = true;
+      setTimeout(openSetNewPasswordModal, 0);
+      return;
+    }
+    if(recoveryMode && session && session.user){
+      if(!document.getElementById('reset-form')) setTimeout(openSetNewPasswordModal, 0);
       return;
     }
     if(session && session.user){
@@ -2794,6 +2812,8 @@
       if(sessionData && sessionData.session && sessionData.session.user){
         currentUser = sessionData.session.user;
         hasBooted = true;
+        recoveryMode = false;
+        try{ history.replaceState(null, '', window.location.pathname); }catch(e){}
         setTimeout(()=> boot(), 600);
       }
     });
