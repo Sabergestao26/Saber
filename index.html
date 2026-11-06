@@ -320,7 +320,7 @@
   .fr-load-box-detail{ border-style:solid; }
   .fr-last-load{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--green-deep); margin:2px 0 10px; }
   .fr-last-load b{ font-weight:600; }
-  .fr-load-set-row{ display:grid; grid-template-columns: 58px minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:center; margin-bottom:6px; }
+  .fr-load-set-row{ display:grid; grid-template-columns: auto minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:center; margin-bottom:6px; }
   .fr-load-set-row-detail{
     display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;
     padding:8px 0; border-bottom:1px dashed var(--border);
@@ -540,7 +540,7 @@
   .fr-modal-close{ position:absolute; top:16px; right:16px; background:none; border:none; cursor:pointer; font-size:20px; color: var(--ink-soft); line-height:1; padding:4px; }
   .fr-modal-close:hover{ color: var(--ink); }
   /* Treino, avaliação e cardio abrem em página inteira (sem janela flutuante) */
-  .fr-overlay-page{ background:var(--card); padding:0; align-items:stretch; overflow-x:hidden; }
+  .fr-overlay-page{ background:var(--card); padding:0; align-items:stretch; overflow-x:hidden; width:100%; max-width:100vw; left:0; right:0; overscroll-behavior:contain; }
   .fr-overlay-page .fr-modal{ max-width:720px; width:100%; min-width:0; border-radius:0; box-shadow:none; background:transparent; margin:0 auto; padding:0 18px 40px; min-height:100%; box-sizing:border-box; }
   .fr-overlay-page .fr-modal-close{ display:none; }
   .fr-page-bar{ position:sticky; top:0; z-index:5; background:var(--card); display:flex; align-items:center; padding:12px 0; margin:0 -18px 14px; padding-left:18px; padding-right:18px; border-bottom:1px solid var(--border); }
@@ -877,6 +877,11 @@
 .fr-pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;background:transparent;color:var(--ink,#262B1E);opacity:.65;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;padding:0;}
 .fr-pw-toggle:hover,.fr-pw-toggle:focus-visible{opacity:1;outline:2px solid currentColor;}
 .fr-pw-toggle svg{width:20px;height:20px;}
+  /* Página de treino fixa: sem rolagem lateral e sem aumento automático de texto no iPhone */
+  html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  html, body{ max-width:100%; overflow-x:hidden; }
+  .fr-overlay-page input, .fr-overlay-page select, .fr-overlay-page textarea, .fr-overlay-page button{ max-width:100%; }
+  .fr-load-box{ max-width:100%; box-sizing:border-box; overflow:hidden; }
 </style>
 </head>
 <body>
@@ -6007,7 +6012,51 @@
   // Mostra, embaixo do nome de cada exercício, a carga da última vez
   // que a pessoa treinou e liga o botão "Usar carga anterior", que
   // preenche as séries de hoje (a pessoa ainda pode editar antes de salvar).
+  // Liga o botão "Usar carga anterior" de um exercício. Pode ser chamado mais de
+  // uma vez (pela busca geral e pela busca da caixa aberta): só liga uma vez.
+  function wireUseLast(ex, sets, dateStr){
+    try{
+      const nums = Object.keys(sets).map(Number).sort((a,b)=>a-b);
+      if(!nums.length) return;
+      const label = document.getElementById(`fr-ex-last-${ex.id}`);
+      if(label && dateStr){
+        const parts = nums.map(n=>{
+          const x = sets[n];
+          const w = x.w!=null ? `${x.w}kg` : '';
+          const r = x.r!=null ? `${x.r}` : '';
+          return w && r ? `${w} × ${r}` : (w || (r ? `${r} reps` : ''));
+        }).filter(Boolean);
+        if(parts.length){
+          label.innerHTML = `Última carga (${esc(formatDateLabel(dateStr))}): <b>${esc(parts.join(' · '))}</b>`;
+          label.style.display = '';
+        }
+      }
+      const useBtn = document.getElementById(`fr-ex-use-last-${ex.id}`);
+      if(!useBtn) return;
+      useBtn.style.display = '';
+      if(useBtn.dataset.wired) return;
+      useBtn.dataset.wired = '1';
+      useBtn.addEventListener('click', ()=>{
+        const box = document.getElementById(`fr-ex-load-box-${ex.id}`);
+        if(!box) return;
+        box.querySelectorAll('.fr-load-set-row').forEach(row=>{
+          const n = parseInt(row.getAttribute('data-set'), 10);
+          // Se hoje tem mais séries que da última vez, repete os valores da última série feita.
+          const src = sets[n] || sets[nums[nums.length-1]];
+          const w = row.querySelector('.fr-load-weight');
+          const r = row.querySelector('.fr-load-reps');
+          if(w) w.value = (src && src.w!=null) ? src.w : '';
+          if(r) r.value = (src && src.r!=null) ? src.r : '';
+        });
+        showToast('Carga anterior preenchida. Ajuste o que mudou e salve.', 'ok');
+      });
+    }catch(e){ console.warn('usar carga anterior', e); }
+  }
+
   async function loadLastLoads(exercises){
+    try{ await loadLastLoadsInner(exercises); }catch(e){ console.warn('últimas cargas', e); }
+  }
+  async function loadLastLoadsInner(exercises){
     const ids = exercises.map(e=>e.id);
     if(!ids.length) return;
     let q = sb.from('exercise_load_logs').select('exercise_id, set_number, weight_kg, reps_done, session_id, created_at')
@@ -6027,39 +6076,7 @@
     exercises.forEach(ex=>{
       const last = byEx[ex.id];
       if(!last) return;
-      const nums = Object.keys(last.sets).map(Number).sort((a,b)=>a-b);
-      if(!nums.length) return;
-      const label = document.getElementById(`fr-ex-last-${ex.id}`);
-      if(label){
-        const parts = nums.map(n=>{
-          const x = last.sets[n];
-          const w = x.w!=null ? `${x.w}kg` : '';
-          const r = x.r!=null ? `${x.r}` : '';
-          return w && r ? `${w} × ${r}` : (w || (r ? `${r} reps` : ''));
-        }).filter(Boolean);
-        if(parts.length){
-          label.innerHTML = `Última carga (${esc(formatDateLabel(last.date))}): <b>${esc(parts.join(' · '))}</b>`;
-          label.style.display = '';
-        }
-      }
-      const useBtn = document.getElementById(`fr-ex-use-last-${ex.id}`);
-      if(useBtn){
-        useBtn.style.display = '';
-        useBtn.addEventListener('click', ()=>{
-          const box = document.getElementById(`fr-ex-load-box-${ex.id}`);
-          if(!box) return;
-          box.querySelectorAll('.fr-load-set-row').forEach(row=>{
-            const n = parseInt(row.getAttribute('data-set'), 10);
-            // Se hoje tem mais séries que da última vez, repete os valores da última série feita.
-            const src = last.sets[n] || last.sets[nums[nums.length-1]];
-            const w = row.querySelector('.fr-load-weight');
-            const r = row.querySelector('.fr-load-reps');
-            if(w) w.value = (src && src.w!=null) ? src.w : '';
-            if(r) r.value = (src && src.r!=null) ? src.r : '';
-          });
-          showToast('Carga anterior preenchida. Ajuste o que mudou e salve.', 'ok');
-        });
-      }
+      wireUseLast(ex, last.sets, last.date);
     });
   }
 
@@ -6080,6 +6097,9 @@
     data.filter(l=> l.session_id===lastSessionId).forEach(l=>{
       if(!(l.set_number in bySet)) bySet[l.set_number] = l;
     });
+    const setsMap = {};
+    Object.keys(bySet).forEach(k=>{ setsMap[k] = { w: bySet[k].weight_kg, r: bySet[k].reps_done }; });
+    wireUseLast(ex, setsMap, data[0].created_at ? data[0].created_at.slice(0,10) : null);
     Object.keys(bySet).forEach(setNum=>{
       const row = box.querySelector(`.fr-load-set-row[data-set="${setNum}"]`);
       if(!row) return;
