@@ -883,34 +883,27 @@
   .fr-overlay-page input, .fr-overlay-page select, .fr-overlay-page textarea, .fr-overlay-page button{ max-width:100%; }
   .fr-load-box{ max-width:100%; box-sizing:border-box; overflow:hidden; }
 
-  /* ---------- Visual novo (teste, só administradores): uma paleta por aba ---------- */
-  /* Fio condutor entre as abas: grafite quente no texto + dourado-mel nos detalhes. */
+  /* ---------- Visual novo (teste, só administradores): uma cor de destaque por aba ---------- */
+  /* Em comum nas três abas: mesmo fundo neutro, grafite no texto/filtros/menu e pedra clara em bordas e trilhos. */
   html:not([data-theme="dark"])[data-tabtheme]{
-    --ink:#2E2A2B; --ink-soft:#7A7172; --gold:#C8A15A;
-    --border:rgba(46,42,43,0.13); --shadow:0 2px 8px rgba(46,42,43,0.08);
-    --card:#FFFDF9; --surface:#FFFEFC; --on-accent:#FFFFFF;
+    --paper:#F5F3EF; --paper-deep:#EAE6DF; --card:#FFFFFF; --surface:#FFFFFF;
+    --ink:#26282B; --ink-soft:#76787C; --on-accent:#FFFFFF;
+    --border:rgba(38,40,43,0.13); --shadow:0 2px 8px rgba(38,40,43,0.06);
+    --accent-soft:#DDD6CB; --accent-soft-ink:#26282B;
   }
   html:not([data-theme="dark"])[data-tabtheme="alimentacao"]{
-    --paper:#F6F1E7; --paper-deep:#EBE4D3; --card:#FFFDF8;
-    --green:#6F8F5E; --green-deep:#5E7F4F; --green-deep-hover:#506C43;
-    --accent:#5E7F4F; --accent-soft:#DCE7D1; --accent-soft-ink:#2F4A25;
+    --green:#C08A18; --green-deep:#B07A12; --green-deep-hover:#94650D; --accent:#B07A12;
   }
   html:not([data-theme="dark"])[data-tabtheme="treino"]{
-    --paper:#F6EDE7; --paper-deep:#ECDDD3; --card:#FFFBF8;
-    --green:#C26B4A; --green-deep:#B85F3E; --green-deep-hover:#9E4F32;
-    --accent:#B85F3E; --accent-soft:#F2D6C7; --accent-soft-ink:#6E301A;
+    --green:#2B7380; --green-deep:#1F5F6B; --green-deep-hover:#184D57; --accent:#1F5F6B;
   }
   html:not([data-theme="dark"])[data-tabtheme="estudos"]{
-    --paper:#F4F3F0; --paper-deep:#E7E4DE; --card:#FFFFFF;
-    --green:#3F7D68; --green-deep:#2F6B57; --green-deep-hover:#265847;
-    --accent:#2F6B57; --accent-soft:#E6D9CA; --accent-soft-ink:#3D2F22;
+    --green:#3F7D68; --green-deep:#2F6B57; --green-deep-hover:#265847; --accent:#2F6B57; --accent-soft:#E6D9CA;
   }
-  html:not([data-theme="dark"])[data-tabtheme] body{ background:var(--paper); }
-  html:not([data-theme="dark"])[data-tabtheme] .fr-btn-primary{ color:#fff; box-shadow:0 2px 0 var(--gold); }
+  html:not([data-theme="dark"])[data-tabtheme] body{ background:var(--paper); background-image:none; }
+  html:not([data-theme="dark"])[data-tabtheme] .fr-btn-primary{ color:#fff; }
   html:not([data-theme="dark"])[data-tabtheme] .fr-view-tab.active,
-  html:not([data-theme="dark"])[data-tabtheme] .fr-tab.active{ background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 2px 0 var(--gold); }
-  html:not([data-theme="dark"])[data-tabtheme] .fr-title::after{ content:""; display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--gold); margin-left:8px; vertical-align:middle; }
-  html:not([data-theme="dark"])[data-tabtheme] .fr-title span.fr-eyebrow::after{ content:none; }
+  html:not([data-theme="dark"])[data-tabtheme] .fr-tab.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
 </style>
 </head>
 <body>
