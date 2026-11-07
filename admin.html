@@ -1602,15 +1602,14 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
   });
 
   /* ---------- Custos e limites (só admin) ---------- */
-  const US = { report:null, settings:{}, limits:[], metrics:[], rows:[], group:'todos', sortKey:'cost', sortDir:-1, timer:null };
+  const US = { month:'', report:null, settings:{}, limits:[], metrics:[], rows:[], group:'todos', sortKey:'cost', sortDir:-1, timer:null };
   const usNum = (v, d) => { const n = Number(v); return isFinite(n) ? n : (d || 0); };
   const usFmtInt = n => Math.round(n).toLocaleString('pt-BR');
   function usFmtNum(n){ return Number(n).toLocaleString('pt-BR', { maximumFractionDigits: n >= 100 ? 0 : (n >= 10 ? 1 : 2) }); }
   function usBRL(v){
     v = usNum(v);
     if(v === 0) return 'R$ 0,00';
-    if(Math.abs(v) < 0.0001) return (v < 0 ? '-' : '') + 'menos de R$ 0,0001';
-    if(Math.abs(v) < 0.01) return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL', minimumFractionDigits:4, maximumFractionDigits:4 });
+    if(Math.abs(v) < 0.01) return (v < 0 ? '-' : '') + 'menos de R$ 0,01';
     return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
   }
   function usBytes(b){
@@ -1629,11 +1628,35 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     'fn:study-ai':'Estudos com IA', 'fn:login-phone':'Entrar por telefone'
   };
 
+  // Período escolhido: '' = últimos 30 dias; 'AAAA-MM' = aquele mês inteiro.
+  function usPeriodArgs(){
+    if(!US.month) return {};
+    const [y, m] = US.month.split('-').map(Number);
+    return { p_from: new Date(y, m - 1, 1).toISOString(), p_to: new Date(y, m, 1).toISOString() };
+  }
+  function usPer(){ return US.month ? 'no mês' : '30 dias'; }
+  function usMonthName(ym){
+    const [y, m] = ym.split('-').map(Number);
+    const t = new Intl.DateTimeFormat('pt-BR', { month:'long', year:'numeric' }).format(new Date(y, m - 1, 1));
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function usMonthOptions(){
+    const out = [], now = new Date();
+    const since = US.report && US.report.tracking_since ? new Date(US.report.tracking_since) : now;
+    let y = now.getFullYear(), m = now.getMonth();
+    for(let i = 0; i < 24; i++){
+      out.push(y + '-' + String(m + 1).padStart(2, '0'));
+      if(y < since.getFullYear() || (y === since.getFullYear() && m <= since.getMonth())) break;
+      m--; if(m < 0){ m = 11; y--; }
+    }
+    return out;
+  }
+
   async function usLoad(){
     const body = document.getElementById('us-body');
     if(body && !US.report) body.innerHTML = '<p class="hint">Carregando...</p>';
     const [rep, set, lim] = await Promise.all([
-      sb.rpc('admin_usage_report'),
+      sb.rpc('admin_usage_report', usPeriodArgs()),
       sb.from('usage_settings').select('key,value'),
       sb.from('usage_limits').select('*').order('sort')
     ]);
@@ -1648,7 +1671,7 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     usCompute();
     usRenderBanner();
     usRender();
-    if(!US.timer) US.timer = setInterval(() => { usLoad(); }, 10 * 60 * 1000);
+    if(!US.timer) US.timer = setInterval(() => { if(!US.month) usLoad(); }, 10 * 60 * 1000);
   }
 
   function usPlan(){ return US.settings.plan === 'pro' ? 'pro' : 'free'; }
@@ -1709,7 +1732,7 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
 
   function usRenderBanner(){
     const el = document.getElementById('us-alert'), badge = document.getElementById('badge-custos');
-    const alerts = US.metrics.filter(m => m.status !== 'ok');
+    const alerts = US.month ? [] : US.metrics.filter(m => m.status !== 'ok');
     if(badge){ badge.textContent = alerts.length; badge.style.display = alerts.length ? '' : 'none'; }
     if(!el) return;
     if(!alerts.length){ el.style.display = 'none'; el.innerHTML = ''; return; }
@@ -1772,14 +1795,21 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     filt.sort((a, b) => { const A = keyf(a), B = keyf(b); return (A > B ? 1 : A < B ? -1 : 0) * US.sortDir; });
     const grpName = { pagante:'Pagante', gratuito:'Gratuito', liberado:'Acesso liberado', equipe:'Equipe' };
     const th = (k, t) => `<th data-us-sort="${k}" class="${US.sortKey === k ? 'on' : ''}">${t}${US.sortKey === k ? (US.sortDir > 0 ? ' ↑' : ' ↓') : ''}</th>`;
-    const tbl = `<div class="us-tw"><table class="us-t"><thead><tr>${th('name','Pessoa')}${th('grp','Grupo')}${th('last','Último acesso')}${th('opens','Aberturas (30 dias)')}${th('fn','Chamadas de funções (30 dias)')}${th('data','Dados guardados')}${th('cost','Custo por mês')}${th('revenue','Receita por mês')}${th('result','Resultado')}</tr></thead><tbody>` +
+    const tbl = `<div class="us-tw"><table class="us-t"><thead><tr>${th('name','Pessoa')}${th('grp','Grupo')}${th('last','Último acesso')}${th('opens','Aberturas (' + usPer() + ')')}${th('fn','Chamadas de funções (' + usPer() + ')')}${th('data','Dados guardados')}${th('cost','Custo por mês')}${th('revenue','Receita por mês')}${th('result','Resultado')}</tr></thead><tbody>` +
       (filt.length ? filt.map(x => `<tr data-us-user="${escAttr(x.id)}"><td><div class="us-nm">${esc(x.name || x.email)}</div>${x.name ? `<div class="hint">${esc(x.email)}</div>` : ''}</td><td>${esc(grpName[x.grp])}</td><td>${esc(usDate(x.last_sign_in))}</td><td>${usFmtInt(x.opens_30d)}</td><td>${usFmtInt(x.fn_30d)}</td><td>${esc(usBytes(usNum(x.db_bytes) + usNum(x.storage_bytes)))}</td><td>${esc(usBRL(x.cost))}</td><td>${x.grp === 'pagante' ? esc(usBRL(x.revenue)) : '-'}</td><td class="${x.grp === 'pagante' ? (x.result >= 0 ? 'us-pos' : 'us-neg') : ''}">${x.grp === 'pagante' ? esc(usBRL(x.result)) : '-'}</td></tr>`).join('') : '<tr><td colspan="9" class="hint">Ninguém neste grupo.</td></tr>') +
       '</tbody></table></div>';
 
     const opt = (v, t) => `<option value="${v}" ${US.group === v ? 'selected' : ''}>${t}</option>`;
     const setIn = (k, label, step) => `<div><label class="ct-l">${esc(label)}</label><input type="number" step="${step || 'any'}" min="0" data-us-set="${k}" value="${escAttr(S[k] ?? '')}"></div>`;
 
+    const monthOpts = usMonthOptions().map(ym => `<option value="${ym}" ${US.month === ym ? 'selected' : ''}>${esc(usMonthName(ym))}</option>`).join('');
     body.innerHTML = `
+      <div class="card">
+        <h4>Período do relatório</h4>
+        <div class="us-filter"><select id="us-month" class="fin-sm"><option value="" ${US.month ? '' : 'selected'}>Últimos 30 dias (atual)</option>${monthOpts}</select>
+        <span class="hint">${US.month ? esc('Mostrando ' + usMonthName(US.month) + '. Aberturas, chamadas de funções e pagamentos são do mês escolhido; o espaço de dados e de arquivos é o de hoje (o Supabase não guarda o histórico dele). Os alertas de limite só aparecem no período atual.') : 'Escolha um mês para ver o relatório de meses anteriores.'}</span></div>
+      </div>
+
       <div class="card">
         <h4>Limites do plano atual</h4>
         <div class="us-planrow"><span class="hint">Plano em uso:</span>
@@ -1794,7 +1824,7 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
         <p class="hint" style="margin-bottom:12px;">${trackedDays ? `O registro de uso começou há ${usFmtInt(trackedDays)} ${trackedDays === 1 ? 'dia' : 'dias'}, então aberturas e chamadas de funções ainda são parciais.` : 'O registro de aberturas e chamadas começa quando a nova versão do app for aberta pelas pessoas.'}</p>
         <div class="grid">${groupHtml}</div>
         <p style="margin-top:12px;font-size:14px;line-height:1.5;">${esc(breakeven)}</p>
-        ${pag.length ? `<p class="hint" style="margin-top:6px;">Cada pagante deixa em média ${esc(usBRL(marginPag))} por mês depois do próprio custo${costFree > 0 && marginPag > 0 ? (marginPag / costFree > 1000 ? '; isso é muito mais do que o custo de todos os gratuitos juntos' : `; isso paga o custo de cerca de ${usFmtInt(marginPag / costFree)} gratuitos`) : ''}.</p>` : ''}
+        ${pag.length ? `<p class="hint" style="margin-top:6px;">Cada pagante deixa em média ${esc(usBRL(marginPag))} por mês depois do próprio custo${costFree > 0 && marginPag > 0 ? `; isso paga o custo de cerca de ${usFmtInt(marginPag / costFree)} gratuitos` : ''}.</p>` : ''}
         <p class="hint" style="margin-top:10px;">Hoje o Saber está no plano ${esc(usPlanLabel())}${usPlan() === 'free' ? ', então você não paga nada em dinheiro pelo uso. Os valores em reais mostram o custo equivalente, se cada recurso fosse cobrado pelo preço do plano Pro. Servem para comparar pessoas e decidir se compensa.' : '.'} A receita é o valor mensal líquido (já sem a taxa do Mercado Pago).</p>
       </div>
 
@@ -1821,6 +1851,7 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
       const v = this.value;
       await usSaveSettings({ plan: v, ...(v === 'pro' && !usNum(S.fixed_cost_brl) ? { fixed_cost_brl: String((25 * usNum(S.usd_brl, 5.5)).toFixed(2)) } : {}), ...(v === 'free' ? { fixed_cost_brl: '0' } : {}) });
     });
+    body.querySelector('#us-month').addEventListener('change', async function(){ US.month = this.value; await usLoad(); });
     body.querySelector('#us-group').addEventListener('change', function(){ US.group = this.value; usRender(); });
     body.querySelectorAll('[data-us-sort]').forEach(h => h.addEventListener('click', () => {
       const k = h.getAttribute('data-us-sort');
@@ -1858,13 +1889,13 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
   function usUserDetail(id){
     const u = US.rows.find(x => x.id === id); if(!u) return;
     const kv = (k, v) => `<div class="fin-kv"><span>${esc(k)}</span><span>${v}</span></div>`;
-    const fnList = Object.keys(u.fn_by || {}).sort((a, b) => u.fn_by[b] - u.fn_by[a]).map(k => kv(US_FN_NAMES[k] || k.replace('fn:', ''), usFmtInt(u.fn_by[k]))).join('') || '<div class="hint">Nenhuma chamada registrada nos últimos 30 dias.</div>';
+    const fnList = Object.keys(u.fn_by || {}).sort((a, b) => u.fn_by[b] - u.fn_by[a]).map(k => kv(US_FN_NAMES[k] || k.replace('fn:', ''), usFmtInt(u.fn_by[k]))).join('') || '<div class="hint">Nenhuma chamada registrada neste período.</div>';
     const grpName = { pagante:'Pagante', gratuito:'Gratuito', liberado:'Acesso liberado', equipe:'Equipe' };
     const o = ctModal(`<h4>${esc(u.name || u.email)}</h4>
       <div class="hint" style="margin-bottom:10px;">${esc(u.email)} · ${esc(grpName[u.grp])} · cadastro em ${esc(usDate(u.created_at))}</div>
       <div class="fin-out">
         ${kv('Último acesso', esc(usDate(u.last_sign_in)))}
-        ${kv('Aberturas do app (30 dias)', usFmtInt(u.opens_30d))}
+        ${kv('Aberturas do app (' + usPer() + ')', usFmtInt(u.opens_30d))}
         ${kv('Registros no banco', usFmtInt(u.rows))}
         ${kv('Espaço no banco (estimado)', esc(usBytes(u.db_bytes)))}
         ${kv('Arquivos guardados', esc(usBytes(u.storage_bytes)))}
@@ -1878,7 +1909,7 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
         ${kv('Parte do custo fixo', esc(usBRL(u.fixedPart)))}
         ${kv('<strong>Custo total</strong>', `<strong>${esc(usBRL(u.cost))}</strong>`)}
       </div>
-      <h4 style="margin-top:16px;font-size:15px;">Chamadas de funções (30 dias)</h4>
+      <h4 style="margin-top:16px;font-size:15px;">Chamadas de funções (${usPer()})</h4>
       <div class="fin-out">${fnList}</div>
       ${u.pay_count ? `<h4 style="margin-top:16px;font-size:15px;">Pagamentos</h4><div class="fin-out">${kv('Pagamentos aprovados', usFmtInt(u.pay_count))}${kv('Total pago', esc(usBRL(u.paid_gross)))}${kv('Taxas do Mercado Pago', esc(usBRL(u.paid_fee)))}${kv('Líquido recebido', esc(usBRL(u.paid_net)))}${kv('Receita mensal líquida', esc(usBRL(u.monthly_net)))}${u.grp === 'pagante' ? kv('<strong>Resultado por mês</strong>', `<strong class="${u.result >= 0 ? 'us-pos' : 'us-neg'}">${esc(usBRL(u.result))}</strong>`) : ''}</div>` : ''}
       <div class="ct-actions"><button type="button" class="ghost" id="us-det-close">Fechar</button></div>`);

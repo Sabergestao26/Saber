@@ -1811,6 +1811,7 @@
             <option value="5" ${currentProfile.report_day===5?'selected':''}>Sexta-feira</option>
             <option value="6" ${currentProfile.report_day===6?'selected':''}>Sábado</option>
           </select>
+          <button type="button" class="fr-btn-ghost" id="fr-report-history" style="width:100%;margin-top:10px;">Ver relatórios anteriores (semanas e meses)</button>
         </div>
         <div class="fr-settings-section">
           <h4>Tenho um código promocional</h4>
@@ -1979,6 +1980,7 @@
         setThemePref(this.value);
       });
 
+      container.querySelector('#fr-report-history').addEventListener('click', ()=> openMyReportViewer());
       container.querySelector('#fr-report-day').addEventListener('change', async function(){
         const val = parseInt(this.value, 10);
         const { error } = await sb.from('profiles').update({ report_day: val }).eq('id', currentUser.id);
@@ -2306,58 +2308,16 @@
 
   async function viewClientWeeklyReport(client){
     const overlay = buildOverlay(`
-      <h3 class="fr-form-title">Relatório semanal — ${esc(client.email)}</h3>
+      <h3 class="fr-form-title">Relatório — ${esc(client.email)}</h3>
       <div id="fr-client-report-content"><div class="fr-loading">Carregando...</div></div>
     `);
     const contentEl = overlay.querySelector('#fr-client-report-content');
-
-    const end = todayStr();
-    const start = shiftDateStr(end, -6);
-    const [{ data: targetsRow }, { data: completions }, { data: waters }, { data: logs }, { data: burns }] = await Promise.all([
-      sb.from('daily_targets').select('*').eq('user_id', client.client_id).maybeSingle(),
-      sb.from('workout_completions').select('date').eq('user_id', client.client_id).gte('date', start).lte('date', end),
-      sb.from('water_logs').select('date, amount_ml').eq('user_id', client.client_id).gte('date', start).lte('date', end),
-      sb.from('diary_logs').select('date, protein, calories').eq('user_id', client.client_id).gte('date', start).lte('date', end),
-      sb.from('calories_burned_logs').select('amount').eq('user_id', client.client_id).gte('date', start).lte('date', end)
-    ]);
-
+    const { data: targetsRow } = await sb.from('daily_targets').select('*').eq('user_id', client.client_id).maybeSingle();
     if(!targetsRow){
       contentEl.innerHTML = `<p class="fr-hint">Esse cliente ainda não definiu metas diárias, então não dá pra calcular o relatório.</p>`;
       return;
     }
-
-    const trainedDays = new Set((completions||[]).map(c=>c.date));
-    const waterByDay = {}; (waters||[]).forEach(w=>{ waterByDay[w.date]=(waterByDay[w.date]||0)+n0(w.amount_ml); });
-    const proteinByDay = {}, calByDay = {};
-    (logs||[]).forEach(l=>{
-      proteinByDay[l.date] = (proteinByDay[l.date]||0) + n0(l.protein);
-      calByDay[l.date] = (calByDay[l.date]||0) + n0(l.calories);
-    });
-    const burnedTotal = (burns||[]).reduce((s,b)=> s+n0(b.amount), 0);
-    const waterGoal = Number(targetsRow.water_goal_ml) || 0;
-    const proteinGoal = Number(targetsRow.protein) || 0;
-    const calGoal = Number(targetsRow.calories) || 0;
-    const burnGoal = Number(targetsRow.weekly_calories_burned) || 0;
-
-    let trainedCount=0, waterCount=0, proteinCount=0, calCount=0;
-    for(let i=0;i<7;i++){
-      const d = shiftDateStr(start, i);
-      if(trainedDays.has(d)) trainedCount++;
-      if(waterGoal>0 && (waterByDay[d]||0)>=waterGoal) waterCount++;
-      if(proteinGoal>0 && (proteinByDay[d]||0)>=proteinGoal) proteinCount++;
-      if(calGoal>0 && calByDay[d]!==undefined && calByDay[d]<=calGoal) calCount++;
-    }
-
-    contentEl.innerHTML = `
-      <p class="fr-hint" style="margin-bottom:14px;">${esc(formatDateLabel(start))} até ${esc(formatDateLabel(end))}</p>
-      <div class="fr-report-grid">
-        <div class="fr-report-stat"><span class="fr-report-num">${trainedCount}/7</span><span class="fr-report-label">dias treinados</span></div>
-        <div class="fr-report-stat"><span class="fr-report-num">${waterCount}/7</span><span class="fr-report-label">meta de água</span></div>
-        <div class="fr-report-stat"><span class="fr-report-num">${proteinCount}/7</span><span class="fr-report-label">meta de proteína</span></div>
-        <div class="fr-report-stat"><span class="fr-report-num">${calCount}/7</span><span class="fr-report-label">dentro das calorias</span></div>
-        ${burnGoal>0 ? `<div class="fr-report-stat"><span class="fr-report-num">${Math.round(burnedTotal)}</span><span class="fr-report-label">kcal gastas / ${burnGoal}</span></div>` : ''}
-      </div>
-    `;
+    mountReportViewer(contentEl, { userId: client.client_id, tg: targetsRow, withTips: false });
   }
 
   const WITHINGS_CLIENT_ID = '93b8137c6ca62be92f25630f554f242be66bcce95d97388c1b444ac7dcda087b';
@@ -8916,15 +8876,30 @@
     }
   }
 
-  async function generateWeeklyReport(){
-    const end = todayStr();
-    const start = shiftDateStr(end, -6);
-    await loadTargetsOnce();
+  /* ---------- Visualizador de relatórios (semana e mês, com histórico) ---------- */
+  function reportRange(mode, offset){
+    const today = todayStr();
+    if(mode === 'week'){
+      const end = shiftDateStr(today, -7*offset);
+      return { start: shiftDateStr(end, -6), end, n: 7 };
+    }
+    const [y, m] = today.split('-').map(Number);
+    const first = new Date(y, m-1-offset, 1);
+    const last = new Date(first.getFullYear(), first.getMonth()+1, 0);
+    const start = first.getFullYear()+'-'+pad(first.getMonth()+1)+'-01';
+    let end = last.getFullYear()+'-'+pad(last.getMonth()+1)+'-'+pad(last.getDate());
+    if(end > today) end = today;
+    const n = Math.round((new Date(end+'T00:00:00') - new Date(start+'T00:00:00')) / 86400000) + 1;
+    const label = new Intl.DateTimeFormat('pt-BR', { month:'long', year:'numeric' }).format(first);
+    return { start, end, n, label: label.charAt(0).toUpperCase()+label.slice(1) };
+  }
+
+  async function computeReport(userId, tg, start, end, n){
     const [{ data: completions }, { data: waters }, { data: logs }, { data: burns }] = await Promise.all([
-      sb.from('workout_completions').select('date').eq('user_id', currentUser.id).gte('date', start).lte('date', end),
-      sb.from('water_logs').select('date, amount_ml').eq('user_id', currentUser.id).gte('date', start).lte('date', end),
-      sb.from('diary_logs').select('date, protein, calories').eq('user_id', currentUser.id).gte('date', start).lte('date', end),
-      sb.from('calories_burned_logs').select('amount').eq('user_id', currentUser.id).gte('date', start).lte('date', end)
+      sb.from('workout_completions').select('date').eq('user_id', userId).gte('date', start).lte('date', end).limit(5000),
+      sb.from('water_logs').select('date, amount_ml').eq('user_id', userId).gte('date', start).lte('date', end).limit(5000),
+      sb.from('diary_logs').select('date, protein, calories').eq('user_id', userId).gte('date', start).lte('date', end).limit(5000),
+      sb.from('calories_burned_logs').select('amount').eq('user_id', userId).gte('date', start).lte('date', end).limit(5000)
     ]);
     const trainedDays = new Set((completions||[]).map(c=>c.date));
     const waterByDay = {}; (waters||[]).forEach(w=>{ waterByDay[w.date]=(waterByDay[w.date]||0)+n0(w.amount_ml); });
@@ -8933,51 +8908,105 @@
       proteinByDay[l.date] = (proteinByDay[l.date]||0) + n0(l.protein);
       calByDay[l.date] = (calByDay[l.date]||0) + n0(l.calories);
     });
-    const burnedTotal = (burns||[]).reduce((s,b)=> s+n0(b.amount), 0);
-    const waterGoal = Number(targets && targets.water_goal_ml) || 0;
-    const proteinGoal = Number(targets && targets.protein) || 0;
-    const calGoal = Number(targets && targets.calories) || 0;
-    const burnGoal = Number(targets && targets.weekly_calories_burned) || 0;
-
+    const burnedTotal = (burns||[]).reduce((sum,b)=> sum+n0(b.amount), 0);
+    const waterGoal = Number(tg && tg.water_goal_ml) || 0;
+    const proteinGoal = Number(tg && tg.protein) || 0;
+    const calGoal = Number(tg && tg.calories) || 0;
+    const burnGoalWeek = Number(tg && tg.weekly_calories_burned) || 0;
+    const burnGoal = Math.round(burnGoalWeek * n / 7);
     let trainedCount=0, waterCount=0, proteinCount=0, calCount=0;
-    for(let i=0;i<7;i++){
+    for(let i=0;i<n;i++){
       const d = shiftDateStr(start, i);
       if(trainedDays.has(d)) trainedCount++;
       if(waterGoal>0 && (waterByDay[d]||0)>=waterGoal) waterCount++;
       if(proteinGoal>0 && (proteinByDay[d]||0)>=proteinGoal) proteinCount++;
       if(calGoal>0 && calByDay[d]!==undefined && calByDay[d]<=calGoal) calCount++;
     }
-
-    const tips = [];
-    if(trainedCount < 3) tips.push('Você treinou menos de 3 dias essa semana. Que tal fixar dias específicos na agenda pra criar o hábito?');
-    if(waterGoal>0 && waterCount < 4) tips.push('A meta de água ficou de fora na maior parte dos dias. Tente deixar uma garrafa visível como lembrete.');
-    if(proteinGoal>0 && proteinCount < 4) tips.push('A meta de proteína também ficou baixa. Inclua uma fonte de proteína em cada refeição pra facilitar.');
-    if(calGoal>0 && calCount < 4) tips.push('As calorias passaram do previsto na maioria dos dias. Vale revisar as porções das refeições mais calóricas.');
-    if(burnGoal>0 && burnedTotal < burnGoal) tips.push('A meta de calorias gastas na semana ainda não foi atingida. Vale intensificar um pouco os treinos ou a atividade dos próximos dias.');
-    if(tips.length===0) tips.push('Semana muito consistente! Continue assim.');
-
-    showWeeklyReportModal({ trainedCount, waterCount, proteinCount, calCount, burnedTotal, burnGoal, tips, start, end });
-    notifyLinkedProfessionalOfReport();
-
-    const { error } = await sb.from('profiles').update({ last_report_shown_date: todayStr() }).eq('id', currentUser.id);
-    if(!error){ currentProfile.last_report_shown_date = todayStr(); }
+    return { trainedCount, waterCount, proteinCount, calCount, burnedTotal, burnGoal, waterGoal, proteinGoal, calGoal };
   }
 
-  function showWeeklyReportModal({ trainedCount, waterCount, proteinCount, calCount, burnedTotal, burnGoal, tips, start, end }){
-    const overlay = buildOverlay(`
-      <h3 class="fr-form-title">Relatório da semana</h3>
-      <p class="fr-hint" style="margin-bottom:16px;">${esc(formatDateLabel(start))} até ${esc(formatDateLabel(end))}</p>
-      <div class="fr-report-grid">
-        <div class="fr-report-stat"><span class="fr-report-num">${trainedCount}/7</span><span class="fr-report-label">dias treinados</span></div>
-        <div class="fr-report-stat"><span class="fr-report-num">${waterCount}/7</span><span class="fr-report-label">meta de água</span></div>
-        <div class="fr-report-stat"><span class="fr-report-num">${proteinCount}/7</span><span class="fr-report-label">meta de proteína</span></div>
-        <div class="fr-report-stat"><span class="fr-report-num">${calCount}/7</span><span class="fr-report-label">dentro das calorias</span></div>
-        ${burnGoal>0 ? `<div class="fr-report-stat"><span class="fr-report-num">${Math.round(burnedTotal)}</span><span class="fr-report-label">kcal gastas / ${burnGoal}</span></div>` : ''}
+  // Monta o relatório dentro de "container", com troca entre Semana/Mês e setas para períodos anteriores.
+  function mountReportViewer(container, ctx){
+    const st = { mode:'week', offset:0 };
+    const MAX_BACK = 36;
+    container.innerHTML = `
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button type="button" class="fr-tab" data-mode="week" style="flex:1">Semana</button>
+        <button type="button" class="fr-tab" data-mode="month" style="flex:1">Mês</button>
       </div>
-      <div class="fr-detail-section"><h4>Dicas pra próxima semana</h4><ul>${tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;">
+        <button type="button" class="fr-btn-ghost" id="fr-rv-prev" aria-label="Período anterior">&larr; Anterior</button>
+        <div class="fr-hint" id="fr-rv-label" style="text-align:center;margin:0;flex:1"></div>
+        <button type="button" class="fr-btn-ghost" id="fr-rv-next" aria-label="Próximo período">Próximo &rarr;</button>
+      </div>
+      <div id="fr-rv-body"><div class="fr-loading">Carregando...</div></div>`;
+    const bodyEl = container.querySelector('#fr-rv-body');
+    const labelEl = container.querySelector('#fr-rv-label');
+    const prevBtn = container.querySelector('#fr-rv-prev');
+    const nextBtn = container.querySelector('#fr-rv-next');
+    let token = 0;
+    async function draw(){
+      const my = ++token;
+      container.querySelectorAll('[data-mode]').forEach(b=> b.classList.toggle('active', b.getAttribute('data-mode')===st.mode));
+      const r = reportRange(st.mode, st.offset);
+      labelEl.textContent = st.mode==='month'
+        ? r.label + (st.offset===0 ? ' (até hoje)' : '')
+        : formatDateLabel(r.start) + ' até ' + formatDateLabel(r.end);
+      prevBtn.disabled = st.offset >= MAX_BACK;
+      nextBtn.disabled = st.offset <= 0;
+      bodyEl.innerHTML = `<div class="fr-loading">Carregando...</div>`;
+      let rep;
+      try{ rep = await computeReport(ctx.userId, ctx.tg, r.start, r.end, r.n); }
+      catch(e){ if(my===token) bodyEl.innerHTML = `<p class="fr-hint">Não foi possível carregar agora. Tente de novo.</p>`; return; }
+      if(my !== token) return;
+      const n = r.n;
+      const tips = [];
+      if(ctx.withTips){
+        const k = n/7;
+        const burned = rep.burnedTotal;
+        if(rep.trainedCount < 3*k) tips.push(st.mode==='week' ? 'Você treinou menos de 3 dias essa semana. Que tal fixar dias específicos na agenda pra criar o hábito?' : 'Você treinou pouco nesse mês. Que tal fixar dias específicos na agenda pra criar o hábito?');
+        if(rep.waterGoal>0 && rep.waterCount < 4*k) tips.push('A meta de água ficou de fora na maior parte dos dias. Tente deixar uma garrafa visível como lembrete.');
+        if(rep.proteinGoal>0 && rep.proteinCount < 4*k) tips.push('A meta de proteína também ficou baixa. Inclua uma fonte de proteína em cada refeição pra facilitar.');
+        if(rep.calGoal>0 && rep.calCount < 4*k) tips.push('As calorias passaram do previsto na maioria dos dias. Vale revisar as porções das refeições mais calóricas.');
+        if(rep.burnGoal>0 && burned < rep.burnGoal) tips.push(st.mode==='week' ? 'A meta de calorias gastas na semana ainda não foi atingida. Vale intensificar um pouco os treinos ou a atividade dos próximos dias.' : 'A meta de calorias gastas do período não foi atingida. Vale intensificar um pouco os treinos ou a atividade.');
+        if(tips.length===0) tips.push(st.mode==='week' ? 'Semana muito consistente! Continue assim.' : 'Mês muito consistente! Continue assim.');
+      }
+      bodyEl.innerHTML = `
+        <div class="fr-report-grid">
+          <div class="fr-report-stat"><span class="fr-report-num">${rep.trainedCount}/${n}</span><span class="fr-report-label">dias treinados</span></div>
+          <div class="fr-report-stat"><span class="fr-report-num">${rep.waterCount}/${n}</span><span class="fr-report-label">meta de água</span></div>
+          <div class="fr-report-stat"><span class="fr-report-num">${rep.proteinCount}/${n}</span><span class="fr-report-label">meta de proteína</span></div>
+          <div class="fr-report-stat"><span class="fr-report-num">${rep.calCount}/${n}</span><span class="fr-report-label">dentro das calorias</span></div>
+          ${rep.burnGoal>0 ? `<div class="fr-report-stat"><span class="fr-report-num">${Math.round(rep.burnedTotal)}</span><span class="fr-report-label">kcal gastas / ${rep.burnGoal}</span></div>` : ''}
+        </div>
+        ${tips.length ? `<div class="fr-detail-section"><h4>${st.mode==='week' ? 'Dicas pra próxima semana' : 'Dicas pro próximo mês'}</h4><ul>${tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}`;
+    }
+    container.querySelectorAll('[data-mode]').forEach(b=> b.addEventListener('click', ()=>{ st.mode = b.getAttribute('data-mode'); st.offset = 0; draw(); }));
+    prevBtn.addEventListener('click', ()=>{ if(st.offset < MAX_BACK){ st.offset++; draw(); } });
+    nextBtn.addEventListener('click', ()=>{ if(st.offset > 0){ st.offset--; draw(); } });
+    draw();
+  }
+
+  async function openMyReportViewer(){
+    await loadTargetsOnce();
+    const overlay = buildOverlay(`
+      <h3 class="fr-form-title">Meus relatórios</h3>
+      <div id="fr-my-report"></div>
       <button class="fr-btn-primary" id="fr-report-close" style="width:100%;margin-top:16px;">Fechar</button>
     `);
     overlay.querySelector('#fr-report-close').addEventListener('click', closeOverlay);
+    if(!targets || !(Number(targets.calories) || Number(targets.protein) || Number(targets.water_goal_ml))){
+      overlay.querySelector('#fr-my-report').innerHTML = `<p class="fr-hint">Defina suas metas diárias para ver os relatórios.</p>`;
+      return;
+    }
+    mountReportViewer(overlay.querySelector('#fr-my-report'), { userId: currentUser.id, tg: targets, withTips: true });
+  }
+
+  async function generateWeeklyReport(){
+    await openMyReportViewer();
+    notifyLinkedProfessionalOfReport();
+    const { error } = await sb.from('profiles').update({ last_report_shown_date: todayStr() }).eq('id', currentUser.id);
+    if(!error){ currentProfile.last_report_shown_date = todayStr(); }
   }
 
   function openTargetsModal(){
