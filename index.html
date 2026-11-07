@@ -883,27 +883,6 @@
   .fr-overlay-page input, .fr-overlay-page select, .fr-overlay-page textarea, .fr-overlay-page button{ max-width:100%; }
   .fr-load-box{ max-width:100%; box-sizing:border-box; overflow:hidden; }
 
-  /* ---------- Visual novo (teste, só administradores): uma cor de destaque por aba ---------- */
-  /* Em comum nas três abas: mesmo fundo neutro, grafite no texto/filtros/menu e pedra clara em bordas e trilhos. */
-  html:not([data-theme="dark"])[data-tabtheme]{
-    --paper:#F5F3EF; --paper-deep:#EAE6DF; --card:#FFFFFF; --surface:#FFFFFF;
-    --ink:#26282B; --ink-soft:#76787C; --on-accent:#FFFFFF;
-    --border:rgba(38,40,43,0.13); --shadow:0 2px 8px rgba(38,40,43,0.06);
-    --accent-soft:#DDD6CB; --accent-soft-ink:#26282B;
-  }
-  html:not([data-theme="dark"])[data-tabtheme="alimentacao"]{
-    --green:#C08A18; --green-deep:#B07A12; --green-deep-hover:#94650D; --accent:#B07A12;
-  }
-  html:not([data-theme="dark"])[data-tabtheme="treino"]{
-    --green:#2B7380; --green-deep:#1F5F6B; --green-deep-hover:#184D57; --accent:#1F5F6B;
-  }
-  html:not([data-theme="dark"])[data-tabtheme="estudos"]{
-    --green:#3F7D68; --green-deep:#2F6B57; --green-deep-hover:#265847; --accent:#2F6B57; --accent-soft:#E6D9CA;
-  }
-  html:not([data-theme="dark"])[data-tabtheme] body{ background:var(--paper); background-image:none; }
-  html:not([data-theme="dark"])[data-tabtheme] .fr-btn-primary{ color:#fff; }
-  html:not([data-theme="dark"])[data-tabtheme] .fr-view-tab.active,
-  html:not([data-theme="dark"])[data-tabtheme] .fr-tab.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
 </style>
 </head>
 <body>
@@ -3062,7 +3041,7 @@
   // Visual novo em teste: só administradores. Cada grupo de abas tem a sua paleta.
   function applyTabTheme(view){
     const root = document.documentElement;
-    if(!isAdmin){ root.removeAttribute('data-tabtheme'); return; }
+    root.removeAttribute('data-tabtheme'); return; // paleta por aba desligada: visual original
     const grp = (view==='workouts') ? 'treino'
       : (view==='estudos' || view==='leitura' || view==='articles' || view==='ia') ? 'estudos'
       : 'alimentacao';
