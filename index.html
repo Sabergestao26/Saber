@@ -882,6 +882,35 @@
   html, body{ max-width:100%; overflow-x:hidden; }
   .fr-overlay-page input, .fr-overlay-page select, .fr-overlay-page textarea, .fr-overlay-page button{ max-width:100%; }
   .fr-load-box{ max-width:100%; box-sizing:border-box; overflow:hidden; }
+
+  /* ---------- Visual novo (teste, só administradores): uma paleta por aba ---------- */
+  /* Fio condutor entre as abas: grafite quente no texto + dourado-mel nos detalhes. */
+  html:not([data-theme="dark"])[data-tabtheme]{
+    --ink:#2E2A2B; --ink-soft:#7A7172; --gold:#C8A15A;
+    --border:rgba(46,42,43,0.13); --shadow:0 2px 8px rgba(46,42,43,0.08);
+    --card:#FFFDF9; --surface:#FFFEFC; --on-accent:#FFFFFF;
+  }
+  html:not([data-theme="dark"])[data-tabtheme="alimentacao"]{
+    --paper:#F6F1E7; --paper-deep:#EBE4D3; --card:#FFFDF8;
+    --green:#6F8F5E; --green-deep:#5E7F4F; --green-deep-hover:#506C43;
+    --accent:#5E7F4F; --accent-soft:#DCE7D1; --accent-soft-ink:#2F4A25;
+  }
+  html:not([data-theme="dark"])[data-tabtheme="treino"]{
+    --paper:#F6EDE7; --paper-deep:#ECDDD3; --card:#FFFBF8;
+    --green:#C26B4A; --green-deep:#B85F3E; --green-deep-hover:#9E4F32;
+    --accent:#B85F3E; --accent-soft:#F2D6C7; --accent-soft-ink:#6E301A;
+  }
+  html:not([data-theme="dark"])[data-tabtheme="estudos"]{
+    --paper:#EDF0F5; --paper-deep:#DFE4EE; --card:#FBFCFE;
+    --green:#5C6FA8; --green-deep:#55689F; --green-deep-hover:#465787;
+    --accent:#55689F; --accent-soft:#D9DFF0; --accent-soft-ink:#2B3764;
+  }
+  html:not([data-theme="dark"])[data-tabtheme] body{ background:var(--paper); }
+  html:not([data-theme="dark"])[data-tabtheme] .fr-btn-primary{ color:#fff; box-shadow:0 2px 0 var(--gold); }
+  html:not([data-theme="dark"])[data-tabtheme] .fr-view-tab.active,
+  html:not([data-theme="dark"])[data-tabtheme] .fr-tab.active{ background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 2px 0 var(--gold); }
+  html:not([data-theme="dark"])[data-tabtheme] .fr-title::after{ content:""; display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--gold); margin-left:8px; vertical-align:middle; }
+  html:not([data-theme="dark"])[data-tabtheme] .fr-title span.fr-eyebrow::after{ content:none; }
 </style>
 </head>
 <body>
@@ -2832,6 +2861,7 @@
     }
     currentProfile = data;
     isAdmin = !!(data && data.is_admin);
+    try{ applyTabTheme(currentView); }catch(e){}
     profVerified = false;
     {
       const { data: subRow } = await sb.from('subscriptions').select('expires_at').eq('user_id', currentUser.id).maybeSingle();
@@ -3036,7 +3066,17 @@
       btn.style.display='none';
     }
   }
+  // Visual novo em teste: só administradores. Cada grupo de abas tem a sua paleta.
+  function applyTabTheme(view){
+    const root = document.documentElement;
+    if(!isAdmin){ root.removeAttribute('data-tabtheme'); return; }
+    const grp = (view==='workouts') ? 'treino'
+      : (view==='estudos' || view==='leitura' || view==='articles' || view==='ia') ? 'estudos'
+      : 'alimentacao';
+    root.setAttribute('data-tabtheme', grp);
+  }
   function switchView(view){
+    applyTabTheme(view);
     if(view === 'settings' && currentView !== 'settings') settingsSubView = null;
     if(view !== 'leitura') clearInterval(leituraTimerTick);
     currentView = view;
