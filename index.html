@@ -6930,6 +6930,84 @@
     return __tesseractLoadPromise;
   }
 
+  // Prepara a foto do rótulo pro OCR: reduz/amplia pra ~1800px de largura,
+  // tons de cinza e contraste (melhora bastante a leitura de letra pequena).
+  function prepLabelImage(file){
+    return new Promise((resolve)=>{
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = ()=>{
+        try{
+          const targetW = 1800;
+          const scale = Math.min(2.5, targetW / img.width);
+          const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const d = ctx.getImageData(0, 0, w, h), px = d.data;
+          let min = 255, max = 0;
+          for(let i=0;i<px.length;i+=4){
+            const g = Math.round(px[i]*0.299 + px[i+1]*0.587 + px[i+2]*0.114);
+            px[i]=px[i+1]=px[i+2]=g;
+            if(g<min) min=g; if(g>max) max=g;
+          }
+          const range = Math.max(1, max-min);
+          for(let i=0;i<px.length;i+=4){
+            const v = Math.max(0, Math.min(255, (px[i]-min)*255/range));
+            px[i]=px[i+1]=px[i+2]=v;
+          }
+          ctx.putImageData(d, 0, 0);
+          URL.revokeObjectURL(url);
+          c.toBlob(b=> resolve(b || file), 'image/png');
+        }catch(e){ URL.revokeObjectURL(url); resolve(file); }
+      };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  // Lê o texto da tabela nutricional (padrão ANVISA) e tenta achar porção,
+  // kcal, carboidratos, proteínas, gorduras e fibra. Tabelas novas têm duas
+  // colunas (100 g e porção); as antigas só a porção. Sempre fica pra conferência.
+  function parseNutritionLabel(rawText){
+    const lines = (rawText||'').toLowerCase().replace(/,/g,'.').split('\n')
+      .map(l=> l.replace(/\s+/g,' ').trim()).filter(Boolean);
+    const all = lines.join(' \n ');
+    let portionG = null;
+    const pm = all.match(/por[çc][ãa]o\s*(?:de|:)?\s*(\d+(?:\.\d+)?)\s*(g|ml)\b/);
+    if(pm) portionG = parseFloat(pm[1]);
+    const hasPer100 = /100\s*(g|ml)\b/.test(all);
+    function nums(line, unitRe){
+      const clean = line.replace(/\d+(?:\.\d+)?\s*%/g,' ').replace(/\*+/g,' ');
+      const out = [];
+      const re = new RegExp('(\\d+(?:\\.\\d+)?)\\s*'+unitRe+'(?![a-zç])','g');
+      let m; while((m = re.exec(clean))) out.push(parseFloat(m[1]));
+      return out;
+    }
+    function grab(lineTest, unitRe){
+      for(const l of lines){
+        if(lineTest(l)){ const n = nums(l, unitRe); if(n.length) return n; }
+      }
+      return null;
+    }
+    const kcal = grab(l=> /(valor\s*energ|energia|kcal)/.test(l) && /kcal/.test(l), 'kcal');
+    const carb = grab(l=> /carboidrat/.test(l) && !/a[çc][úu]car/.test(l), 'g');
+    const prot = grab(l=> /prote[íi]na/.test(l), 'g');
+    let fat = grab(l=> /gorduras?\s*totais?/.test(l), 'g');
+    if(!fat) fat = grab(l=> /gorduras?/.test(l) && !/(saturad|trans|monoinsat|poliinsat|boas)/.test(l), 'g');
+    const fiber = grab(l=> /fibra/.test(l), 'g');
+    const two = hasPer100 && [kcal,carb,prot,fat].some(a=> a && a.length>=2);
+    const pick = (a, i)=> (a && a[i]!=null) ? a[i] : null;
+    const col = (i)=> ({ kcal:pick(kcal,i), carb:pick(carb,i), prot:pick(prot,i), fat:pick(fat,i), fiber:pick(fiber,i) });
+    const found = [kcal,carb,prot,fat].filter(Boolean).length;
+    return {
+      portionG, found,
+      base: two ? 'p100' : 'portion',
+      p100: two ? col(0) : null,
+      portion: two ? col(1) : col(0)
+    };
+  }
+
   // Tenta adivinhar nome/séries/repetições/descanso a partir do texto bruto
   // reconhecido na foto. É uma heurística simples (sem IA paga) — por isso o
   // resultado sempre fica pra revisão da pessoa antes de salvar.
@@ -9126,7 +9204,43 @@
             </div>
             <div class="fr-hint" style="margin:10px 0 4px;">Valores da tabela TACO (base oficial brasileira), por 100g.</div>
           </div>
+          <button type="button" class="fr-btn-ghost" id="fr-food-label-toggle" style="width:100%;margin-top:6px;">Ler o rótulo do produto (foto)</button>
           <button type="button" class="fr-btn-ghost" id="fr-food-manual-toggle" style="width:100%;margin-top:6px;">Não encontrei — informar valores manualmente</button>
+          <div id="fr-food-label-wrap" style="display:none">
+            <p class="fr-hint" style="margin:8px 0;">Fotografe a tabela nutricional da embalagem, de frente, com boa luz e sem cortar. A foto é lida aqui no seu celular e não é enviada nem guardada.</p>
+            <button type="button" class="fr-btn-primary" id="fr-label-photo-btn" style="width:100%;">Tirar foto ou escolher da galeria</button>
+            <input type="file" id="fr-label-file" accept="image/*" style="display:none">
+            <p class="fr-hint" id="fr-label-status" style="display:none;margin:8px 0;"></p>
+            <div id="fr-label-fields" style="display:none;margin-top:10px;">
+              <div class="fr-field"><label for="fr-label-name">Nome do produto</label><input type="text" id="fr-label-name" placeholder="ex.: Iogurte natural, barra de cereal..."></div>
+              <div class="fr-row">
+                <div class="fr-field"><label for="fr-label-base">Valores do rótulo são por</label>
+                  <select id="fr-label-base"><option value="portion">Porção</option><option value="p100">100 g / 100 ml</option></select>
+                </div>
+                <div class="fr-field"><label for="fr-label-portion">Tamanho da porção (g/ml)</label><input type="number" min="0" step="0.1" id="fr-label-portion" value=""></div>
+              </div>
+              <div class="fr-row4">
+                <div class="fr-field"><label for="fr-label-kcal">Kcal</label><input type="number" min="0" step="0.1" id="fr-label-kcal"></div>
+                <div class="fr-field"><label for="fr-label-prot">Proteína (g)</label><input type="number" min="0" step="0.1" id="fr-label-prot"></div>
+                <div class="fr-field"><label for="fr-label-carb">Carbo (g)</label><input type="number" min="0" step="0.1" id="fr-label-carb"></div>
+                <div class="fr-field"><label for="fr-label-fat">Gordura (g)</label><input type="number" min="0" step="0.1" id="fr-label-fat"></div>
+              </div>
+              <div class="fr-field"><label for="fr-label-fiber">Fibra (g)</label><input type="number" min="0" step="0.1" id="fr-label-fiber"></div>
+              <div class="fr-row">
+                <div class="fr-field"><label for="fr-label-qty">Quantidade consumida</label><input type="number" min="0" step="0.25" id="fr-label-qty" value="1"></div>
+                <div class="fr-field"><label for="fr-label-unit">Em</label>
+                  <select id="fr-label-unit"><option value="portion">Porções</option><option value="g">Gramas / ml</option></select>
+                </div>
+              </div>
+              <div class="fr-log-preview">
+                <div><span class="v" id="fr-lb-cal">0</span><span class="l">kcal</span></div>
+                <div><span class="v" id="fr-lb-prot">0</span><span class="l">ptn</span></div>
+                <div><span class="v" id="fr-lb-carb">0</span><span class="l">carb</span></div>
+                <div><span class="v" id="fr-lb-fat">0</span><span class="l">gord</span></div>
+                <div><span class="v" id="fr-lb-fiber">0</span><span class="l">fibra</span></div>
+              </div>
+            </div>
+          </div>
           <div id="fr-food-manual-wrap" style="display:none">
             <div class="fr-field"><label for="fr-log-name">Nome do alimento</label><input type="text" id="fr-log-name" placeholder="ex.: Banana, iogurte, pão francês..."></div>
             <div class="fr-row4">
@@ -9192,13 +9306,79 @@
     const foodPickedLabel = overlay.querySelector('#fr-food-picked-label');
     const foodQtyInput = overlay.querySelector('#fr-food-qty');
 
-    foodManualToggle.addEventListener('click', ()=>{
-      customMode = customMode === 'search' ? 'manual' : 'search';
-      foodSearchWrap.style.display = customMode==='search' ? '' : 'none';
-      foodManualWrap.style.display = customMode==='manual' ? '' : 'none';
-      foodManualToggle.textContent = customMode==='search'
-        ? 'Não encontrei — informar valores manualmente'
-        : 'Voltar a buscar na base de alimentos';
+    const foodLabelWrap = overlay.querySelector('#fr-food-label-wrap');
+    const foodLabelToggle = overlay.querySelector('#fr-food-label-toggle');
+    function setCustomMode(m){
+      customMode = m;
+      foodSearchWrap.style.display = m==='search' ? '' : 'none';
+      foodManualWrap.style.display = m==='manual' ? '' : 'none';
+      foodLabelWrap.style.display = m==='label' ? '' : 'none';
+      foodManualToggle.style.display = m==='label' ? 'none' : '';
+      foodLabelToggle.style.display = m==='manual' ? 'none' : '';
+      foodManualToggle.textContent = m==='manual' ? 'Voltar a buscar na base de alimentos' : 'Não encontrei — informar valores manualmente';
+      foodLabelToggle.textContent = m==='label' ? 'Voltar a buscar na base de alimentos' : 'Ler o rótulo do produto (foto)';
+    }
+    foodManualToggle.addEventListener('click', ()=> setCustomMode(customMode==='manual' ? 'search' : 'manual'));
+    foodLabelToggle.addEventListener('click', ()=> setCustomMode(customMode==='label' ? 'search' : 'label'));
+
+    // ----- Leitura do rótulo por foto -----
+    const lbEl = id=> overlay.querySelector('#fr-label-'+id);
+    let lbRead = null;
+    function lbNum(id){ const v = parseFloat(lbEl(id).value); return isNaN(v) ? 0 : v; }
+    function lbFactor(){
+      // quantas "bases" do rótulo (porção ou 100 g) foram consumidas
+      const baseG = lbEl('base').value==='p100' ? 100 : lbNum('portion');
+      const portionG = lbNum('portion');
+      const qty = lbNum('qty');
+      const consumedG = lbEl('unit').value==='portion' ? qty*portionG : qty;
+      if(!baseG || !consumedG) return { factor:0, consumedG:0 };
+      return { factor: consumedG/baseG, consumedG };
+    }
+    function lbUpdate(){
+      const { factor } = lbFactor();
+      const set = (id, key)=> overlay.querySelector('#fr-lb-'+id).textContent = Math.round(lbNum(key)*factor);
+      set('cal','kcal'); set('prot','prot'); set('carb','carb'); set('fat','fat'); set('fiber','fiber');
+    }
+    ['base','portion','kcal','prot','carb','fat','fiber','qty','unit'].forEach(id=>{
+      lbEl(id).addEventListener('input', lbUpdate);
+      lbEl(id).addEventListener('change', lbUpdate);
+    });
+    function lbFill(base){
+      if(!lbRead) return;
+      const c = lbRead[base] || lbRead.portion;
+      const put = (id, v)=> lbEl(id).value = (v==null ? '' : v);
+      put('kcal', c.kcal); put('prot', c.prot); put('carb', c.carb); put('fat', c.fat); put('fiber', c.fiber);
+    }
+    lbEl('base').addEventListener('change', ()=> lbFill(lbEl('base').value));
+    const lbBtn = lbEl('photo-btn'), lbFile = lbEl('file'), lbStatus = lbEl('status');
+    lbBtn.addEventListener('click', ()=> lbFile.click());
+    lbFile.addEventListener('change', async function(){
+      const file = this.files[0];
+      this.value = '';
+      if(!file) return;
+      lbStatus.style.display = '';
+      lbStatus.textContent = 'Lendo o rótulo... na primeira vez pode levar até um minuto.';
+      lbBtn.disabled = true;
+      try{
+        await loadTesseract();
+        const prepped = await prepLabelImage(file);
+        const { data } = await Tesseract.recognize(prepped, 'por');
+        lbRead = parseNutritionLabel(data.text || '');
+        overlay.querySelector('#fr-label-fields').style.display = '';
+        if(lbRead.portionG) lbEl('portion').value = lbRead.portionG;
+        lbEl('base').value = lbRead.base;
+        lbFill(lbRead.base);
+        lbUpdate();
+        lbStatus.textContent = lbRead.found >= 3
+          ? 'Li o rótulo. Confira cada número com a embalagem antes de registrar: a leitura por foto pode errar.'
+          : 'Consegui ler só parte do rótulo. Complete os campos que ficaram vazios olhando a embalagem, ou tire outra foto mais nítida.';
+      }catch(err){
+        console.error(err);
+        overlay.querySelector('#fr-label-fields').style.display = '';
+        lbStatus.textContent = 'Não consegui ler essa foto agora. Tente outra foto (nítida, sem reflexo) ou preencha os campos à mão.';
+      }finally{
+        lbBtn.disabled = false;
+      }
     });
 
     function renderFoodResults(query){
@@ -9297,6 +9477,16 @@
             user_id: currentUser.id, date, meal_type: mealType, source:'food', name: selectedFood.name, quantity: qty,
             calories: selectedFood.kcal*factor, protein: selectedFood.protein*factor,
             carbs: selectedFood.carbs*factor, fat: selectedFood.fat*factor, fiber: n0(selectedFood.fiber)*factor
+          };
+        } else if(customMode === 'label'){
+          const name = lbEl('name').value.trim();
+          if(!name){ showToast('Dê um nome ao produto.', 'err'); lbEl('name').focus(); return; }
+          const { factor, consumedG } = lbFactor();
+          if(!factor){ showToast('Informe o tamanho da porção e a quantidade consumida.', 'err'); return; }
+          entry = {
+            user_id: currentUser.id, date, meal_type: mealType, source:'food', name, quantity: Math.round(consumedG*10)/10,
+            calories: lbNum('kcal')*factor, protein: lbNum('prot')*factor,
+            carbs: lbNum('carb')*factor, fat: lbNum('fat')*factor, fiber: lbNum('fiber')*factor
           };
         } else {
           const name = document.getElementById('fr-log-name').value.trim();
