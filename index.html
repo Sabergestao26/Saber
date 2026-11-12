@@ -6930,6 +6930,21 @@
     return __tesseractLoadPromise;
   }
 
+  // Leitor de código de barras/QR (carrega só quando o botão é usado)
+  let __h5qLoadPromise = null;
+  function loadHtml5Qrcode(){
+    if(window.Html5Qrcode) return Promise.resolve();
+    if(__h5qLoadPromise) return __h5qLoadPromise;
+    __h5qLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      s.onload = ()=> resolve();
+      s.onerror = ()=> { __h5qLoadPromise = null; reject(new Error('Falha ao carregar leitor')); };
+      document.head.appendChild(s);
+    });
+    return __h5qLoadPromise;
+  }
+
   // Prepara a foto do rótulo pro OCR: reduz/amplia pra ~1800px de largura,
   // tons de cinza e contraste (melhora bastante a leitura de letra pequena).
   function prepLabelImage(file){
@@ -9162,6 +9177,7 @@
     const defaultMeal = guessMealTypeByTime();
     const overlay = buildOverlay(`
       <h3 class="fr-form-title">Registrar alimento</h3>
+      <button type="button" class="fr-btn-primary" id="fr-scan-shortcut" style="width:100%;margin-bottom:12px;">Escanear produto (código de barras ou rótulo)</button>
       <div class="fr-log-subtabs">
         <button type="button" class="fr-log-subtab ${hasRecipes && recipeKind==='fitness'?'active':''}" id="fr-subtab-fit" ${kindCount.fitness?'':'disabled'}>Receitas fitness</button>
         <button type="button" class="fr-log-subtab ${hasRecipes && recipeKind==='tradicional'?'active':''}" id="fr-subtab-trad" ${kindCount.tradicional?'':'disabled'}>Receitas tradicionais</button>
@@ -9207,8 +9223,11 @@
           <button type="button" class="fr-btn-ghost" id="fr-food-label-toggle" style="width:100%;margin-top:6px;">Ler o rótulo do produto (foto)</button>
           <button type="button" class="fr-btn-ghost" id="fr-food-manual-toggle" style="width:100%;margin-top:6px;">Não encontrei — informar valores manualmente</button>
           <div id="fr-food-label-wrap" style="display:none">
-            <p class="fr-hint" style="margin:8px 0;">Fotografe a tabela nutricional da embalagem, de frente, com boa luz e sem cortar. A foto é lida aqui no seu celular e não é enviada nem guardada.</p>
-            <button type="button" class="fr-btn-primary" id="fr-label-photo-btn" style="width:100%;">Tirar foto ou escolher da galeria</button>
+            <button type="button" class="fr-btn-primary" id="fr-label-barcode-btn" style="width:100%;margin-top:8px;">Ler código de barras ou QR Code</button>
+            <div id="fr-label-reader" style="display:none;width:100%;margin-top:8px;border-radius:8px;overflow:hidden;"></div>
+            <button type="button" class="fr-btn-ghost" id="fr-label-barcode-stop" style="display:none;width:100%;margin-top:6px;">Fechar câmera</button>
+            <p class="fr-hint" style="margin:8px 0;">Aponte a câmera para o código de barras da embalagem. Se o produto não estiver na base, fotografe a tabela nutricional (de frente, com boa luz e sem cortar): a foto é lida aqui no seu celular e não é enviada nem guardada.</p>
+            <button type="button" class="fr-btn-ghost" id="fr-label-photo-btn" style="width:100%;">Fotografar a tabela nutricional (ou escolher da galeria)</button>
             <input type="file" id="fr-label-file" accept="image/*" style="display:none">
             <p class="fr-hint" id="fr-label-status" style="display:none;margin:8px 0;"></p>
             <div id="fr-label-fields" style="display:none;margin-top:10px;">
@@ -9350,6 +9369,93 @@
       put('kcal', c.kcal); put('prot', c.prot); put('carb', c.carb); put('fat', c.fat); put('fiber', c.fiber);
     }
     lbEl('base').addEventListener('change', ()=> lbFill(lbEl('base').value));
+    // ----- Código de barras / QR (consulta a base aberta Open Food Facts) -----
+    const lbShow = ()=> { overlay.querySelector('#fr-label-fields').style.display = ''; };
+    let lbScanner = null;
+    async function lbStopScan(){
+      const readerEl = lbEl('reader');
+      try{ if(lbScanner){ await lbScanner.stop(); lbScanner.clear(); } }catch(e){}
+      lbScanner = null;
+      readerEl.style.display = 'none';
+      lbEl('barcode-stop').style.display = 'none';
+      lbEl('barcode-btn').style.display = '';
+    }
+    async function lbLookupBarcode(code){
+      lbStatus.style.display = '';
+      lbStatus.textContent = 'Procurando o produto ' + code + '...';
+      try{
+        const res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(code) + '.json?fields=product_name,brands,nutriments,serving_quantity');
+        const j = await res.json();
+        if(!j || j.status !== 1 || !j.product){
+          lbStatus.textContent = 'Esse produto não está na base. Fotografe a tabela nutricional da embalagem ou preencha os campos à mão.';
+          lbShow();
+          return;
+        }
+        const p = j.product, n = p.nutriments || {};
+        const num = v=> (v==null || v==='' || isNaN(Number(v))) ? null : Math.round(Number(v)*10)/10;
+        let kcal = num(n['energy-kcal_100g']);
+        if(kcal==null && n['energy_100g']!=null) kcal = num(Number(n['energy_100g'])/4.184);
+        const p100 = { kcal, prot:num(n['proteins_100g']), carb:num(n['carbohydrates_100g']), fat:num(n['fat_100g']), fiber:num(n['fiber_100g']) };
+        const portionG = num(p.serving_quantity) || null;
+        const per = portionG ? Object.fromEntries(Object.entries(p100).map(([k,v])=> [k, v==null ? null : Math.round(v*portionG/100*10)/10])) : p100;
+        lbRead = { portionG, found: [p100.kcal,p100.prot,p100.carb,p100.fat].filter(v=>v!=null).length, base:'p100', p100, portion: per };
+        lbShow();
+        const brand = (p.brands||'').split(',')[0].trim();
+        lbEl('name').value = [p.product_name||'', brand].filter(Boolean).join(' - ');
+        lbEl('portion').value = portionG || '';
+        lbEl('base').value = 'p100';
+        lbFill('p100');
+        if(portionG){ lbEl('unit').value = 'portion'; lbEl('qty').value = 1; }
+        else { lbEl('unit').value = 'g'; lbEl('qty').value = 100; }
+        lbUpdate();
+        lbStatus.textContent = 'Encontrei o produto na base aberta Open Food Facts (colaborativa). Confira os números com a embalagem e informe quanto você comeu.';
+      }catch(err){
+        console.error(err);
+        lbStatus.textContent = 'Não consegui consultar a base agora (sem internet?). Fotografe a tabela nutricional ou preencha à mão.';
+        lbShow();
+      }
+    }
+    lbEl('barcode-btn').addEventListener('click', async ()=>{
+      lbStatus.style.display = '';
+      lbStatus.textContent = 'Abrindo a câmera... permita o acesso quando o celular pedir.';
+      try{
+        await loadHtml5Qrcode();
+        const readerEl = lbEl('reader');
+        readerEl.style.display = '';
+        lbEl('barcode-btn').style.display = 'none';
+        lbEl('barcode-stop').style.display = '';
+        lbScanner = new Html5Qrcode('fr-label-reader');
+        const F = Html5QrcodeSupportedFormats;
+        let handled = false;
+        await lbScanner.start(
+          { facingMode:'environment' },
+          { fps:10, qrbox:{ width:260, height:140 }, formatsToSupport:[F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.QR_CODE] },
+          async (text)=>{
+            if(handled) return;
+            const code = String(text||'').trim();
+            if(/^\d{8,14}$/.test(code)){
+              handled = true;
+              await lbStopScan();
+              lbLookupBarcode(code);
+            } else {
+              lbStatus.textContent = 'Esse QR Code não é de um produto (é um link ou texto). Aponte para o código de barras da embalagem.';
+            }
+          },
+          ()=>{}
+        );
+        lbStatus.textContent = 'Aponte a câmera para o código de barras da embalagem.';
+      }catch(err){
+        console.error(err);
+        await lbStopScan();
+        lbStatus.textContent = 'Não consegui abrir a câmera. Permita o acesso à câmera nas configurações do celular, ou fotografe a tabela nutricional.';
+      }
+    });
+    lbEl('barcode-stop').addEventListener('click', ()=> lbStopScan());
+    // se a tela for fechada com a câmera aberta, desliga a câmera
+    const lbObs = new MutationObserver(()=>{ if(!document.body.contains(overlay)){ lbObs.disconnect(); lbStopScan(); } });
+    lbObs.observe(document.body, { childList:true, subtree:true });
+    // atalho no topo: abre direto o modo "ler produto"
+    overlay.querySelector('#fr-scan-shortcut').addEventListener('click', ()=>{ setSource('custom'); setCustomMode('label'); });
     const lbBtn = lbEl('photo-btn'), lbFile = lbEl('file'), lbStatus = lbEl('status');
     lbBtn.addEventListener('click', ()=> lbFile.click());
     lbFile.addEventListener('change', async function(){
