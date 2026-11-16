@@ -895,6 +895,34 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
   }
   /* PLAN_GENERATOR_END */
 
+  /* ---------- Quem enviou + data e hora (usado em todas as pendências) ---------- */
+  async function whoMap(ids){
+    ids = [...new Set((ids||[]).filter(Boolean))];
+    const map = {};
+    if(!ids.length) return map;
+    const { data, error } = await sb.rpc('admin_user_names', { p_ids: ids });
+    if(!error && Array.isArray(data)){
+      data.forEach(r=>{ map[r.id] = { email: r.email, name: r.name }; });
+    } else {
+      const { data: profs } = await sb.from('profiles').select('id, email, display_name').in('id', ids);
+      (profs||[]).forEach(r=>{ map[r.id] = { email: r.email, name: r.display_name }; });
+    }
+    return map;
+  }
+  function whoHtml(id, map){
+    const w = (map && map[id]) || {};
+    const parts = [w.name, w.email].filter(Boolean);
+    return parts.length ? esc(parts.join(' · ')) : 'Pessoa não identificada';
+  }
+  function whenHtml(ts){
+    if(!ts) return '—';
+    const d = new Date(ts);
+    return esc(d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }));
+  }
+  function whoWhenLine(id, ts, map, label){
+    return `<b>${label || 'Enviado por'}:</b> ${whoHtml(id, map)}<br><b>Data e hora:</b> ${whenHtml(ts)}`;
+  }
+
   /* ---------- Avaliações e reclamações sobre profissionais ---------- */
   async function renderProfFeedbackArea(){
     const el = document.getElementById('prof-feedback-area');
@@ -906,6 +934,7 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     const profIds = list.map(f=>f.professional_id);
     const { data: profs } = await sb.from('profiles').select('id, email, professional_label').in('id', profIds);
     const profById = {}; (profs||[]).forEach(p=> profById[p.id]=p);
+    const whoF = await whoMap(list.map(f=>f.client_id));
     el.innerHTML = list.map(f=>{
       const prof = profById[f.professional_id] || {};
       const isComplaint = f.kind === 'reclamacao';
@@ -913,8 +942,8 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
         <div class="review-item" data-id="${f.id}" ${isComplaint ? 'style="border-color:var(--rust);"' : ''}>
           <div class="review-name">${isComplaint ? 'Reclamação' : 'Avaliação'} sobre ${esc(prof.email || 'profissional')} ${prof.professional_label ? '· ' + esc(prof.professional_label) : ''}</div>
           <div class="review-meta">
+            ${whoWhenLine(f.client_id, f.created_at, whoF)}<br>
             ${f.rating ? 'Nota: ' + '★'.repeat(f.rating) + '☆'.repeat(5-f.rating) + '<br>' : ''}
-            ${new Date(f.created_at).toLocaleString('pt-BR')}
             ${f.message ? `<br>"${esc(f.message)}"` : ''}
           </div>
           <div class="review-actions">
@@ -962,6 +991,7 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     const userIds = list.map(v=>v.user_id);
     const { data: profs } = await sb.from('profiles').select('id, email, professional_label').in('id', userIds);
     const profById = {}; (profs||[]).forEach(p=> profById[p.id]=p);
+    const whoD = await whoMap(userIds);
 
     const rows = await Promise.all(list.map(async (v)=>{
       const prof = profById[v.user_id] || {};
@@ -974,10 +1004,10 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
       const copyBtn = v.registration_number ? `<button type="button" data-copy="${escAttr(v.registration_number)}" style="width:auto;display:inline-block;padding:3px 10px;font-size:12px;font-weight:600;margin-left:8px;vertical-align:middle;background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:6px;">Copiar número</button>` : '';
       return `
         <div class="review-item" data-user="${v.user_id}">
-          <div class="review-name">${esc(prof.email || 'Pessoa')} · ${esc(prof.professional_label || 'Profissional')}</div>
+          <div class="review-name">${whoHtml(v.user_id, whoD)} · ${esc(prof.professional_label || 'Profissional')}</div>
           <div class="review-meta">
-            Registro informado: <b>${esc(v.registration_number || '—')}</b>${copyBtn}<br>
-            Enviado em: ${v.submitted_at ? new Date(v.submitted_at).toLocaleString('pt-BR') : '—'}
+            ${whoWhenLine(v.user_id, v.submitted_at, whoD, 'Enviado por')}<br>
+            Registro informado: <b>${esc(v.registration_number || '—')}</b>${copyBtn}
           </div>
           ${docUrl ? `<a href="${docUrl}" target="_blank" rel="noopener" style="display:block;margin-bottom:8px;"><img src="${docUrl}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);display:block;"></a>` : '<p class="hint">Não foi possível carregar a foto.</p>'}
           ${council ? `<a href="${council.url}" target="_blank" rel="noopener" class="hint" style="display:block;margin-bottom:10px;">${esc(council.label)} ↗</a>` : ''}
@@ -1041,12 +1071,12 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     pendingCounts.assessments = list.length; refreshBadges();
     if(list.length===0){ el.innerHTML = `<p class="hint">Nenhuma avaliação pendente.</p>`; return; }
     const userIds = list.map(a=>a.user_id);
-    const { data: profs } = await sb.from('profiles').select('id, email').in('id', userIds);
-    const emailById = {}; (profs||[]).forEach(p=> emailById[p.id]=p.email);
+    const whoA = await whoMap(userIds);
     el.innerHTML = list.map(a=>`
       <div class="review-item" data-id="${a.id}">
-        <div class="review-name">${esc(emailById[a.user_id]||'Pessoa')}</div>
+        <div class="review-name">${whoHtml(a.user_id, whoA)}</div>
         <div class="review-meta">
+          ${whoWhenLine(a.user_id, a.created_at, whoA, 'Solicitado por')}<br>
           Objetivo: ${esc(a.goal)} · Nível: ${esc(a.level)} · ${esc(a.days_per_week)}x/semana · Local: ${a.location==='casa' ? 'Casa (sem equipamento)' : 'Academia'} · Liberação médica: ${esc(a.medical_clearance)}<br>
           Limitações: ${a.limitations && a.limitations.length ? esc(a.limitations.map(l=>LIMITATION_LABELS[l]||l).join(', ')) : '—'}
           ${assessmentExtraHtml(a)}
@@ -1098,10 +1128,11 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     const list = data || [];
     pendingCounts.suggestions = list.length; refreshBadges();
     if(list.length===0){ el.innerHTML = `<p class="hint">Nenhuma sugestão pendente.</p>`; return; }
+    const whoS = await whoMap(list.map(x=>x.submitted_by));
     el.innerHTML = list.map(s=>`
       <div class="review-item" data-id="${s.id}">
         <div class="review-name">${esc(s.name)}</div>
-        <div class="review-meta">${Math.round(s.kcal||0)} kcal · P:${Math.round(s.protein||0)}g C:${Math.round(s.carbs||0)}g G:${Math.round(s.fat||0)}g${s.fiber!=null?` F:${Math.round(s.fiber)}g`:''} <i>(por porção informada)</i></div>
+        <div class="review-meta">${whoWhenLine(s.submitted_by, s.created_at, whoS, 'Sugerido por')}<br>${Math.round(s.kcal||0)} kcal · P:${Math.round(s.protein||0)}g C:${Math.round(s.carbs||0)}g G:${Math.round(s.fat||0)}g${s.fiber!=null?` F:${Math.round(s.fiber)}g`:''} <i>(por porção informada)</i></div>
         <div class="review-actions">
           <button data-action="approve" data-id="${s.id}">Aprovar e adicionar</button>
           <button class="danger" data-action="reject" data-id="${s.id}">Rejeitar</button>
@@ -1139,9 +1170,10 @@ table.us-t{width:100%;border-collapse:collapse;font-size:13px;}
     const list = data || [];
     pendingCounts.problems = list.length; refreshBadges();
     if(list.length===0){ el.innerHTML = `<p class="hint">Nenhum problema pendente.</p>`; return; }
+    const whoP = await whoMap(list.map(x=>x.submitted_by));
     el.innerHTML = list.map(r=>`
       <div class="review-item" data-id="${r.id}">
-        <div class="review-meta" style="margin-bottom:6px;">${new Date(r.created_at).toLocaleString('pt-BR')}${r.page_context ? ' · tela: ' + esc(r.page_context) : ''}</div>
+        <div class="review-meta" style="margin-bottom:6px;">${whoWhenLine(r.submitted_by, r.created_at, whoP, 'Enviado por')}${r.page_context ? '<br><b>Tela:</b> ' + esc(r.page_context) : ''}</div>
         <div class="review-name" style="font-weight:400;white-space:pre-wrap;">${esc(r.message)}</div>
         <div class="review-actions" style="margin-top:10px;">
           <button data-action="resolve" data-id="${r.id}">Marcar como resolvido</button>
