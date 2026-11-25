@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saber-v2';
+const CACHE_NAME = 'saber-v3';
 const ASSETS = [
   './',
   './index.html',
